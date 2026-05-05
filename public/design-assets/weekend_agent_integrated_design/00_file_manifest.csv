@@ -1,0 +1,137 @@
+﻿sequence,filename,platform,source,title,note
+1,001_D43_home_landing_v1_refined_bold_nav.svg,desktop,desktop_svg-43,官网首页,原 43 页保留并加粗
+2,002_D43_identity_choice_guest_login_register_v1_refined_bold_nav.svg,desktop,desktop_svg-43,身份选择：游客 / 登录 / 注册,原 43 页保留并加粗
+3,003_D43_guest_default_profile_modal_v1_refined_bold_nav.svg,desktop,desktop_svg-43,游客默认画像弹窗,原 43 页保留并加粗
+4,004_D43_login_separate_v1_refined_bold_nav.svg,desktop,desktop_svg-43,独立登录页,原 43 页保留并加粗
+5,005_D43_register_separate_v1_refined_bold_nav.svg,desktop,desktop_svg-43,独立注册页,原 43 页保留并加粗
+6,006_D43_profile_center_public_v1_refined_bold_nav.svg,desktop,desktop_svg-43,个人中心入口,原 43 页保留并加粗
+7,007_D43_profile_setup_city_modal_v1_refined_bold_nav.svg,desktop,desktop_svg-43,画像设置：城市,原 43 页保留并加粗
+8,008_D43_profile_setup_family_modal_v1_refined_bold_nav.svg,desktop,desktop_svg-43,画像设置：家庭成员,原 43 页保留并加粗
+9,009_D43_profile_setup_budget_modal_v1_refined_bold_nav.svg,desktop,desktop_svg-43,画像设置：预算习惯,原 43 页保留并加粗
+10,010_D43_profile_memory_dashboard_v1_refined_bold_nav.svg,desktop,desktop_svg-43,记忆与画像中心,原 43 页保留并加粗
+11,011_D43_feature_hub_try_first_v1_refined_bold_nav.svg,desktop,desktop_svg-43,功能页卡 / 先试试,原 43 页保留并加粗
+12,012_D43_demand_chat_collection_v1_refined_bold_nav.svg,desktop,desktop_svg-43,对话式需求收集,原 43 页保留并加粗
+13,013_D43_demand_chat_constraint_popup_v1_refined_bold_nav.svg,desktop,desktop_svg-43,对话内约束弹窗,原 43 页保留并加粗
+14,014_D43_demand_preparse_three_plans_card_v1_refined_bold_nav.svg,desktop,desktop_svg-43,预解析三套方案卡片,原 43 页保留并加粗
+15,015_D43_agent_workbench_embedded_v1_refined_bold_nav.svg,desktop,desktop_svg-43,Agent 工作台,原 43 页保留并加粗
+16,016_D43_plan_result_overview_v1_refined_bold_nav.svg,desktop,desktop_svg-43,结果总览,原 43 页保留并加粗
+17,017_D43_plan_compare_v1_refined_bold_nav.svg,desktop,desktop_svg-43,多方案对比,原 43 页保留并加粗
+18,018_D43_route_booking_v1_refined_bold_nav.svg,desktop,desktop_svg-43,路线与预订,原 43 页保留并加粗
+19,019_D43_authorization_modal_v1_refined_bold_nav.svg,desktop,desktop_svg-43,授权弹窗,原 43 页保留并加粗
+20,020_D43_execution_actions_v1_refined_bold_nav.svg,desktop,desktop_svg-43,执行动作页,原 43 页保留并加粗
+21,021_D43_share_calendar_collaboration_v1_refined_bold_nav.svg,desktop,desktop_svg-43,分享与日历协作,原 43 页保留并加粗
+22,022_D43_collaboration_review_v1_refined_bold_nav.svg,desktop,desktop_svg-43,协作确认页,原 43 页保留并加粗
+23,023_D43_trip_feedback_rating_v1_refined_bold_nav.svg,desktop,desktop_svg-43,行程评分反馈,原 43 页保留并加粗
+24,024_D43_history_insights_v1_refined_bold_nav.svg,desktop,desktop_svg-43,历史与洞察,原 43 页保留并加粗
+25,025_D43_place_detail_v1_refined_bold_nav.svg,desktop,desktop_svg-43,地点详情,原 43 页保留并加粗
+26,026_D43_booking_checkout_v1_refined_bold_nav.svg,desktop,desktop_svg-43,预订结算,原 43 页保留并加粗
+27,027_D43_emergency_replan_v1_refined_bold_nav.svg,desktop,desktop_svg-43,临时改约 / 重新规划,原 43 页保留并加粗
+28,028_D43_notification_center_profile_v1_refined_bold_nav.svg,desktop,desktop_svg-43,通知中心,原 43 页保留并加粗
+29,029_D43_privacy_security_profile_v1_refined_bold_nav.svg,desktop,desktop_svg-43,隐私与安全,原 43 页保留并加粗
+30,030_D43_developer_console_api_key_v1_refined_bold_nav.svg,desktop,desktop_svg-43,开发者控制台 / API Key,原 43 页保留并加粗
+31,031_D43_account_settings_v1_refined_bold_nav.svg,desktop,desktop_svg-43,账号设置,原 43 页保留并加粗
+32,032_D43_admin_quality_dashboard_v1_refined_bold_nav.svg,desktop,desktop_svg-43,质量看板,原 43 页保留并加粗
+33,033_D43_ui_design_system_v1_refined_bold_nav.svg,desktop,desktop_svg-43,UI 设计系统,原 43 页保留并加粗
+34,034_D43_product_workflow_highlights_v1_refined_bold_nav.svg,desktop,desktop_svg-43,产品流程亮点,原 43 页保留并加粗
+35,035_D43_task_workflow_highlights_v1_refined_bold_nav.svg,desktop,desktop_svg-43,任务工作流亮点,原 43 页保留并加粗
+36,036_D43_data_requirements_matrix_v1_refined_bold_nav.svg,desktop,desktop_svg-43,数据需求矩阵,原 43 页保留并加粗
+37,037_D43_modal_library_v1_refined_bold_nav.svg,desktop,desktop_svg-43,弹窗组件库,原 43 页保留并加粗
+38,038_D43_status_empty_loading_error_states_v1_refined_bold_nav.svg,desktop,desktop_svg-43,状态页组件,原 43 页保留并加粗
+39,039_D43_group_preferences_v1_refined_bold_nav.svg,desktop,desktop_svg-43,多人偏好设置,原 43 页保留并加粗
+40,040_D43_plan_version_history_v1_refined_bold_nav.svg,desktop,desktop_svg-43,方案版本历史,原 43 页保留并加粗
+41,041_D43_team_pricing_v1_refined_bold_nav.svg,desktop,desktop_svg-43,团队定价页,原 43 页保留并加粗
+42,042_D43_marketing_longpage_v1_refined_bold_nav.svg,desktop,desktop_svg-43,营销长页,原 43 页保留并加粗
+43,043_D43_mobile_key_flow_v1_refined_bold_nav.svg,desktop,desktop_svg-43,移动端关键流程总览,原 43 页保留并加粗
+44,044_I28_home_landing_v2_desktop_nav_variant.svg,desktop,individual_svg-28,官网首页,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+45,045_I28_solution_cards_v2_desktop_nav_variant.svg,desktop,individual_svg-28,方案卡片页,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+46,046_I28_auth_login_register_v2_desktop_nav_variant.svg,desktop,individual_svg-28,登录注册合并原稿,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+47,047_I28_onboarding_preferences_v2_desktop_nav_variant.svg,desktop,individual_svg-28,首次偏好设置,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+48,048_I28_feature_hub_try_first_v2_desktop_nav_variant.svg,desktop,individual_svg-28,功能页卡 / 先试试,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+49,049_I28_demand_builder_v2_desktop_nav_variant.svg,desktop,individual_svg-28,需求构建器,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+50,050_I28_agent_workbench_v2_desktop_nav_variant.svg,desktop,individual_svg-28,Agent 工作台,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+51,051_I28_plan_result_overview_v2_desktop_nav_variant.svg,desktop,individual_svg-28,结果总览,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+52,052_I28_route_booking_v2_desktop_nav_variant.svg,desktop,individual_svg-28,路线与预订,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+53,053_I28_plan_compare_v2_desktop_nav_variant.svg,desktop,individual_svg-28,多方案对比,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+54,054_I28_share_calendar_v2_desktop_nav_variant.svg,desktop,individual_svg-28,分享 / 日历,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+55,055_I28_history_favorites_v2_desktop_nav_variant.svg,desktop,individual_svg-28,历史收藏,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+56,056_I28_profile_center_v2_desktop_nav_variant.svg,desktop,individual_svg-28,个人中心,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+57,057_I28_group_preferences_v2_desktop_nav_variant.svg,desktop,individual_svg-28,多人偏好设置,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+58,058_I28_admin_quality_dashboard_v2_desktop_nav_variant.svg,desktop,individual_svg-28,质量看板,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+59,059_I28_mobile_key_flow_v2_desktop_nav_variant.svg,desktop,individual_svg-28,移动端关键流程总览,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+60,060_I28_design_system_v2_desktop_nav_variant.svg,desktop,individual_svg-28,设计系统,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+61,061_I28_product_flow_map_v2_desktop_nav_variant.svg,desktop,individual_svg-28,产品流程地图,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+62,062_I28_marketing_longpage_v2_desktop_nav_variant.svg,desktop,individual_svg-28,营销长页,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+63,063_I28_place_detail_v2_desktop_nav_variant.svg,desktop,individual_svg-28,地点详情,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+64,064_I28_booking_checkout_v2_desktop_nav_variant.svg,desktop,individual_svg-28,预订结算,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+65,065_I28_emergency_replan_v2_desktop_nav_variant.svg,desktop,individual_svg-28,临时改约 / 重新规划,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+66,066_I28_notification_center_v2_desktop_nav_variant.svg,desktop,individual_svg-28,notification center,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+67,067_I28_security_settings_v2_desktop_nav_variant.svg,desktop,individual_svg-28,安全设置,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+68,068_I28_developer_console_v2_desktop_nav_variant.svg,desktop,individual_svg-28,开发者控制台,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+69,069_I28_mobile_plan_detail_v2_desktop_nav_variant.svg,desktop,individual_svg-28,移动端方案详情总览,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+70,070_I28_empty_loading_error_states_v2_desktop_nav_variant.svg,desktop,individual_svg-28,空 / 加载 / 错误状态,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+71,071_I28_team_pricing_v2_desktop_nav_variant.svg,desktop,individual_svg-28,团队定价页,原 28 页差异版本保留，裁切旧导航并套用 D43 导航
+72,072_NEW_home_value_story_alt.svg,desktop,new_added,官网价值叙事增强页,新增桌面端流程补充页
+73,073_NEW_feature_agent_capability_map.svg,desktop,new_added,功能能力地图,新增桌面端流程补充页
+74,074_NEW_case_family_afternoon.svg,desktop,new_added,场景案例：亲子下午半日,新增桌面端流程补充页
+75,075_NEW_case_couple_fitness_dinner.svg,desktop,new_added,场景案例：减脂晚餐约会,新增桌面端流程补充页
+76,076_NEW_case_friends_indoor_plan.svg,desktop,new_added,场景案例：朋友室内聚会,新增桌面端流程补充页
+77,077_NEW_chat_kids_preference_popup.svg,desktop,new_added,对话弹窗：孩子偏好补充,新增桌面端流程补充页
+78,078_NEW_chat_budget_conflict_resolution.svg,desktop,new_added,对话弹窗：预算冲突处理,新增桌面端流程补充页
+79,079_NEW_chat_weather_warning_replan.svg,desktop,new_added,对话弹窗：天气风险提醒,新增桌面端流程补充页
+80,080_NEW_agent_tool_log_map_poi.svg,desktop,new_added,Agent 工具调用：地图与 POI,新增桌面端流程补充页
+81,081_NEW_agent_risk_review_panel.svg,desktop,new_added,Agent 风险复核面板,新增桌面端流程补充页
+82,082_NEW_agent_what_if_simulator.svg,desktop,new_added,Agent What-if 模拟器,新增桌面端流程补充页
+83,083_NEW_plan_selected_detail.svg,desktop,new_added,已选方案详情页,新增桌面端流程补充页
+84,084_NEW_plan_itinerary_timeline.svg,desktop,new_added,行程时间轴详情,新增桌面端流程补充页
+85,085_NEW_plan_poi_confidence.svg,desktop,new_added,地点可信度说明页,新增桌面端流程补充页
+86,086_NEW_route_transport_selector.svg,desktop,new_added,交通方式选择页,新增桌面端流程补充页
+87,087_NEW_route_queue_reservation_status.svg,desktop,new_added,排队与订座状态页,新增桌面端流程补充页
+88,088_NEW_route_ticket_bundle_checkout.svg,desktop,new_added,票务组合结算页,新增桌面端流程补充页
+89,089_NEW_authorization_granular_permissions.svg,desktop,new_added,细粒度授权弹窗,新增桌面端流程补充页
+90,090_NEW_execution_booking_success_detail.svg,desktop,new_added,执行成功详情页,新增桌面端流程补充页
+91,091_NEW_execution_failure_fallback.svg,desktop,new_added,执行失败与兜底页,新增桌面端流程补充页
+92,092_NEW_collaboration_invite_permissions.svg,desktop,new_added,协作邀请权限页,新增桌面端流程补充页
+93,093_NEW_collaboration_live_voting.svg,desktop,new_added,多人实时投票页,新增桌面端流程补充页
+94,094_NEW_feedback_memory_update.svg,desktop,new_added,评分后记忆更新页,新增桌面端流程补充页
+95,095_NEW_history_family_insight_detail.svg,desktop,new_added,家庭历史洞察详情,新增桌面端流程补充页
+96,096_NEW_profile_memory_edit.svg,desktop,new_added,个人画像记忆编辑页,新增桌面端流程补充页
+97,097_NEW_notification_permission_center.svg,desktop,new_added,通知权限中心,新增桌面端流程补充页
+98,098_NEW_privacy_data_export_delete.svg,desktop,new_added,隐私数据导出与删除页,新增桌面端流程补充页
+99,099_NEW_developer_webhook_monitor.svg,desktop,new_added,开发者 Webhook 监控页,新增桌面端流程补充页
+100,100_NEW_demo_acceptance_storyboard.svg,desktop,new_added,答辩演示与验收故事板,新增桌面端流程补充页
+1,01_MOBILE_splash_landing.svg,mobile,new_mobile,启动页,新增移动端流程补充页
+2,02_MOBILE_home_logged_out.svg,mobile,new_mobile,首页未登录,新增移动端流程补充页
+3,03_MOBILE_identity_choice.svg,mobile,new_mobile,身份选择,新增移动端流程补充页
+4,04_MOBILE_login.svg,mobile,new_mobile,登录,新增移动端流程补充页
+5,05_MOBILE_register.svg,mobile,new_mobile,注册,新增移动端流程补充页
+6,06_MOBILE_guest_profile.svg,mobile,new_mobile,游客默认画像,新增移动端流程补充页
+7,07_MOBILE_profile_city.svg,mobile,new_mobile,画像城市,新增移动端流程补充页
+8,08_MOBILE_profile_family.svg,mobile,new_mobile,画像家庭,新增移动端流程补充页
+9,09_MOBILE_profile_budget.svg,mobile,new_mobile,画像预算,新增移动端流程补充页
+10,10_MOBILE_feature_hub.svg,mobile,new_mobile,功能入口,新增移动端流程补充页
+11,11_MOBILE_demand_chat.svg,mobile,new_mobile,需求对话,新增移动端流程补充页
+12,12_MOBILE_constraint_popup.svg,mobile,new_mobile,约束弹窗,新增移动端流程补充页
+13,13_MOBILE_preparse_cards.svg,mobile,new_mobile,三套方案预览,新增移动端流程补充页
+14,14_MOBILE_agent_workbench.svg,mobile,new_mobile,Agent 工作台,新增移动端流程补充页
+15,15_MOBILE_result_overview.svg,mobile,new_mobile,结果总览,新增移动端流程补充页
+16,16_MOBILE_compare_swipe.svg,mobile,new_mobile,多方案横滑对比,新增移动端流程补充页
+17,17_MOBILE_plan_detail.svg,mobile,new_mobile,方案详情,新增移动端流程补充页
+18,18_MOBILE_route_map.svg,mobile,new_mobile,路线地图,新增移动端流程补充页
+19,19_MOBILE_place_detail.svg,mobile,new_mobile,地点详情,新增移动端流程补充页
+20,20_MOBILE_booking_checkout.svg,mobile,new_mobile,预订结算,新增移动端流程补充页
+21,21_MOBILE_authorization_sheet.svg,mobile,new_mobile,授权底部弹窗,新增移动端流程补充页
+22,22_MOBILE_execution_status.svg,mobile,new_mobile,执行状态,新增移动端流程补充页
+23,23_MOBILE_share_invite.svg,mobile,new_mobile,分享邀请,新增移动端流程补充页
+24,24_MOBILE_group_vote.svg,mobile,new_mobile,多人投票,新增移动端流程补充页
+25,25_MOBILE_feedback_rating.svg,mobile,new_mobile,评分反馈,新增移动端流程补充页
+26,26_MOBILE_memory_update.svg,mobile,new_mobile,记忆更新,新增移动端流程补充页
+27,27_MOBILE_history_list.svg,mobile,new_mobile,历史列表,新增移动端流程补充页
+28,28_MOBILE_insight_detail.svg,mobile,new_mobile,洞察详情,新增移动端流程补充页
+29,29_MOBILE_profile_dashboard.svg,mobile,new_mobile,个人中心,新增移动端流程补充页
+30,30_MOBILE_notification_center.svg,mobile,new_mobile,通知中心,新增移动端流程补充页
+31,31_MOBILE_privacy_security.svg,mobile,new_mobile,隐私安全,新增移动端流程补充页
+32,32_MOBILE_emergency_replan.svg,mobile,new_mobile,紧急重新规划,新增移动端流程补充页
+33,33_MOBILE_developer_log.svg,mobile,new_mobile,工具日志查看,新增移动端流程补充页
+34,34_MOBILE_empty_state.svg,mobile,new_mobile,空状态,新增移动端流程补充页
+35,35_MOBILE_calendar_share.svg,mobile,new_mobile,日历共享,新增移动端流程补充页
+36,36_MOBILE_version_history.svg,mobile,new_mobile,方案版本历史,新增移动端流程补充页

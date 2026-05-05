@@ -1,0 +1,147 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-label="官网首页">
+<defs>
+  <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="18" stdDeviation="26" flood-color="#111213" flood-opacity="0.10"/></filter>
+  <filter id="smallShadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#111213" flood-opacity="0.08"/></filter>
+  <linearGradient id="warmGrad" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FFFDF8"/><stop offset="1" stop-color="#F5EBD8"/></linearGradient>
+  <linearGradient id="yellowGrad" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#FFCC33"/><stop offset="1" stop-color="#FFD84D"/></linearGradient>
+  <linearGradient id="darkGrad" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#111213"/><stop offset="1" stop-color="#242220"/></linearGradient>
+</defs>
+<rect width="100%" height="100%" fill="#F7F1E7"/>
+<circle cx="1370" cy="140" r="260" fill="#FFE88A" opacity="0.38"/>
+<circle cx="40" cy="960" r="290" fill="#EAF0F2" opacity="0.8"/>
+
+<rect x="92" y="46" width="1416" height="76" rx="30" fill="#FFFDF8" stroke="#E7DDCE" stroke-width="1" opacity="1"/>
+<circle cx="130" cy="84" r="18" fill="#FFCC33" opacity="1" stroke="none" stroke-width="1"/>
+<circle cx="138" cy="76" r="7" fill="#111213" opacity="1" stroke="none" stroke-width="1"/>
+<text x="162" y="91" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="18" fill="#111213" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="162" dy="0">周末有谱</tspan>
+</text>
+<rect x="360" y="62" width="118" height="44" rx="22.0" fill="#FFCC33" stroke="none" stroke-width="1" opacity="1" filter="url(#smallShadow)"/>
+<text x="419.0" y="88.5" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="15" fill="#111213" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="419.0" dy="0">首页</tspan>
+</text>
+<text x="558" y="91" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="15" fill="#111213" font-weight="700" text-anchor="middle" opacity="1">
+<tspan x="558" dy="0">功能页卡</tspan>
+</text>
+<text x="698" y="91" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="15" fill="#111213" font-weight="700" text-anchor="middle" opacity="1">
+<tspan x="698" dy="0">场景案例</tspan>
+</text>
+<text x="838" y="91" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="15" fill="#111213" font-weight="700" text-anchor="middle" opacity="1">
+<tspan x="838" dy="0">设计亮点</tspan>
+</text>
+<text x="978" y="91" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="15" fill="#111213" font-weight="700" text-anchor="middle" opacity="1">
+<tspan x="978" dy="0">开发者</tspan>
+</text>
+<text x="1111" y="91" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="15" fill="#111213" font-weight="700" text-anchor="middle" opacity="1">
+<tspan x="1111" dy="0">个人中心</tspan>
+</text>
+<text x="1235" y="91" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="15" fill="#111213" font-weight="700" text-anchor="middle" opacity="1">
+<tspan x="1235" dy="0">登录</tspan>
+</text>
+<rect x="1295" y="62" width="160" height="44" rx="22.0" fill="#FFCC33" stroke="none" stroke-width="1" opacity="1" filter="url(#smallShadow)"/>
+<text x="1375.0" y="88.5" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="15" fill="#111213" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="1375.0" dy="0">免费注册</tspan>
+</text>
+<text x="120" y="250" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="64" fill="#111213" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="120" dy="0">把周末这件事</tspan>
+<tspan x="120" dy="76">彻底安排好</tspan>
+</text>
+<text x="124" y="430" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="20" fill="#6F6A62" font-weight="600" text-anchor="start" opacity="1">
+<tspan x="124" dy="0">不是搜索地点，而是从一句话开始，规划、订座、购票、分享、</tspan>
+<tspan x="124" dy="30">沉淀记忆。</tspan>
+</text>
+<rect x="124" y="520" width="190" height="56" rx="28.0" fill="#FFCC33" stroke="none" stroke-width="1" opacity="1" filter="url(#smallShadow)"/>
+<text x="219.0" y="553.0" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="16" fill="#111213" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="219.0" dy="0">开始规划</tspan>
+</text>
+<rect x="332" y="520" width="190" height="56" rx="28.0" fill="#FFFDF8" stroke="#E7DDCE" stroke-width="1" opacity="1"/>
+<text x="427.0" y="553.0" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="16" fill="#111213" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="427.0" dy="0">游客体验</tspan>
+</text>
+<rect x="124" y="630" width="160" height="88" rx="22" fill="#F4EDE2" stroke="#E7DDCE" stroke-width="1" opacity="1"/>
+<text x="144" y="662" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="26" fill="#111213" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="144" dy="0">4-6h</tspan>
+</text>
+<text x="144" y="690" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="13" fill="#6F6A62" font-weight="700" text-anchor="start" opacity="1">
+<tspan x="144" dy="0">下午完整方案</tspan>
+</text>
+<rect x="304" y="630" width="160" height="88" rx="22" fill="#F4EDE2" stroke="#E7DDCE" stroke-width="1" opacity="1"/>
+<text x="324" y="662" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="26" fill="#111213" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="324" dy="0">3套</tspan>
+</text>
+<text x="324" y="690" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="13" fill="#6F6A62" font-weight="700" text-anchor="start" opacity="1">
+<tspan x="324" dy="0">亲子/朋友/雨天</tspan>
+</text>
+<rect x="484" y="630" width="160" height="88" rx="22" fill="#F4EDE2" stroke="#E7DDCE" stroke-width="1" opacity="1"/>
+<text x="504" y="662" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="26" fill="#111213" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="504" dy="0">87%</tspan>
+</text>
+<text x="504" y="690" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="13" fill="#6F6A62" font-weight="700" text-anchor="start" opacity="1">
+<tspan x="504" dy="0">方案可信度</tspan>
+</text>
+<rect x="780" y="190" width="620" height="660" rx="42" fill="#111213" stroke="#2B2B2B" stroke-width="1" opacity="1" filter="url(#softShadow)"/>
+<text x="830" y="250" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="30" fill="#FFFFFF" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="830" dy="0">交互 Demo</tspan>
+</text>
+<rect x="830" y="300" width="500" height="96" rx="26" fill="#202124" stroke="#333" stroke-width="1" opacity="1"/>
+<text x="862" y="335" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="17" fill="#FFFFFF" font-weight="600" text-anchor="start" opacity="1">
+<tspan x="862" dy="0">今天下午空的，想和老婆孩子/朋友出去玩几个小时，别离</tspan>
+<tspan x="862" dy="24.65">家太远。</tspan>
+</text>
+<text x="830" y="445" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="22" fill="#FFCC33" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="830" dy="0">正在生成可执行计划</tspan>
+</text>
+<line x1="852" y1="518" x2="852" y2="798" stroke="#56585A" stroke-width="3" opacity="1"/>
+<circle cx="852" cy="518" r="12" fill="#FFCC33" opacity="1" stroke="none" stroke-width="1"/>
+<text x="878" y="516" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="13" fill="#FFCC33" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="878" dy="0">14:00</tspan>
+</text>
+<text x="878" y="542" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="18" fill="#FFFFFF" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="878" dy="0">从家出发</tspan>
+</text>
+<text x="878" y="566" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="13" fill="#D2CDC4" font-weight="600" text-anchor="start" opacity="1">
+<tspan x="878" dy="0">打车 18 分钟</tspan>
+</text>
+<circle cx="852" cy="600" r="12" fill="#FFCC33" opacity="1" stroke="none" stroke-width="1"/>
+<text x="878" y="598" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="13" fill="#FFCC33" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="878" dy="0">14:30</tspan>
+</text>
+<text x="878" y="624" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="18" fill="#FFFFFF" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="878" dy="0">室内亲子展</tspan>
+</text>
+<text x="878" y="648" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="13" fill="#D2CDC4" font-weight="600" text-anchor="start" opacity="1">
+<tspan x="878" dy="0">孩子友好，少晒</tspan>
+</text>
+<circle cx="852" cy="682" r="12" fill="#FFCC33" opacity="1" stroke="none" stroke-width="1"/>
+<text x="878" y="680" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="13" fill="#FFCC33" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="878" dy="0">16:30</tspan>
+</text>
+<text x="878" y="706" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="18" fill="#FFFFFF" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="878" dy="0">轻食咖啡</tspan>
+</text>
+<text x="878" y="730" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="13" fill="#D2CDC4" font-weight="600" text-anchor="start" opacity="1">
+<tspan x="878" dy="0">老婆减脂友好</tspan>
+</text>
+<circle cx="852" cy="764" r="12" fill="#FFCC33" opacity="1" stroke="none" stroke-width="1"/>
+<text x="878" y="762" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="13" fill="#FFCC33" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="878" dy="0">18:00</tspan>
+</text>
+<text x="878" y="788" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="18" fill="#FFFFFF" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="878" dy="0">晚餐</tspan>
+</text>
+<text x="878" y="812" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="13" fill="#D2CDC4" font-weight="600" text-anchor="start" opacity="1">
+<tspan x="878" dy="0">已查有位，可预约</tspan>
+</text>
+<rect x="1070" y="770" width="240" height="46" rx="23.0" fill="#FFCC33" stroke="none" stroke-width="1" opacity="1" filter="url(#smallShadow)"/>
+<text x="1190.0" y="797.0" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="14" fill="#111213" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="1190.0" dy="0">查看完整方案</tspan>
+</text>
+<rect x="1110" y="904" width="142" height="52" rx="26.0" fill="#F4EDE2" stroke="#E7DDCE" stroke-width="1" opacity="1"/>
+<text x="1181.0" y="934.5" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="15" fill="#111213" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="1181.0" dy="0">了解功能</tspan>
+</text>
+<rect x="1270" y="904" width="190" height="52" rx="26.0" fill="#FFCC33" stroke="none" stroke-width="1" opacity="1" filter="url(#smallShadow)"/>
+<text x="1365.0" y="934.5" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="15" fill="#111213" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="1365.0" dy="0">进入规划</tspan>
+</text>
+<rect x="1128" y="949" width="360" height="32" rx="16" fill="#FFF8DC" stroke="#E7D58F" stroke-width="1" opacity="0.96"/><text x="1308" y="970" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="13" fill="#6B4E00" font-weight="800" text-anchor="middle" opacity="1" ><tspan x="1308" dy="0">001 · D43 原稿优化 · 字体加粗 · 导航沿用</tspan></text></svg>

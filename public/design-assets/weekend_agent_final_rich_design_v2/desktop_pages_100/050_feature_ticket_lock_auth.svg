@@ -1,0 +1,165 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-label="授权细分：票务锁单">
+<defs>
+  <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="16" stdDeviation="22" flood-color="#111213" flood-opacity="0.12"/></filter>
+  <filter id="smallShadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#111213" flood-opacity="0.08"/></filter>
+  <linearGradient id="warmGrad" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FFFDF8"/><stop offset="1" stop-color="#F5EBD8"/></linearGradient>
+  <linearGradient id="yellowGrad" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#FFCC33"/><stop offset="1" stop-color="#FFD84D"/></linearGradient>
+  <linearGradient id="darkGrad" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#111213"/><stop offset="1" stop-color="#2A2620"/></linearGradient>
+  <clipPath id="roundCard"><rect x="0" y="0" width="100" height="100" rx="26"/></clipPath>
+</defs>
+<rect x="0" y="0" width="1600" height="1000" rx="0" fill="#F7F1E7" stroke="none" stroke-width="1" opacity="1"/>
+<rect x="76" y="82" width="86" height="86" rx="0" fill="#FFFDF8" stroke="none" stroke-width="1" opacity="0.92"/>
+<path d="M1220 70 C1420 30 1562 132 1552 314 C1540 466 1364 506 1238 414 C1120 328 1126 142 1220 70 Z" fill="#706736" stroke="none" stroke-width="1" opacity="0.18"/>
+<circle cx="1370" cy="190" r="238" fill="#FFCC33" stroke="none" stroke-width="1" opacity="0.22"/>
+<path d="M0 770 C162 690 358 732 450 912 L450 1000 L0 1000 Z" fill="#C9D1D3" stroke="none" stroke-width="1" opacity="0.7"/>
+<circle cx="122" cy="884" r="210" fill="#DDE7E8" stroke="none" stroke-width="1" opacity="0.55"/>
+<circle cx="1510" cy="920" r="210" fill="#FFCC33" stroke="none" stroke-width="1" opacity="0.13"/>
+<rect x="120" y="56" width="1360" height="76" rx="38" fill="#FFFDF8" stroke="#E7DDCE" stroke-width="1" opacity="1" filter="url(#smallShadow)"/>
+<circle cx="158" cy="94" r="18" fill="#FFCC33" stroke="none" stroke-width="1" opacity="1"/>
+<circle cx="166" cy="86" r="7" fill="#111213" stroke="none" stroke-width="1" opacity="1"/>
+<text x="192" y="101" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="18" fill="#111213" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="192" dy="0">周末有谱</tspan>
+</text>
+<text x="430" y="99" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="15" fill="#111213" font-weight="700" text-anchor="middle" opacity="1">
+<tspan x="430" dy="0">首页</tspan>
+</text>
+<rect x="512" y="72" width="116" height="44" rx="22" fill="#FFCC33" stroke="none" stroke-width="1" opacity="1" filter="url(#smallShadow)"/>
+<text x="570" y="99" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="15" fill="#111213" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="570" dy="0">功能页卡</tspan>
+</text>
+<text x="720" y="99" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="15" fill="#111213" font-weight="700" text-anchor="middle" opacity="1">
+<tspan x="720" dy="0">场景案例</tspan>
+</text>
+<text x="875" y="99" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="15" fill="#111213" font-weight="700" text-anchor="middle" opacity="1">
+<tspan x="875" dy="0">设计亮点</tspan>
+</text>
+<text x="1010" y="99" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="15" fill="#111213" font-weight="700" text-anchor="middle" opacity="1">
+<tspan x="1010" dy="0">开发者</tspan>
+</text>
+<text x="1148" y="99" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="15" fill="#111213" font-weight="700" text-anchor="middle" opacity="1">
+<tspan x="1148" dy="0">个人中心</tspan>
+</text>
+<text x="1278" y="99" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="15" fill="#111213" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="1278" dy="0">小明</tspan>
+</text>
+<rect x="1334" y="72" width="112" height="44" rx="22.0" fill="#151515" stroke="none" stroke-width="1" opacity="1"/>
+<text x="1390.0" y="98.5" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="15" fill="#FFFFFF" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="1390.0" dy="0">退出</tspan>
+</text>
+<text x="120" y="210" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="40" fill="#111213" font-weight="900" text-anchor="start" opacity="1">
+<tspan x="120" dy="0">授权细分：票务锁单</tspan>
+</text>
+<text x="122" y="255" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="16" fill="#6F6A62" font-weight="700" text-anchor="start" opacity="1">
+<tspan x="122" dy="0">锁座 15 分钟，用户确认后跳支付。</tspan>
+</text>
+<rect x="120" y="320" width="720" height="520" rx="28" fill="#FFFDF8" stroke="#E7DDCE" stroke-width="1" opacity="1" filter="url(#softShadow)"/>
+<text x="146" y="364" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="24" fill="#111213" font-weight="900" text-anchor="start" opacity="1">
+<tspan x="146" dy="0">方案已选：亲子西湖低负担</tspan>
+</text>
+<text x="146" y="398" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="14" fill="#6F6A62" font-weight="700" text-anchor="start" opacity="1">
+<tspan x="146" dy="0">下一步不是“继续推荐”，而是把路线、餐厅、票务、分享全部安排好。</tspan>
+</text>
+<line x1="188" y1="452" x2="188" y2="638" stroke="#E7DDCE" stroke-width="3" opacity="1"/>
+<circle cx="188" cy="452" r="9" fill="#FFCC33" stroke="none" stroke-width="1" opacity="1"/>
+<text x="210" y="447" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="12" fill="#6F6A62" font-weight="900" text-anchor="start" opacity="1">
+<tspan x="210" dy="0">14:00</tspan>
+</text>
+<text x="210" y="470" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="16" fill="#111213" font-weight="900" text-anchor="start" opacity="1">
+<tspan x="210" dy="0">浙大紫金港出发</tspan>
+</text>
+<text x="210" y="491" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="12" fill="#6F6A62" font-weight="700" text-anchor="start" opacity="1">
+<tspan x="210" dy="0">打车/地铁</tspan>
+</text>
+<circle cx="188" cy="514" r="9" fill="#FFCC33" stroke="none" stroke-width="1" opacity="1"/>
+<text x="210" y="509" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="12" fill="#6F6A62" font-weight="900" text-anchor="start" opacity="1">
+<tspan x="210" dy="0">14:45</tspan>
+</text>
+<text x="210" y="532" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="16" fill="#111213" font-weight="900" text-anchor="start" opacity="1">
+<tspan x="210" dy="0">西湖散步</tspan>
+</text>
+<text x="210" y="553" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="12" fill="#6F6A62" font-weight="700" text-anchor="start" opacity="1">
+<tspan x="210" dy="0">断桥-白堤</tspan>
+</text>
+<circle cx="188" cy="576" r="9" fill="#FFCC33" stroke="none" stroke-width="1" opacity="1"/>
+<text x="210" y="571" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="12" fill="#6F6A62" font-weight="900" text-anchor="start" opacity="1">
+<tspan x="210" dy="0">18:00</tspan>
+</text>
+<text x="210" y="594" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="16" fill="#111213" font-weight="900" text-anchor="start" opacity="1">
+<tspan x="210" dy="0">海底捞晚餐</tspan>
+</text>
+<text x="210" y="615" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="12" fill="#6F6A62" font-weight="700" text-anchor="start" opacity="1">
+<tspan x="210" dy="0">提前锁桌</tspan>
+</text>
+<circle cx="188" cy="638" r="9" fill="#FFCC33" stroke="none" stroke-width="1" opacity="1"/>
+<text x="210" y="633" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="12" fill="#6F6A62" font-weight="900" text-anchor="start" opacity="1">
+<tspan x="210" dy="0">19:40</tspan>
+</text>
+<text x="210" y="656" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="16" fill="#111213" font-weight="900" text-anchor="start" opacity="1">
+<tspan x="210" dy="0">回家</tspan>
+</text>
+<text x="210" y="677" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="12" fill="#6F6A62" font-weight="700" text-anchor="start" opacity="1">
+<tspan x="210" dy="0">发给小张</tspan>
+</text>
+<rect x="890" y="300" width="520" height="560" rx="36" fill="#FFFDF8" stroke="#E7DDCE" stroke-width="1" opacity="1" filter="url(#softShadow)"/>
+<circle cx="950" cy="370" r="30" fill="#FFCC33" stroke="none" stroke-width="1" opacity="1"/>
+<text x="996" y="365" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="25" fill="#111213" font-weight="900" text-anchor="start" opacity="1">
+<tspan x="996" dy="0">授权 Agent 执行哪些动作？</tspan>
+</text>
+<text x="996" y="425" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="15" fill="#6F6A62" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="996" dy="0">你确认后，Agent 只执行预约、锁座、日</tspan>
+<tspan x="996" dy="23">历、导航推送等动作，支付仍由用户本人</tspan>
+<tspan x="996" dy="23">完成。</tspan>
+</text>
+<rect x="930" y="492" width="430" height="48" rx="16" fill="#F4EBDD" stroke="#E7DDCE" stroke-width="1" opacity="1"/>
+<circle cx="955" cy="516" r="8" fill="#27AE60" stroke="none" stroke-width="1" opacity="1"/>
+<text x="978" y="513" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="15" fill="#111213" font-weight="900" text-anchor="start" opacity="1">
+<tspan x="978" dy="0">定位与地图</tspan>
+</text>
+<text x="978" y="532" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="12" fill="#6F6A62" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="978" dy="0">用于路线、导航与到达提醒</tspan>
+</text>
+<rect x="930" y="548" width="430" height="48" rx="16" fill="#F4EBDD" stroke="#E7DDCE" stroke-width="1" opacity="1"/>
+<circle cx="955" cy="572" r="8" fill="#27AE60" stroke="none" stroke-width="1" opacity="1"/>
+<text x="978" y="569" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="15" fill="#111213" font-weight="900" text-anchor="start" opacity="1">
+<tspan x="978" dy="0">餐厅预约</tspan>
+</text>
+<text x="978" y="588" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="12" fill="#6F6A62" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="978" dy="0">提交人数、时间、备注，不代付</tspan>
+</text>
+<rect x="930" y="604" width="430" height="48" rx="16" fill="#F4EBDD" stroke="#E7DDCE" stroke-width="1" opacity="1"/>
+<circle cx="955" cy="628" r="8" fill="#27AE60" stroke="none" stroke-width="1" opacity="1"/>
+<text x="978" y="625" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="15" fill="#111213" font-weight="900" text-anchor="start" opacity="1">
+<tspan x="978" dy="0">票务锁单</tspan>
+</text>
+<text x="978" y="644" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="12" fill="#6F6A62" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="978" dy="0">如看电影，仅锁座 15 分钟</tspan>
+</text>
+<rect x="930" y="660" width="430" height="48" rx="16" fill="#F4EBDD" stroke="#E7DDCE" stroke-width="1" opacity="1"/>
+<circle cx="955" cy="684" r="8" fill="#27AE60" stroke="none" stroke-width="1" opacity="1"/>
+<text x="978" y="681" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="15" fill="#111213" font-weight="900" text-anchor="start" opacity="1">
+<tspan x="978" dy="0">日历通知</tspan>
+</text>
+<text x="978" y="700" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="12" fill="#6F6A62" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="978" dy="0">写入出发时间和回程提醒</tspan>
+</text>
+<rect x="930" y="716" width="430" height="48" rx="16" fill="#F4EBDD" stroke="#E7DDCE" stroke-width="1" opacity="1"/>
+<circle cx="955" cy="740" r="8" fill="#27AE60" stroke="none" stroke-width="1" opacity="1"/>
+<text x="978" y="737" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="15" fill="#111213" font-weight="900" text-anchor="start" opacity="1">
+<tspan x="978" dy="0">分享协作</tspan>
+</text>
+<text x="978" y="756" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="12" fill="#6F6A62" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="978" dy="0">发给老婆/朋友确认</tspan>
+</text>
+<rect x="930" y="792" width="190" height="46" rx="23.0" fill="#FFCC33" stroke="none" stroke-width="1" opacity="1" filter="url(#smallShadow)"/>
+<text x="1025.0" y="819.5" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="15" fill="#111213" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="1025.0" dy="0">允许并执行</tspan>
+</text>
+<rect x="1140" y="792" width="190" height="46" rx="23.0" fill="#151515" stroke="none" stroke-width="1" opacity="1"/>
+<text x="1235.0" y="819.5" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="15" fill="#FFFFFF" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="1235.0" dy="0">逐项设置</tspan>
+</text>
+<rect x="690" y="930" width="220" height="34" rx="17.0" fill="#FFFDF8" stroke="#E7DDCE" stroke-width="1" opacity="1" filter="url(#smallShadow)"/>
+<text x="800.0" y="950.0" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Hiragino Sans GB, Arial, sans-serif" font-size="12" fill="#6F6A62" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="800.0" dy="0">050 / 100 · 功能页卡</tspan>
+</text>
+</svg>

@@ -4,14 +4,31 @@ import { z } from "zod";
 import { demoProfile, pois, baseToolLogs, planOptions, trafficRoutes, weather } from "./data/mockData";
 import { parseDemand, planningRequestSchema, runPlanningAgent, simulateWhatIf } from "./services/agent";
 import {
+  advanceExecution,
+  clearLongTermMemory,
+  createApiKey,
   createShareRoom,
   deleteMemory,
+  exportPrivacyBundle,
+  getSelectedPlanId,
+  issueAuthCode,
+  listApiKeys,
+  listExecutionSteps,
   listMemories,
+  listPermissions,
   listReservations,
   listShareRooms,
+  listWebhooks,
+  replayWebhook,
+  revokeApiKey,
+  selectPlan,
+  setPermission,
+  updateExecutionStep,
   updateReservationStatus,
+  upsertWebhook,
   upsertMemory,
   upsertReservation,
+  verifyAuthCode,
   vote,
 } from "./services/store";
 
@@ -42,24 +59,33 @@ export async function registerRoutes(app: FastifyInstance) {
     name: "PlanningGo API",
     version: "0.1.0",
     groups: [
-      { group: "Auth", endpoints: ["POST /api/auth/login", "POST /api/auth/register", "POST /api/auth/guest"] },
-      { group: "Profile", endpoints: ["GET /api/profile/demo", "PATCH /api/profile/demo", "PATCH /api/profile/demo/permissions"] },
+      { group: "Auth", endpoints: ["POST /api/auth/code", "POST /api/auth/login", "POST /api/auth/register", "POST /api/auth/guest"] },
+      { group: "Profile", endpoints: ["GET /api/profile/demo", "PATCH /api/profile/demo", "GET /api/profile/demo/permissions", "PATCH /api/profile/demo/permissions"] },
       { group: "Planning Agent", endpoints: ["POST /api/agent/parse", "POST /api/agent/plan", "POST /api/agent/what-if"] },
       { group: "Mock Data", endpoints: ["GET /api/mock/pois", "GET /api/mock/weather", "GET /api/mock/routes"] },
-      { group: "Plans", endpoints: ["GET /api/plans/demo"] },
+      { group: "Plans", endpoints: ["GET /api/plans/demo", "POST /api/plans/select"] },
       { group: "Reservations", endpoints: ["GET /api/reservations", "POST /api/reservations", "PATCH /api/reservations/:id/status"] },
-      { group: "Execution", endpoints: ["GET /api/execution/demo", "GET /api/tools/logs"] },
+      { group: "Execution", endpoints: ["GET /api/execution/demo", "POST /api/execution/advance", "PATCH /api/execution/:key", "GET /api/tools/logs"] },
       { group: "Share", endpoints: ["GET /api/share/rooms", "POST /api/share/rooms", "POST /api/share/rooms/:id/vote"] },
       { group: "Memory", endpoints: ["GET /api/memories", "POST /api/memories", "DELETE /api/memories/:id"] },
-      { group: "Developer", endpoints: ["GET /api/developer/dashboard"] },
+      { group: "Developer", endpoints: ["GET /api/developer/dashboard", "GET /api/developer/api-keys", "POST /api/developer/api-keys", "POST /api/developer/api-keys/:id/revoke", "GET /api/developer/webhooks", "POST /api/developer/webhooks", "POST /api/developer/webhooks/:id/replay"] },
+      { group: "Privacy", endpoints: ["GET /api/privacy/export", "DELETE /api/privacy/memories"] },
       { group: "Calendar", endpoints: ["POST /api/ics"] },
     ],
   }));
 
   app.get("/api/profile/demo", async () => demoProfile);
 
+  app.post("/api/auth/code", async (request) => {
+    const input = z.object({ phone: z.string().min(3) }).parse(request.body);
+    return issueAuthCode(input.phone);
+  });
+
   app.post("/api/auth/login", async (request) => {
     const input = authSchema.parse(request.body);
+    if (!verifyAuthCode(input.phone, input.code)) {
+      return { error: "INVALID_CODE", message: "验证码错误或已过期，演示码为 123456。" };
+    }
     return {
       token: `demo_token_${Date.now()}`,
       user: {
@@ -73,6 +99,9 @@ export async function registerRoutes(app: FastifyInstance) {
 
   app.post("/api/auth/register", async (request) => {
     const input = authSchema.parse(request.body);
+    if (input.code && !verifyAuthCode(input.phone, input.code)) {
+      return { error: "INVALID_CODE", message: "验证码错误或已过期，演示码为 123456。" };
+    }
     return {
       token: `demo_token_${Date.now()}`,
       user: {
@@ -111,12 +140,11 @@ export async function registerRoutes(app: FastifyInstance) {
     ...(request.body as object),
   }));
 
+  app.get("/api/profile/demo/permissions", async () => listPermissions());
+
   app.patch("/api/profile/demo/permissions", async (request) => {
     const input = permissionSchema.parse(request.body);
-    return {
-      ...demoProfile.permissions,
-      [input.key]: input.allowed,
-    };
+    return setPermission(input.key, input.allowed);
   });
 
   app.get("/api/mock/pois", async () => ({
@@ -138,9 +166,17 @@ export async function registerRoutes(app: FastifyInstance) {
   }));
 
   app.get("/api/plans/demo", async () => ({
-    selectedPlanId: "plan_a",
+    selectedPlanId: getSelectedPlanId(),
     options: planOptions,
   }));
+
+  app.post("/api/plans/select", async (request, reply) => {
+    const input = z.object({ planId: z.string() }).parse(request.body);
+    if (!planOptions.some((plan) => plan.id === input.planId)) {
+      return reply.status(404).send({ error: "PLAN_NOT_FOUND" });
+    }
+    return selectPlan(input.planId);
+  });
 
   app.post("/api/agent/parse", async (request, reply) => {
     try {
@@ -202,14 +238,21 @@ export async function registerRoutes(app: FastifyInstance) {
 
   app.get("/api/execution/demo", async () => ({
     traceId: "exec_demo",
-    steps: [
-      { key: "location", title: "定位确认", status: "done" },
-      { key: "restaurant", title: "海底捞预约", status: "running" },
-      { key: "ticket", title: "电影票锁座", status: "pending" },
-      { key: "calendar", title: "日历提醒", status: "pending" },
-      { key: "share", title: "分享给家人", status: "pending" },
-    ],
+    steps: listExecutionSteps(),
   }));
+
+  app.post("/api/execution/advance", async () => ({
+    traceId: "exec_demo",
+    steps: advanceExecution(),
+  }));
+
+  app.patch("/api/execution/:key", async (request, reply) => {
+    const params = z.object({ key: z.string() }).parse(request.params);
+    const body = z.object({ status: z.enum(["pending", "running", "done", "failed"]) }).parse(request.body);
+    const next = updateExecutionStep(params.key, body.status);
+    if (!next) return reply.status(404).send({ error: "EXECUTION_STEP_NOT_FOUND" });
+    return next;
+  });
 
   app.get("/api/share/rooms", async () => ({ items: listShareRooms() }));
 
@@ -266,7 +309,52 @@ export async function registerRoutes(app: FastifyInstance) {
       { label: "用户确认率", value: "87%" },
     ],
     logs: baseToolLogs,
+    apiKeys: listApiKeys(),
+    webhooks: listWebhooks(),
   }));
+
+  app.get("/api/developer/api-keys", async () => ({ items: listApiKeys() }));
+
+  app.post("/api/developer/api-keys", async (request) => {
+    const input = z
+      .object({
+        name: z.string().default("Demo Key"),
+        scopes: z.array(z.string()).default(["plan:read", "tool:read"]),
+      })
+      .parse(request.body ?? {});
+    return createApiKey(input.name, input.scopes);
+  });
+
+  app.post("/api/developer/api-keys/:id/revoke", async (request, reply) => {
+    const params = z.object({ id: z.string() }).parse(request.params);
+    const next = revokeApiKey(params.id);
+    if (!next) return reply.status(404).send({ error: "API_KEY_NOT_FOUND" });
+    return next;
+  });
+
+  app.get("/api/developer/webhooks", async () => ({ items: listWebhooks() }));
+
+  app.post("/api/developer/webhooks", async (request) => {
+    const input = z
+      .object({
+        url: z.string().url(),
+        event: z.enum(["plan.created", "reservation.updated", "execution.failed", "share.voted"]),
+        enabled: z.boolean().default(true),
+      })
+      .parse(request.body);
+    return upsertWebhook(input);
+  });
+
+  app.post("/api/developer/webhooks/:id/replay", async (request, reply) => {
+    const params = z.object({ id: z.string() }).parse(request.params);
+    const next = replayWebhook(params.id);
+    if (!next) return reply.status(404).send({ error: "WEBHOOK_NOT_FOUND" });
+    return next;
+  });
+
+  app.get("/api/privacy/export", async () => exportPrivacyBundle());
+
+  app.delete("/api/privacy/memories", async () => clearLongTermMemory());
 
   app.post("/api/ics", async (request, reply) => {
     const body = request.body as { title?: string; date?: string };

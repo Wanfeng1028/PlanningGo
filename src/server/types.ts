@@ -72,3 +72,27 @@ export interface MemoryItem {
   detail: string;
   weight: number;
 }
+
+export interface ExecutionStep {
+  key: string;
+  title: string;
+  status: "pending" | "running" | "done" | "failed";
+  detail: string;
+}
+
+export interface ApiKeyRecord {
+  id: string;
+  name: string;
+  keyPreview: string;
+  scopes: string[];
+  createdAt: string;
+  revoked: boolean;
+}
+
+export interface WebhookRecord {
+  id: string;
+  url: string;
+  event: "plan.created" | "reservation.updated" | "execution.failed" | "share.voted";
+  enabled: boolean;
+  lastDelivery: "success" | "failed" | "pending";
+}

@@ -44,40 +44,105 @@ export async function requestAgentPlan(prompt: string): Promise<AgentPlanRespons
   return response.json() as Promise<AgentPlanResponse>;
 }
 
-export async function login(phone: string, code: string): Promise<AuthResponse> {
-  const response = await fetch(`${API_BASE}/api/auth/login`, {
+async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      "content-type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+  });
+  if (!response.ok) throw new Error(`API failed: ${path} ${response.status}`);
+  return response.json() as Promise<T>;
+}
+
+export async function sendAuthCode(phone: string) {
+  return apiJson<{ phone: string; code: string; expiresInSeconds: number }>("/api/auth/code", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ phone }),
+  });
+}
+
+export async function login(phone: string, code: string): Promise<AuthResponse> {
+  return apiJson<AuthResponse>("/api/auth/login", {
+    method: "POST",
     body: JSON.stringify({ phone, code }),
   });
-  if (!response.ok) throw new Error(`Login failed: ${response.status}`);
-  return response.json() as Promise<AuthResponse>;
 }
 
 export async function register(input: {
   name: string;
   phone: string;
+  code: string;
   city: string;
   startPoint: string;
   companions: string;
   budgetMin: number;
   budgetMax: number;
 }): Promise<AuthResponse> {
-  const response = await fetch(`${API_BASE}/api/auth/register`, {
+  return apiJson<AuthResponse>("/api/auth/register", {
     method: "POST",
-    headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
   });
-  if (!response.ok) throw new Error(`Register failed: ${response.status}`);
-  return response.json() as Promise<AuthResponse>;
 }
 
 export async function enterAsGuest(input: { city: string; startPoint: string; companions: string }): Promise<AuthResponse> {
-  const response = await fetch(`${API_BASE}/api/auth/guest`, {
+  return apiJson<AuthResponse>("/api/auth/guest", {
     method: "POST",
-    headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
   });
-  if (!response.ok) throw new Error(`Guest failed: ${response.status}`);
-  return response.json() as Promise<AuthResponse>;
+}
+
+export async function getPlans() {
+  return apiJson<{ selectedPlanId: string; options: unknown[] }>("/api/plans/demo");
+}
+
+export async function selectPlan(planId: string) {
+  return apiJson<{ selectedPlanId: string }>("/api/plans/select", {
+    method: "POST",
+    body: JSON.stringify({ planId }),
+  });
+}
+
+export async function createReservation(input: { type: string; title: string; status?: string; price?: string; detail: string }) {
+  return apiJson("/api/reservations", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function advanceExecution() {
+  return apiJson<{ traceId: string; steps: unknown[] }>("/api/execution/advance", { method: "POST" });
+}
+
+export async function updatePermission(key: string, allowed: boolean) {
+  return apiJson<Record<string, boolean>>("/api/profile/demo/permissions", {
+    method: "PATCH",
+    body: JSON.stringify({ key, allowed }),
+  });
+}
+
+export async function createShareRoom(input: { planId: string; title: string; members: Array<{ name: string; vote?: string; comment?: string }> }) {
+  return apiJson("/api/share/rooms", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function saveMemory(input: { category: string; title: string; detail: string; weight: number }) {
+  return apiJson("/api/memories", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function exportPrivacy() {
+  return apiJson("/api/privacy/export");
+}
+
+export async function createApiKey(input: { name: string; scopes: string[] }) {
+  return apiJson("/api/developer/api-keys", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }

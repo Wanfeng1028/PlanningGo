@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-label="通知中心">
+<defs>
+  <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="18" stdDeviation="26" flood-color="#111213" flood-opacity="0.10"/></filter>
+  <filter id="smallShadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#111213" flood-opacity="0.08"/></filter>
+  <linearGradient id="warmGrad" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FFFDF8"/><stop offset="1" stop-color="#F5EBD8"/></linearGradient>
+  <linearGradient id="yellowGrad" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#FFCC33"/><stop offset="1" stop-color="#FFD84D"/></linearGradient>
+  <linearGradient id="darkGrad" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#111213"/><stop offset="1" stop-color="#242220"/></linearGradient>
+</defs>
+<rect width="100%" height="100%" fill="#F7F1E7"/>
+<circle cx="1370" cy="140" r="260" fill="#FFE88A" opacity="0.38"/>
+<circle cx="40" cy="960" r="290" fill="#EAF0F2" opacity="0.8"/>
+
+<rect x="92" y="46" width="1416" height="76" rx="30" fill="#FFFDF8" stroke="#E7DDCE" stroke-width="1" opacity="1"/>
+<circle cx="130" cy="84" r="18" fill="#FFCC33" opacity="1" stroke="none" stroke-width="1"/>
+<circle cx="138" cy="76" r="7" fill="#111213" opacity="1" stroke="none" stroke-width="1"/>
+<text x="162" y="91" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="18" fill="#111213" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="162" dy="0">周末有谱</tspan>
+</text>
+<text x="418" y="91" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="15" fill="#111213" font-weight="700" text-anchor="middle" opacity="1">
+<tspan x="418" dy="0">首页</tspan>
+</text>
+<text x="558" y="91" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="15" fill="#111213" font-weight="700" text-anchor="middle" opacity="1">
+<tspan x="558" dy="0">功能页卡</tspan>
+</text>
+<text x="698" y="91" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="15" fill="#111213" font-weight="700" text-anchor="middle" opacity="1">
+<tspan x="698" dy="0">场景案例</tspan>
+</text>
+<text x="838" y="91" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="15" fill="#111213" font-weight="700" text-anchor="middle" opacity="1">
+<tspan x="838" dy="0">设计亮点</tspan>
+</text>
+<text x="978" y="91" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="15" fill="#111213" font-weight="700" text-anchor="middle" opacity="1">
+<tspan x="978" dy="0">开发者</tspan>
+</text>
+<rect x="1051" y="62" width="120" height="44" rx="22.0" fill="#FFCC33" stroke="none" stroke-width="1" opacity="1" filter="url(#smallShadow)"/>
+<text x="1111.0" y="88.5" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="15" fill="#111213" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="1111.0" dy="0">个人中心</tspan>
+</text>
+<text x="1235" y="91" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="15" fill="#111213" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="1235" dy="0">小明</tspan>
+</text>
+<rect x="1295" y="62" width="122" height="44" rx="22.0" fill="#111213" stroke="none" stroke-width="1" opacity="1"/>
+<text x="1356.0" y="88.5" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="15" fill="#FFFFFF" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="1356.0" dy="0">退出</tspan>
+</text>
+<rect x="90" y="170" width="360" height="720" rx="34" fill="#111213" stroke="#2B2B2B" stroke-width="1" opacity="1" filter="url(#softShadow)"/>
+<text x="130" y="225" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="34" fill="#FFFFFF" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="130" dy="0">个人中心</tspan>
+</text>
+<text x="132" y="255" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="14" fill="#D2CDC4" font-weight="600" text-anchor="start" opacity="1">
+<tspan x="132" dy="0">画像、记忆、通知、隐私、安全和开发者模式都在</tspan>
+<tspan x="132" dy="20.3">这里。</tspan>
+</text>
+<rect x="130" y="310" width="260" height="42" rx="21.0" fill="#202124" stroke="#333" stroke-width="1" opacity="1"/>
+<text x="260.0" y="335.0" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="14" fill="#FFFFFF" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="260.0" dy="0">人物画像</tspan>
+</text>
+<rect x="130" y="365" width="260" height="42" rx="21.0" fill="#202124" stroke="#333" stroke-width="1" opacity="1"/>
+<text x="260.0" y="390.0" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="14" fill="#FFFFFF" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="260.0" dy="0">记忆与洞察</tspan>
+</text>
+<rect x="130" y="420" width="260" height="42" rx="21.0" fill="#202124" stroke="#333" stroke-width="1" opacity="1"/>
+<text x="260.0" y="445.0" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="14" fill="#FFFFFF" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="260.0" dy="0">同行人画像</tspan>
+</text>
+<rect x="130" y="475" width="260" height="42" rx="21.0" fill="#202124" stroke="#333" stroke-width="1" opacity="1"/>
+<text x="260.0" y="500.0" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="14" fill="#FFFFFF" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="260.0" dy="0">历史与评分</tspan>
+</text>
+<rect x="130" y="530" width="260" height="42" rx="21.0" fill="#FFCC33" stroke="#333" stroke-width="1" opacity="1" filter="url(#smallShadow)"/>
+<text x="260.0" y="555.0" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="14" fill="#111213" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="260.0" dy="0">通知中心</tspan>
+</text>
+<rect x="130" y="585" width="260" height="42" rx="21.0" fill="#202124" stroke="#333" stroke-width="1" opacity="1"/>
+<text x="260.0" y="610.0" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="14" fill="#FFFFFF" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="260.0" dy="0">隐私与安全</tspan>
+</text>
+<rect x="130" y="640" width="260" height="42" rx="21.0" fill="#202124" stroke="#333" stroke-width="1" opacity="1"/>
+<text x="260.0" y="665.0" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="14" fill="#FFFFFF" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="260.0" dy="0">开发者模式</tspan>
+</text>
+<rect x="130" y="695" width="260" height="42" rx="21.0" fill="#202124" stroke="#333" stroke-width="1" opacity="1"/>
+<text x="260.0" y="720.0" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="14" fill="#FFFFFF" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="260.0" dy="0">账号管理</tspan>
+</text>
+<rect x="500" y="170" width="900" height="720" rx="34" fill="#FFFDF8" stroke="#E7DDCE" stroke-width="1" opacity="1" filter="url(#softShadow)"/>
+<text x="550" y="235" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="40" fill="#111213" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="550" dy="0">通知中心</tspan>
+</text>
+<text x="552" y="275" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="16" fill="#6F6A62" font-weight="600" text-anchor="start" opacity="1">
+<tspan x="552" dy="0">通知中心放在个人中心内，不做独立一级页面。</tspan>
+</text>
+<rect x="560" y="360" width="760" height="36" rx="14" fill="#F4EDE2" stroke="#E7DDCE" stroke-width="1" opacity="1"/>
+<text x="578" y="385" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="13" fill="#6F6A62" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="578" dy="0">行程提醒</tspan>
+</text>
+<text x="680" y="385" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="13" fill="#111213" font-weight="700" text-anchor="start" opacity="1">
+<tspan x="680" dy="0">出发前 30 分钟提醒</tspan>
+</text>
+<rect x="560" y="402" width="760" height="36" rx="14" fill="#F4EDE2" stroke="#E7DDCE" stroke-width="1" opacity="1"/>
+<text x="578" y="427" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="13" fill="#6F6A62" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="578" dy="0">协作反馈</tspan>
+</text>
+<text x="680" y="427" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="13" fill="#111213" font-weight="700" text-anchor="start" opacity="1">
+<tspan x="680" dy="0">老婆/朋友评论后提醒</tspan>
+</text>
+<rect x="560" y="444" width="760" height="36" rx="14" fill="#F4EDE2" stroke="#E7DDCE" stroke-width="1" opacity="1"/>
+<text x="578" y="469" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="13" fill="#6F6A62" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="578" dy="0">风险变更</tspan>
+</text>
+<text x="680" y="469" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="13" fill="#111213" font-weight="700" text-anchor="start" opacity="1">
+<tspan x="680" dy="0">下雨、无位、售罄自动提醒</tspan>
+</text>
+<rect x="560" y="486" width="760" height="36" rx="14" fill="#F4EDE2" stroke="#E7DDCE" stroke-width="1" opacity="1"/>
+<text x="578" y="511" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="13" fill="#6F6A62" font-weight="800" text-anchor="start" opacity="1">
+<tspan x="578" dy="0">每周推荐</tspan>
+</text>
+<text x="680" y="511" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="13" fill="#111213" font-weight="700" text-anchor="start" opacity="1">
+<tspan x="680" dy="0">可关闭的周末场景推荐</tspan>
+</text>
+<rect x="1110" y="904" width="142" height="52" rx="26.0" fill="#F4EDE2" stroke="#E7DDCE" stroke-width="1" opacity="1"/>
+<text x="1181.0" y="934.5" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="15" fill="#111213" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="1181.0" dy="0">返回个人中心</tspan>
+</text>
+<rect x="1270" y="904" width="190" height="52" rx="26.0" fill="#FFCC33" stroke="none" stroke-width="1" opacity="1" filter="url(#smallShadow)"/>
+<text x="1365.0" y="934.5" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="15" fill="#111213" font-weight="800" text-anchor="middle" opacity="1">
+<tspan x="1365.0" dy="0">保存设置</tspan>
+</text>
+<rect x="1128" y="949" width="360" height="32" rx="16" fill="#FFF8DC" stroke="#E7D58F" stroke-width="1" opacity="0.96"/><text x="1308" y="970" font-family="Noto Sans CJK SC, Microsoft YaHei, PingFang SC, Arial, sans-serif" font-size="13" fill="#6B4E00" font-weight="800" text-anchor="middle" opacity="1" ><tspan x="1308" dy="0">028 · D43 原稿优化 · 字体加粗 · 导航沿用</tspan></text></svg>

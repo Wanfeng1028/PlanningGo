@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { Button } from "./Button";
-import { enterAsGuest, login, register } from "../lib/api";
+import { enterAsGuest, login, register, sendAuthCode } from "../lib/api";
 import type { ModalKey, SessionUser } from "../types";
 import modalStyles from "./Modal.module.scss";
 import styles from "./AuthModal.module.scss";
@@ -15,6 +15,7 @@ interface AuthModalProps {
 export function AuthModal({ mode, onClose, onSuccess }: AuthModalProps) {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     name: "小明",
@@ -41,6 +42,7 @@ export function AuthModal({ mode, onClose, onSuccess }: AuthModalProps) {
             : await register({
                 name: form.name,
                 phone: form.phone,
+                code: form.code,
                 city: form.city,
                 startPoint: form.startPoint,
                 companions: form.companions,
@@ -165,6 +167,26 @@ export function AuthModal({ mode, onClose, onSuccess }: AuthModalProps) {
               ) : (
                 <Button onClick={complete} disabled={loading}>{loading ? "处理中" : mode === "login" ? "登录并继续" : mode === "guest" ? "以游客身份进入" : "完成注册"}</Button>
               )}
+              {mode !== "guest" ? (
+                <Button
+                  variant="ghost"
+                  onClick={async () => {
+                    setLoading(true);
+                    setError("");
+                    try {
+                      await sendAuthCode(form.phone);
+                      setCodeSent(true);
+                    } catch {
+                      setError("验证码发送失败，演示时可直接输入 123456。");
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  disabled={loading}
+                >
+                  {codeSent ? "已发送验证码" : "发送验证码"}
+                </Button>
+              ) : null}
               {mode !== "guest" ? (
                 <Button variant="ghost" onClick={async () => {
                   setLoading(true);
