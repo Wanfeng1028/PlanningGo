@@ -11,7 +11,6 @@ import {
   deleteMemory,
   exportPrivacyBundle,
   getSelectedPlanId,
-  issueAuthCode,
   listApiKeys,
   listExecutionSteps,
   listMemories,
@@ -28,13 +27,12 @@ import {
   upsertWebhook,
   upsertMemory,
   upsertReservation,
-  verifyAuthCode,
   vote,
 } from "./services/store";
 
 const authSchema = z.object({
-  phone: z.string().min(3),
-  code: z.string().optional(),
+  email: z.string().email(),
+  password: z.string().min(6),
   name: z.string().optional(),
 });
 
@@ -59,7 +57,7 @@ export async function registerRoutes(app: FastifyInstance) {
     name: "PlanningGo API",
     version: "0.1.0",
     groups: [
-      { group: "Auth", endpoints: ["POST /api/auth/code", "POST /api/auth/login", "POST /api/auth/register", "POST /api/auth/guest"] },
+      { group: "Auth", endpoints: ["POST /api/auth/login", "POST /api/auth/register", "POST /api/auth/guest"] },
       { group: "Profile", endpoints: ["GET /api/profile/demo", "PATCH /api/profile/demo", "GET /api/profile/demo/permissions", "PATCH /api/profile/demo/permissions"] },
       { group: "Planning Agent", endpoints: ["POST /api/agent/parse", "POST /api/agent/plan", "POST /api/agent/what-if"] },
       { group: "Mock Data", endpoints: ["GET /api/mock/pois", "GET /api/mock/weather", "GET /api/mock/routes"] },
@@ -76,38 +74,33 @@ export async function registerRoutes(app: FastifyInstance) {
 
   app.get("/api/profile/demo", async () => demoProfile);
 
-  app.post("/api/auth/code", async (request) => {
-    const input = z.object({ phone: z.string().min(3) }).parse(request.body);
-    return issueAuthCode(input.phone);
-  });
-
-  app.post("/api/auth/login", async (request) => {
+  app.post("/api/auth/login", async (request, reply) => {
     const input = authSchema.parse(request.body);
-    if (!verifyAuthCode(input.phone, input.code)) {
-      return { error: "INVALID_CODE", message: "验证码错误或已过期，演示码为 123456。" };
+    if (input.email === "xiaoming@example.com" && input.password !== "weekend123") {
+      return reply.status(401).send({ error: "INVALID_PASSWORD", message: "邮箱或密码错误。演示密码为 weekend123。" });
     }
     return {
       token: `demo_token_${Date.now()}`,
       user: {
         id: demoProfile.id,
         name: input.name ?? demoProfile.name,
-        phone: input.phone,
+        email: input.email,
       },
       profile: demoProfile,
     };
   });
 
-  app.post("/api/auth/register", async (request) => {
+  app.post("/api/auth/register", async (request, reply) => {
     const input = authSchema.parse(request.body);
-    if (input.code && !verifyAuthCode(input.phone, input.code)) {
-      return { error: "INVALID_CODE", message: "验证码错误或已过期，演示码为 123456。" };
+    if (input.password.length < 6) {
+      return reply.status(400).send({ error: "WEAK_PASSWORD", message: "密码至少需要 6 位。" });
     }
     return {
       token: `demo_token_${Date.now()}`,
       user: {
         id: `user_${Date.now()}`,
         name: input.name ?? "新用户",
-        phone: input.phone,
+        email: input.email,
       },
       onboardingSteps: ["城市", "家庭成员", "预算习惯"],
     };

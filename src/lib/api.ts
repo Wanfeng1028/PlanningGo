@@ -10,7 +10,7 @@ export interface AuthResponse {
   user: {
     id: string;
     name: string;
-    phone?: string;
+    email?: string;
     mode?: "guest" | "registered";
   };
   profile?: {
@@ -56,24 +56,17 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function sendAuthCode(phone: string) {
-  return apiJson<{ phone: string; code: string; expiresInSeconds: number }>("/api/auth/code", {
-    method: "POST",
-    body: JSON.stringify({ phone }),
-  });
-}
-
-export async function login(phone: string, code: string): Promise<AuthResponse> {
+export async function login(email: string, password: string): Promise<AuthResponse> {
   return apiJson<AuthResponse>("/api/auth/login", {
     method: "POST",
-    body: JSON.stringify({ phone, code }),
+    body: JSON.stringify({ email, password }),
   });
 }
 
 export async function register(input: {
   name: string;
-  phone: string;
-  code: string;
+  email: string;
+  password: string;
   city: string;
   startPoint: string;
   companions: string;

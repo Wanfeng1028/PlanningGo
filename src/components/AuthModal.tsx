@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { Button } from "./Button";
-import { enterAsGuest, login, register, sendAuthCode } from "../lib/api";
+import { enterAsGuest, login, register } from "../lib/api";
 import type { ModalKey, SessionUser } from "../types";
 import modalStyles from "./Modal.module.scss";
 import styles from "./AuthModal.module.scss";
@@ -15,12 +15,11 @@ interface AuthModalProps {
 export function AuthModal({ mode, onClose, onSuccess }: AuthModalProps) {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [codeSent, setCodeSent] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     name: "小明",
-    phone: "13800000000",
-    code: "123456",
+    email: "xiaoming@example.com",
+    password: "weekend123",
     city: "杭州",
     startPoint: "浙大紫金港",
     companions: "family",
@@ -30,19 +29,32 @@ export function AuthModal({ mode, onClose, onSuccess }: AuthModalProps) {
 
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
 
+  const validateEmailPassword = () => {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      setError("请输入正确的邮箱地址。");
+      return false;
+    }
+    if (form.password.length < 6) {
+      setError("密码至少需要 6 位。演示密码为 weekend123。");
+      return false;
+    }
+    return true;
+  };
+
   const complete = async () => {
+    if (mode !== "guest" && !validateEmailPassword()) return;
     setLoading(true);
     setError("");
     try {
       const result =
         mode === "login"
-          ? await login(form.phone, form.code)
+          ? await login(form.email, form.password)
           : mode === "guest"
             ? await enterAsGuest({ city: form.city, startPoint: form.startPoint, companions: form.companions })
             : await register({
                 name: form.name,
-                phone: form.phone,
-                code: form.code,
+                email: form.email,
+                password: form.password,
                 city: form.city,
                 startPoint: form.startPoint,
                 companions: form.companions,
@@ -62,7 +74,7 @@ export function AuthModal({ mode, onClose, onSuccess }: AuthModalProps) {
         onClose();
         return;
       }
-      setError("服务暂时不可用，请稍后重试。演示时可以先用游客访问。");
+      setError("邮箱或密码校验失败。演示邮箱 xiaoming@example.com，密码 weekend123。");
     } finally {
       setLoading(false);
     }
@@ -87,7 +99,7 @@ export function AuthModal({ mode, onClose, onSuccess }: AuthModalProps) {
               ? "登录后加载城市、家庭成员、预算偏好和历史记忆。"
               : mode === "guest"
                 ? "不注册也可以完整体验规划流程，游客画像会保留 2 小时。"
-                : "注册分三步：账号、出发地和画像偏好，完成后直接进入规划工作台。"}
+                : "注册分三步：邮箱密码、出发地和画像偏好，完成后直接进入规划工作台。"}
           </p>
 
           {mode === "register" ? (
@@ -111,16 +123,28 @@ export function AuthModal({ mode, onClose, onSuccess }: AuthModalProps) {
                 {mode === "register" ? (
                   <div className={styles.field}>
                     <label htmlFor="auth-name">昵称</label>
-                    <input id="auth-name" value={form.name} onChange={(event) => update("name", event.target.value)} />
+                    <input id="auth-name" value={form.name} onChange={(event) => update("name", event.target.value)} autoComplete="nickname" />
                   </div>
                 ) : null}
                 <div className={styles.field}>
-                  <label htmlFor="auth-phone">手机号</label>
-                  <input id="auth-phone" value={form.phone} onChange={(event) => update("phone", event.target.value)} />
+                  <label htmlFor="auth-email">邮箱</label>
+                  <input
+                    id="auth-email"
+                    value={form.email}
+                    inputMode="email"
+                    autoComplete="email"
+                    onChange={(event) => update("email", event.target.value.trim())}
+                  />
                 </div>
                 <div className={styles.field}>
-                  <label htmlFor="auth-code">验证码</label>
-                  <input id="auth-code" value={form.code} onChange={(event) => update("code", event.target.value)} />
+                  <label htmlFor="auth-password">密码</label>
+                  <input
+                    id="auth-password"
+                    value={form.password}
+                    type="password"
+                    autoComplete={mode === "login" ? "current-password" : "new-password"}
+                    onChange={(event) => update("password", event.target.value)}
+                  />
                 </div>
               </div>
             ) : null}
@@ -168,26 +192,6 @@ export function AuthModal({ mode, onClose, onSuccess }: AuthModalProps) {
                 <Button onClick={complete} disabled={loading}>{loading ? "处理中" : mode === "login" ? "登录并继续" : mode === "guest" ? "以游客身份进入" : "完成注册"}</Button>
               )}
               {mode !== "guest" ? (
-                <Button
-                  variant="ghost"
-                  onClick={async () => {
-                    setLoading(true);
-                    setError("");
-                    try {
-                      await sendAuthCode(form.phone);
-                      setCodeSent(true);
-                    } catch {
-                      setError("验证码发送失败，演示时可直接输入 123456。");
-                    } finally {
-                      setLoading(false);
-                    }
-                  }}
-                  disabled={loading}
-                >
-                  {codeSent ? "已发送验证码" : "发送验证码"}
-                </Button>
-              ) : null}
-              {mode !== "guest" ? (
                 <Button variant="ghost" onClick={async () => {
                   setLoading(true);
                   await enterAsGuest({ city: form.city, startPoint: form.startPoint, companions: form.companions })
@@ -202,7 +206,7 @@ export function AuthModal({ mode, onClose, onSuccess }: AuthModalProps) {
                 </Button>
               ) : null}
             </div>
-            <p className={styles.hint}>演示验证码可直接使用 123456。游客模式不会保存长期记忆。</p>
+            <p className={styles.hint}>演示账号：xiaoming@example.com / weekend123。游客模式不会保存长期记忆。</p>
           </div>
         </div>
       </section>

@@ -8,7 +8,7 @@ export const modalContent: Record<ModalContent["key"], ModalContent> = {
     body: "登录后会加载城市、家庭成员、预算偏好和历史记忆，让 Agent 少问问题、多做决策。",
     primary: "登录并继续",
     secondary: "稍后再说",
-    bullets: ["支持手机号或演示账号", "登录不影响当前未保存方案", "右上角始终保留注册 / 登录入口"],
+    bullets: ["支持邮箱密码或演示账号", "登录不影响当前未保存方案", "右上角始终保留注册 / 登录入口"],
   },
   register: {
     key: "register",
@@ -26,7 +26,7 @@ export const modalContent: Record<ModalContent["key"], ModalContent> = {
     body: "游客可以完整体验规划、路线、分享和执行预览，但长期记忆、真实预约和支付交接需要登录。",
     primary: "进入游客模式",
     secondary: "返回",
-    bullets: ["无需手机号", "游客画像保留 2 小时", "可随时注册并带入当前计划"],
+    bullets: ["无需邮箱", "游客画像保留 2 小时", "可随时注册并带入当前计划"],
   },
   identity: {
     key: "identity",

@@ -58,7 +58,7 @@ export const productScreens: ProductScreen[] = [
     metrics: [
       { label: "已识别约束", value: "5" },
       { label: "追问次数", value: "1" },
-      { label: "演示验证码", value: "123456" },
+      { label: "演示密码", value: "weekend123" },
     ],
     details: ["出发地：浙大紫金港", "同行人：家庭，孩子 5 岁", "偏好：晚饭别太油，步行少一点"],
   },
@@ -268,11 +268,11 @@ export const productScreens: ProductScreen[] = [
     primary: "导出记忆",
     modal: "privacy",
     metrics: [
-      { label: "手机号", value: "138****0000" },
+      { label: "邮箱", value: "xiaoming@..." },
       { label: "通知", value: "3 类" },
       { label: "隐私", value: "可删" },
     ],
-    details: ["手机号验证码登录注册", "分享链接可撤回", "画像和历史记忆可导出或删除"],
+    details: ["邮箱密码登录注册", "分享链接可撤回", "画像和历史记忆可导出或删除"],
   },
   {
     id: "developer-console",

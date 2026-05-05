@@ -4,7 +4,6 @@ import type { ApiKeyRecord, ExecutionStep, MemoryItem, Reservation, ShareRoom, W
 const reservationStore = new Map(reservations.map((item) => [item.id, item]));
 const shareStore = new Map(shareRooms.map((item) => [item.id, item]));
 const memoryStore = new Map(memories.map((item) => [item.id, item]));
-const authCodeStore = new Map<string, { code: string; expiresAt: number }>();
 let selectedPlanId = "plan_a";
 const permissionStore = new Map<string, boolean>([
   ["location", true],
@@ -51,19 +50,6 @@ const webhookStore = new Map<string, WebhookRecord>([
     },
   ],
 ]);
-
-export function issueAuthCode(phone: string) {
-  const code = "123456";
-  authCodeStore.set(phone, { code, expiresAt: Date.now() + 5 * 60 * 1000 });
-  return { phone, code, expiresInSeconds: 300 };
-}
-
-export function verifyAuthCode(phone: string, code = "123456") {
-  const stored = authCodeStore.get(phone);
-  if (!stored && code === "123456") return true;
-  if (!stored) return false;
-  return stored.code === code && stored.expiresAt >= Date.now();
-}
 
 export function getSelectedPlanId() {
   return selectedPlanId;
