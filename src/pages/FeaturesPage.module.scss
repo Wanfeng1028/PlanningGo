@@ -105,12 +105,22 @@
   font-weight: 900;
   white-space: nowrap;
   cursor: pointer;
+  transition:
+    transform 180ms var(--ease-out),
+    background 180ms var(--ease-out),
+    box-shadow 180ms var(--ease-out);
+}
+
+.tab:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-xs);
 }
 
 .activeTab {
   background: var(--color-brand);
   border-color: var(--color-brand);
   box-shadow: var(--shadow-sm);
+  animation: activePop 240ms var(--ease-out) both;
 }
 
 .mainGrid {
@@ -137,6 +147,7 @@
   font-size: 15px;
   font-weight: 800;
   line-height: 1.65;
+  animation: messageIn 360ms var(--ease-out) both;
 }
 
 .messageUser {
@@ -211,6 +222,29 @@
   gap: 16px;
 }
 
+.agentBanner {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 18px;
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  background: rgb(var(--color-brand-rgb) / 0.18);
+  animation: messageIn 360ms var(--ease-out) both;
+}
+
+.agentBanner strong {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.agentBanner span {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.65;
+}
+
 .planCard {
   padding: 22px;
   position: relative;
@@ -219,6 +253,18 @@
 .planCard[data-selected="true"] {
   border-color: var(--color-brand);
   box-shadow: 0 0 0 4px rgb(var(--color-brand-rgb) / 0.22), var(--shadow-md);
+}
+
+.planCard[data-selected="true"]::after {
+  content: "";
+  position: absolute;
+  inset: auto 18px 18px auto;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-brand);
+  box-shadow: 0 0 0 8px rgb(var(--color-brand-rgb) / 0.18);
+  animation: pulseDot 1.8s ease-in-out infinite;
 }
 
 .planCard h3 {
@@ -289,6 +335,38 @@
   background: rgb(var(--color-brand-rgb) / 0.2);
   font-size: 12px;
   font-weight: 900;
+}
+
+@keyframes activePop {
+  from {
+    transform: scale(0.96);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes messageIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseDot {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.28);
+    opacity: 0.72;
+  }
 }
 
 @media (max-width: 1100px) {

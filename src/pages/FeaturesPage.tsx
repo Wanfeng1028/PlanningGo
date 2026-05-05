@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Bell,
   Bot,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "../components/Button";
 import { RouteMap } from "../components/RouteMap";
+import { requestAgentPlan, type AgentPlanResponse } from "../lib/api";
 import type { ModalKey } from "../types";
 import styles from "./FeaturesPage.module.scss";
 
@@ -65,11 +67,39 @@ interface FeaturesPageProps {
 
 export function FeaturesPage({ onOpenModal }: FeaturesPageProps) {
   const [active, setActive] = useState<ModuleKey>("chat");
+  const [prompt, setPrompt] = useState("如果下午下雨，就换成室内方案");
+  const [agentResult, setAgentResult] = useState<AgentPlanResponse | null>(null);
+  const [isPlanning, setIsPlanning] = useState(false);
+
+  const tabMotion = {
+    initial: { opacity: 0, y: 18, scale: 0.985 },
+    animate: { opacity: 1, y: 0, scale: 1 },
+    exit: { opacity: 0, y: -12, scale: 0.985 },
+    transition: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
+  } as const;
+
+  const handleGenerate = async () => {
+    setIsPlanning(true);
+    try {
+      const result = await requestAgentPlan(prompt);
+      setAgentResult(result);
+    } catch {
+      setAgentResult({
+        traceId: "local_fallback",
+        selectedPlanId: "plan_a",
+        summary: "后端服务未启动，已使用前端 Mock 方案继续演示。推荐亲子西湖低负担方案，支付仍由用户本人确认。",
+        nextActions: ["确认起点", "选择方案", "授权预约", "分享给家人"],
+      });
+    } finally {
+      setIsPlanning(false);
+      setActive("plan");
+    }
+  };
 
   return (
     <div className={styles.workspace}>
-      <section className={styles.hero}>
-        <div className={styles.panel}>
+      <motion.section className={styles.hero} initial={{ opacity: 0, y: 22 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+        <motion.div className={styles.panel} whileHover={{ y: -3 }}>
           <span className={styles.kicker}>功能 / 完整产品工作台</span>
           <h1 className={styles.title}>从一句话需求，到可执行周末计划</h1>
           <p className={styles.intro}>
@@ -89,11 +119,11 @@ export function FeaturesPage({ onOpenModal }: FeaturesPageProps) {
               <em>执行状态</em>
             </span>
           </div>
-        </div>
-        <div className={styles.mapCard}>
+        </motion.div>
+        <motion.div className={styles.mapCard} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.12 }}>
           <RouteMap />
-        </div>
-      </section>
+        </motion.div>
+      </motion.section>
 
       <nav className={styles.moduleTabs} aria-label="功能模块">
         {modules.map((item) => {
@@ -112,8 +142,9 @@ export function FeaturesPage({ onOpenModal }: FeaturesPageProps) {
         })}
       </nav>
 
+      <AnimatePresence mode="wait">
       {active === "chat" ? (
-        <section className={styles.mainGrid}>
+        <motion.section className={styles.mainGrid} key="chat" {...tabMotion}>
           <div className={styles.chat}>
             <h2 className={styles.sectionTitle}>对话式需求收集</h2>
             <div className={styles.messages}>
@@ -124,8 +155,8 @@ export function FeaturesPage({ onOpenModal }: FeaturesPageProps) {
               <p className={styles.message}>检测到家庭画像：孩子 5 岁，老婆减脂，优先少走路和可订餐厅。</p>
             </div>
             <div className={styles.composer}>
-              <input aria-label="输入规划需求" defaultValue="如果下午下雨，就换成室内方案" />
-              <Button onClick={() => setActive("plan")}>生成方案</Button>
+              <input aria-label="输入规划需求" value={prompt} onChange={(event) => setPrompt(event.target.value)} />
+              <Button onClick={handleGenerate} disabled={isPlanning}>{isPlanning ? "规划中" : "生成方案"}</Button>
             </div>
           </div>
           <aside className={styles.side}>
@@ -149,15 +180,29 @@ export function FeaturesPage({ onOpenModal }: FeaturesPageProps) {
               <Button variant="ghost" onClick={() => onOpenModal("identity")}>同行人</Button>
             </div>
           </aside>
-        </section>
+        </motion.section>
       ) : null}
 
       {active === "plan" ? (
-        <section>
+        <motion.section key="plan" {...tabMotion}>
           <h2 className={styles.sectionTitle}>Agent 工作台与三方案对比</h2>
+          {agentResult ? (
+            <div className={styles.agentBanner}>
+              <strong>Agent 返回</strong>
+              <span>{agentResult.summary}</span>
+            </div>
+          ) : null}
           <div className={styles.sectionGrid}>
-            {plans.map((plan) => (
-              <article className={styles.planCard} data-selected={plan.selected} key={plan.id}>
+            {plans.map((plan, index) => (
+              <motion.article
+                className={styles.planCard}
+                data-selected={plan.selected}
+                key={plan.id}
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.06 }}
+                whileHover={{ y: -5 }}
+              >
                 <span className={styles.statusPill}>方案 {plan.id}</span>
                 <h3>{plan.title}</h3>
                 <p>{plan.desc}</p>
@@ -169,14 +214,14 @@ export function FeaturesPage({ onOpenModal }: FeaturesPageProps) {
                 <Button variant={plan.selected ? "primary" : "ghost"} onClick={() => setActive("route")}>
                   {plan.selected ? "采用方案" : "查看详情"}
                 </Button>
-              </article>
+              </motion.article>
             ))}
           </div>
-        </section>
+        </motion.section>
       ) : null}
 
       {active === "route" ? (
-        <section className={styles.split}>
+        <motion.section className={styles.split} key="route" {...tabMotion}>
           <div className={styles.mapCard}>
             <RouteMap />
           </div>
@@ -193,11 +238,11 @@ export function FeaturesPage({ onOpenModal }: FeaturesPageProps) {
               <Button variant="ghost" onClick={() => onOpenModal("ticket")}>加电影/活动</Button>
             </div>
           </aside>
-        </section>
+        </motion.section>
       ) : null}
 
       {active === "execute" ? (
-        <section className={styles.mainGrid}>
+        <motion.section className={styles.mainGrid} key="execute" {...tabMotion}>
           <div className={styles.panel}>
             <h2 className={styles.sectionTitle}>授权与执行队列</h2>
             <ul className={styles.toolList}>
@@ -220,11 +265,11 @@ export function FeaturesPage({ onOpenModal }: FeaturesPageProps) {
               <li><strong>失败兜底</strong>换餐厅或改时间。</li>
             </ul>
           </aside>
-        </section>
+        </motion.section>
       ) : null}
 
       {active === "share" ? (
-        <section className={styles.mainGrid}>
+        <motion.section className={styles.mainGrid} key="share" {...tabMotion}>
           <div className={styles.panel}>
             <h2 className={styles.sectionTitle}>分享协作与多人投票</h2>
             <p className={styles.intro}>把计划递给老婆或朋友，他们只需要看时间、路线、预算和调整项。反馈会自动进入改版。</p>
@@ -245,11 +290,11 @@ export function FeaturesPage({ onOpenModal }: FeaturesPageProps) {
               <li><strong>步行 2.2km</strong>孩子可接受。</li>
             </ul>
           </aside>
-        </section>
+        </motion.section>
       ) : null}
 
       {active === "memory" ? (
-        <section className={styles.mainGrid}>
+        <motion.section className={styles.mainGrid} key="memory" {...tabMotion}>
           <div className={styles.panel}>
             <h2 className={styles.sectionTitle}>What-if 与记忆沉淀</h2>
             <div className={styles.sectionGrid}>
@@ -269,8 +314,9 @@ export function FeaturesPage({ onOpenModal }: FeaturesPageProps) {
               <Button variant="ghost" onClick={() => onOpenModal("privacy")}>管理记忆</Button>
             </div>
           </aside>
-        </section>
+        </motion.section>
       ) : null}
+      </AnimatePresence>
     </div>
   );
 }

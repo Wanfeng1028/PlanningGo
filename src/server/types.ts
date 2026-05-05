@@ -37,3 +37,38 @@ export interface AgentResult {
   authorization: string[];
   nextActions: string[];
 }
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  city: string;
+  startPoint: string;
+  family: string[];
+  preferences: string[];
+  budgetRange: [number, number];
+  permissions: Record<string, boolean>;
+}
+
+export interface Reservation {
+  id: string;
+  type: "restaurant" | "ticket" | "activity" | "delivery";
+  title: string;
+  status: "draft" | "holding" | "confirmed" | "failed";
+  price?: string;
+  detail: string;
+}
+
+export interface ShareRoom {
+  id: string;
+  planId: string;
+  title: string;
+  members: Array<{ name: string; vote: "yes" | "no" | "pending"; comment?: string }>;
+}
+
+export interface MemoryItem {
+  id: string;
+  category: "family" | "food" | "route" | "collaboration";
+  title: string;
+  detail: string;
+  weight: number;
+}

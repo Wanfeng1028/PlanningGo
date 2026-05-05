@@ -47,6 +47,35 @@ npm install
 npm run dev
 ```
 
+后端 Agent API：
+
+```bash
+npm run dev:api
+```
+
+前端默认请求 `http://127.0.0.1:8787`，可通过 `VITE_API_BASE` 覆盖。
+
+## 后端服务
+
+当前 Mock 后端覆盖完整产品闭环：
+
+- Auth：登录、注册
+- Profile：画像、权限管理
+- Planning Agent：需求解析、三方案规划、What-if 重规划
+- Mock Data：POI、天气、交通路线
+- Reservations：餐厅、票务、活动、配送预约状态
+- Execution：执行队列和工具日志
+- Share：分享房间、成员投票、评论
+- Memory：记忆列表、新增、删除
+- Developer：质量看板、工具调用日志
+- Calendar：ICS 日历文件生成
+
+接口目录可访问：
+
+```text
+GET /api/docs
+```
+
 ## 生产构建
 
 ```bash
