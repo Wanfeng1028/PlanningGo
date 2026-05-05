@@ -1,7 +1,7 @@
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
 import { navItems } from "../data/navigation";
-import type { ModalKey, NavKey } from "../types";
+import type { ModalKey, NavKey, SessionUser } from "../types";
 import { Button } from "./Button";
 import styles from "./NavBar.module.scss";
 
@@ -9,9 +9,11 @@ interface NavBarProps {
   active: NavKey;
   onNavigate: (key: NavKey) => void;
   onOpenModal: (key: ModalKey) => void;
+  user: SessionUser | null;
+  onLogout: () => void;
 }
 
-export function NavBar({ active, onNavigate, onOpenModal }: NavBarProps) {
+export function NavBar({ active, onNavigate, onOpenModal, user, onLogout }: NavBarProps) {
   const [open, setOpen] = useState(false);
 
   const handleNavigate = (key: NavKey) => {
@@ -40,12 +42,20 @@ export function NavBar({ active, onNavigate, onOpenModal }: NavBarProps) {
           ))}
         </div>
         <div className={styles.actions}>
-          <Button variant="ghost" size="small" onClick={() => onOpenModal("register")}>
-            注册
-          </Button>
-          <Button variant="dark" size="small" onClick={() => onOpenModal("login")}>
-            登录
-          </Button>
+          {user ? (
+            <>
+              <button className={styles.userBadge} type="button" onClick={() => handleNavigate("profile")}>
+                {user.mode === "guest" ? "游客" : user.name}
+              </button>
+              <Button variant="dark" size="small" onClick={onLogout}>退出</Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" size="small" onClick={() => onOpenModal("guest")}>游客访问</Button>
+              <Button variant="ghost" size="small" onClick={() => onOpenModal("register")}>注册</Button>
+              <Button variant="dark" size="small" onClick={() => onOpenModal("login")}>登录</Button>
+            </>
+          )}
         </div>
         <button
           className={styles.menuButton}
@@ -68,12 +78,18 @@ export function NavBar({ active, onNavigate, onOpenModal }: NavBarProps) {
           </button>
         ))}
         <div className={styles.mobileActions}>
-          <Button variant="ghost" size="small" onClick={() => onOpenModal("register")}>
-            注册
-          </Button>
-          <Button variant="dark" size="small" onClick={() => onOpenModal("login")}>
-            登录
-          </Button>
+          {user ? (
+            <>
+              <Button variant="ghost" size="small" onClick={() => handleNavigate("profile")}>{user.mode === "guest" ? "游客" : user.name}</Button>
+              <Button variant="dark" size="small" onClick={onLogout}>退出</Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" size="small" onClick={() => onOpenModal("guest")}>游客访问</Button>
+              <Button variant="ghost" size="small" onClick={() => onOpenModal("register")}>注册</Button>
+              <Button variant="dark" size="small" onClick={() => onOpenModal("login")}>登录</Button>
+            </>
+          )}
         </div>
       </div>
     </>

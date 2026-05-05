@@ -93,6 +93,20 @@
   gap: 12px;
 }
 
+.userBadge {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 16px;
+  border-radius: var(--radius-pill);
+  background: var(--color-brand);
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
 .menuButton {
   display: none;
 }

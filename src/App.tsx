@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
+import { AuthModal } from "./components/AuthModal";
 import { BottomTabs } from "./components/BottomTabs";
 import { Modal } from "./components/Modal";
 import { NavBar } from "./components/NavBar";
 import { designHighlights } from "./data/content";
-import type { ModalKey, NavKey } from "./types";
+import type { ModalKey, NavKey, SessionUser } from "./types";
 import { CasesPage } from "./pages/CasesPage";
 import { DevelopersPage } from "./pages/DevelopersPage";
 import { FeaturesPage } from "./pages/FeaturesPage";
@@ -15,6 +16,7 @@ import styles from "./App.module.scss";
 export function App() {
   const [active, setActive] = useState<NavKey>("home");
   const [modal, setModal] = useState<ModalKey | null>(null);
+  const [user, setUser] = useState<SessionUser | null>(null);
 
   const page = useMemo(() => {
     switch (active) {
@@ -45,14 +47,25 @@ export function App() {
 
   return (
     <div className={styles.shell}>
-      <NavBar active={active} onNavigate={setActive} onOpenModal={setModal} />
+      <NavBar active={active} onNavigate={setActive} onOpenModal={setModal} user={user} onLogout={() => setUser(null)} />
       <main className={`${styles.content} ${styles.page}`}>{page}</main>
       <footer className={styles.footer}>
         <span>周末有谱 · 本地生活规划 Agent</span>
-        <span>React + Vite + TypeScript + SCSS Modules · No Tailwind CSS</span>
+        <span></span>
       </footer>
       <BottomTabs active={active} onNavigate={setActive} />
-      <Modal modal={modal} onClose={() => setModal(null)} />
+      {modal === "login" || modal === "register" || modal === "guest" ? (
+        <AuthModal
+          mode={modal}
+          onClose={() => setModal(null)}
+          onSuccess={(nextUser) => {
+            setUser(nextUser);
+            setActive("features");
+          }}
+        />
+      ) : (
+        <Modal modal={modal} onClose={() => setModal(null)} />
+      )}
     </div>
   );
 }

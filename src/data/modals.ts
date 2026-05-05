@@ -19,6 +19,15 @@ export const modalContent: Record<ModalContent["key"], ModalContent> = {
     secondary: "用游客画像体验",
     bullets: ["默认城市可手动改", "家庭成员和朋友偏好可跳过", "画像后续可在个人中心导出或删除"],
   },
+  guest: {
+    key: "guest",
+    eyebrow: "游客访问",
+    title: "先用游客身份体验",
+    body: "游客可以完整体验规划、路线、分享和执行预览，但长期记忆、真实预约和支付交接需要登录。",
+    primary: "进入游客模式",
+    secondary: "返回",
+    bullets: ["无需手机号", "游客画像保留 2 小时", "可随时注册并带入当前计划"],
+  },
   identity: {
     key: "identity",
     eyebrow: "身份选择",

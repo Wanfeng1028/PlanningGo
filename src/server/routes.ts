@@ -21,6 +21,12 @@ const authSchema = z.object({
   name: z.string().optional(),
 });
 
+const guestSchema = z.object({
+  city: z.string().default("杭州"),
+  startPoint: z.string().default("浙大紫金港"),
+  companions: z.enum(["family", "friends", "couple", "solo"]).default("family"),
+});
+
 const permissionSchema = z.object({
   key: z.string(),
   allowed: z.boolean(),
@@ -36,7 +42,7 @@ export async function registerRoutes(app: FastifyInstance) {
     name: "PlanningGo API",
     version: "0.1.0",
     groups: [
-      { group: "Auth", endpoints: ["POST /api/auth/login", "POST /api/auth/register"] },
+      { group: "Auth", endpoints: ["POST /api/auth/login", "POST /api/auth/register", "POST /api/auth/guest"] },
       { group: "Profile", endpoints: ["GET /api/profile/demo", "PATCH /api/profile/demo", "PATCH /api/profile/demo/permissions"] },
       { group: "Planning Agent", endpoints: ["POST /api/agent/parse", "POST /api/agent/plan", "POST /api/agent/what-if"] },
       { group: "Mock Data", endpoints: ["GET /api/mock/pois", "GET /api/mock/weather", "GET /api/mock/routes"] },
@@ -75,6 +81,28 @@ export async function registerRoutes(app: FastifyInstance) {
         phone: input.phone,
       },
       onboardingSteps: ["城市", "家庭成员", "预算习惯"],
+    };
+  });
+
+  app.post("/api/auth/guest", async (request) => {
+    const input = guestSchema.parse(request.body ?? {});
+    return {
+      token: `guest_token_${Date.now()}`,
+      user: {
+        id: `guest_${Date.now()}`,
+        name: "游客",
+        mode: "guest",
+      },
+      profile: {
+        ...demoProfile,
+        id: "guest",
+        name: "游客",
+        city: input.city,
+        startPoint: input.startPoint,
+        family: input.companions === "family" ? ["5 岁孩子", "伴侣"] : [],
+        preferences: ["低负担路线", "预算可控", "可随时改计划"],
+      },
+      expiresInMinutes: 120,
     };
   });
 

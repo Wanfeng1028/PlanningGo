@@ -5,6 +5,7 @@ export type NavKey = "home" | "features" | "cases" | "design" | "developers" | "
 export type ModalKey =
   | "login"
   | "register"
+  | "guest"
   | "identity"
   | "location"
   | "reservation"
@@ -58,4 +59,11 @@ export interface TimelineItem {
   title: string;
   desc: string;
   status: "done" | "active" | "pending";
+}
+
+export interface SessionUser {
+  id: string;
+  name: string;
+  mode: "guest" | "registered";
+  city: string;
 }
