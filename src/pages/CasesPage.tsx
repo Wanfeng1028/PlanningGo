@@ -1,5 +1,4 @@
 import { SectionHeader } from "../components/SectionHeader";
-import { PageCoverage } from "../components/PageCoverage";
 import { caseCards } from "../data/content";
 import styles from "./Pages.module.scss";
 
@@ -27,7 +26,6 @@ export function CasesPage() {
           </article>
         ))}
       </section>
-      <PageCoverage nav="cases" />
     </>
   );
 }

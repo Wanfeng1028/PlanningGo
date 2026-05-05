@@ -1,6 +1,5 @@
 import { ShieldCheck, UserRound } from "lucide-react";
 import { Button } from "../components/Button";
-import { PageCoverage } from "../components/PageCoverage";
 import { SectionHeader } from "../components/SectionHeader";
 import { profileBlocks, scoreboard } from "../data/content";
 import type { ModalKey } from "../types";
@@ -62,7 +61,6 @@ export function ProfilePage({ onOpenModal }: ProfilePageProps) {
           </article>
         </div>
       </section>
-      <PageCoverage nav="profile" />
     </>
   );
 }
