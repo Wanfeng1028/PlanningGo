@@ -59,3 +59,15 @@ export interface TimelineItem {
   desc: string;
   status: "done" | "active" | "pending";
 }
+
+export interface PageSpec {
+  id: string;
+  platform: "desktop" | "mobile";
+  nav: NavKey;
+  source: "V2-100" | "Mobile-60" | "D43" | "I28";
+  number: string;
+  title: string;
+  file: string;
+  renderAs: "page" | "modal" | "drawer" | "sheet" | "state";
+  summary: string;
+}

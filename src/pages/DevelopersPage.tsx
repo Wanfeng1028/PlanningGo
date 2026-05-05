@@ -1,4 +1,5 @@
 import { SectionHeader } from "../components/SectionHeader";
+import { PageCoverage } from "../components/PageCoverage";
 import { developerBlocks } from "../data/content";
 import type { ModalKey } from "../types";
 import { FlowPage } from "./FlowPage";
@@ -42,6 +43,7 @@ export function DevelopersPage({ onOpenModal }: DevelopersPageProps) {
           ))}
         </div>
       </section>
+      <PageCoverage nav="developers" />
     </>
   );
 }

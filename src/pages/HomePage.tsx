@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { ArrowRight, Play, Route } from "lucide-react";
 import { Button } from "../components/Button";
+import { PageCoverage } from "../components/PageCoverage";
 import { RouteMap } from "../components/RouteMap";
 import { SectionHeader } from "../components/SectionHeader";
 import { capabilityCards, demoTimeline, heroStats } from "../data/content";
@@ -104,6 +105,7 @@ export function HomePage({ onNavigate, onOpenModal }: HomePageProps) {
           </article>
         </div>
       </section>
+      <PageCoverage nav="home" />
     </>
   );
 }
