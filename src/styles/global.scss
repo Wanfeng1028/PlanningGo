@@ -1,0 +1,144 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;800;900&family=Inter:wght@500;600;700;800;900&display=swap");
+
+:root {
+  --color-brand: #ffcc33;
+  --color-brand-rgb: 255 204 51;
+  --color-brand-hover: #ffd84d;
+  --color-brand-hover-rgb: 255 216 77;
+  --color-brand-pressed: #eeb81f;
+  --color-brand-pressed-rgb: 238 184 31;
+  --color-text-primary: #111213;
+  --color-text-primary-rgb: 17 18 19;
+  --color-text-strong: #151515;
+  --color-text-strong-rgb: 21 21 21;
+  --color-text-secondary: #6f6a62;
+  --color-text-secondary-rgb: 111 106 98;
+  --color-text-inverse: #ffffff;
+  --color-text-inverse-rgb: 255 255 255;
+  --color-page: #f7f1e7;
+  --color-page-rgb: 247 241 231;
+  --color-surface: #fffdf8;
+  --color-surface-rgb: 255 253 248;
+  --color-surface-warm: #fff8ea;
+  --color-surface-warm-rgb: 255 248 234;
+  --color-surface-muted: #f4ebdd;
+  --color-surface-muted-rgb: 244 235 221;
+  --color-panel: #efe6d8;
+  --color-panel-rgb: 239 230 216;
+  --color-border: #e7ddce;
+  --color-border-rgb: 231 221 206;
+  --color-border-strong: #e3d7c7;
+  --color-border-strong-rgb: 227 215 199;
+  --color-map-water: #cfe5dd;
+  --color-map-water-rgb: 207 229 221;
+  --color-ambient-grey: #c9d1d3;
+  --color-ambient-grey-rgb: 201 209 211;
+  --color-ambient-mist: #dde7e8;
+  --color-ambient-mist-rgb: 221 231 232;
+  --color-ambient-olive: #706736;
+  --color-ambient-olive-rgb: 112 103 54;
+  --color-success: #27ae60;
+  --color-success-rgb: 39 174 96;
+  --color-danger: #d94a38;
+  --color-danger-rgb: 217 74 56;
+  --font-sans: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Inter", Arial, sans-serif;
+  --font-number: "Inter", "Noto Sans SC", Arial, sans-serif;
+  --container-xl: 1360px;
+  --radius-xs: 10px;
+  --radius-sm: 12px;
+  --radius-control: 20px;
+  --radius-card: 24px;
+  --radius-panel: 30px;
+  --radius-pill: 999px;
+  --shadow-xs: 0 4px 10px rgb(var(--color-text-primary-rgb) / 0.06);
+  --shadow-sm: 0 8px 10px rgb(var(--color-text-primary-rgb) / 0.08);
+  --shadow-md: 0 16px 22px rgb(var(--color-text-primary-rgb) / 0.12);
+  --shadow-lg: 0 24px 36px rgb(var(--color-text-primary-rgb) / 0.14);
+  --shadow-xl: 0 32px 64px rgb(var(--color-text-primary-rgb) / 0.22);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  background: var(--color-page);
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-text-primary);
+  background: var(--color-page);
+  letter-spacing: 0.02em;
+  overflow-x: hidden;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  border: 0;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid rgb(var(--color-brand-rgb) / 0.55);
+  outline-offset: 3px;
+}
+
+::selection {
+  color: var(--color-text-primary);
+  background: rgb(var(--color-brand-rgb) / 0.55);
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes routeDash {
+  from {
+    stroke-dashoffset: 140;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
+}

@@ -1,0 +1,122 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(var(--color-text-primary-rgb) / 0.28);
+}
+
+.modal {
+  width: min(560px, 100%);
+  max-height: min(760px, calc(100vh - 48px));
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 28px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-xl);
+  animation: scaleIn 220ms var(--ease-out) both;
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 26px 26px 0;
+}
+
+.eyebrow {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  background: var(--color-brand);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.close {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  color: var(--color-text-primary);
+  background: var(--color-surface-muted);
+  cursor: pointer;
+}
+
+.body {
+  padding: 20px 26px 28px;
+}
+
+.title {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.18;
+  font-weight: 900;
+}
+
+.copy {
+  margin: 14px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.75;
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+  margin: 22px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.6;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--color-brand);
+  box-shadow: 0 0 0 4px rgb(var(--color-brand-rgb) / 0.18);
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 600px) {
+  .backdrop {
+    align-items: end;
+    padding: 0;
+  }
+
+  .modal {
+    width: 100%;
+    max-height: 82vh;
+    border-radius: 28px 28px 0 0;
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,158 @@
+.map {
+  position: relative;
+  min-height: 520px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  background:
+    radial-gradient(circle at 74% 34%, var(--color-map-water) 0 13rem, transparent 13.5rem),
+    linear-gradient(135deg, var(--color-panel), var(--color-surface-muted));
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.grid {
+  position: absolute;
+  inset: 52px 40px 40px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 28px;
+  opacity: 0.72;
+}
+
+.block {
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: rgb(var(--color-surface-warm-rgb) / 0.74);
+}
+
+.svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.line {
+  fill: none;
+  stroke: var(--color-brand);
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 14 10;
+  animation: routeDash 1.8s linear infinite;
+}
+
+.shadowLine {
+  fill: none;
+  stroke: var(--color-text-primary);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.52;
+}
+
+.pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+
+.pinDot {
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--color-text-primary);
+  border-radius: 50%;
+  background: var(--color-brand);
+}
+
+.pinLabel {
+  position: absolute;
+  left: 18px;
+  top: -2px;
+  min-width: max-content;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 900;
+  box-shadow: var(--shadow-xs);
+}
+
+.summary {
+  position: absolute;
+  right: 26px;
+  top: 50px;
+  width: 232px;
+  padding: 22px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: rgb(var(--color-surface-rgb) / 0.96);
+  box-shadow: var(--shadow-md);
+}
+
+.summary h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.summary p {
+  margin: 12px 0 18px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.65;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.metric {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-surface-muted);
+}
+
+.value {
+  display: block;
+  font-family: var(--font-number);
+  font-size: 22px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.label {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+@media (max-width: 760px) {
+  .map {
+    min-height: 620px;
+  }
+
+  .summary {
+    left: 18px;
+    right: 18px;
+    top: auto;
+    bottom: 18px;
+    width: auto;
+  }
+
+  .pinLabel {
+    font-size: 11px;
+  }
+}

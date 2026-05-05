@@ -1,0 +1,48 @@
+.header {
+  max-width: 840px;
+  margin-bottom: 34px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  background: var(--color-brand);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: var(--shadow-sm);
+}
+
+.title {
+  margin: 18px 0 0;
+  color: var(--color-text-primary);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 900;
+  line-height: 1.12;
+}
+
+.intro {
+  margin: 18px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.75;
+}
+
+@media (max-width: 600px) {
+  .header {
+    margin-bottom: 24px;
+  }
+
+  .title {
+    font-size: 30px;
+  }
+
+  .intro {
+    font-size: 15px;
+  }
+}
