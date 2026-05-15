@@ -51,9 +51,8 @@ export function NavBar({ active, onNavigate, onOpenModal, user, onLogout }: NavB
             </>
           ) : (
             <>
-              <Button variant="ghost" size="small" onClick={() => onOpenModal("guest")}>游客访问</Button>
-              <Button variant="ghost" size="small" onClick={() => onOpenModal("register")}>注册</Button>
-              <Button variant="dark" size="small" onClick={() => onOpenModal("login")}>登录</Button>
+              <button className={styles.loginLink} type="button" onClick={() => onOpenModal("login")}>登录</button>
+              <Button size="small" onClick={() => onOpenModal("register")}>免费注册</Button>
             </>
           )}
         </div>
@@ -85,9 +84,8 @@ export function NavBar({ active, onNavigate, onOpenModal, user, onLogout }: NavB
             </>
           ) : (
             <>
-              <Button variant="ghost" size="small" onClick={() => onOpenModal("guest")}>游客访问</Button>
-              <Button variant="ghost" size="small" onClick={() => onOpenModal("register")}>注册</Button>
-              <Button variant="dark" size="small" onClick={() => onOpenModal("login")}>登录</Button>
+              <Button variant="ghost" size="small" onClick={() => onOpenModal("login")}>登录</Button>
+              <Button size="small" onClick={() => onOpenModal("register")}>免费注册</Button>
             </>
           )}
         </div>

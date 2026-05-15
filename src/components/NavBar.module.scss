@@ -93,6 +93,25 @@
   gap: 12px;
 }
 
+.loginLink {
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  transition:
+    background 180ms var(--ease-out),
+    transform 180ms var(--ease-out);
+}
+
+.loginLink:hover {
+  background: rgb(var(--color-brand-rgb) / 0.14);
+  transform: translateY(-1px);
+}
+
 .userBadge {
   min-height: 40px;
   display: inline-flex;
