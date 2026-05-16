@@ -2,14 +2,16 @@
   position: sticky;
   top: 24px;
   z-index: 50;
-  width: min(var(--container-xl), calc(100vw - 48px));
+  width: var(--layout-shell-width);
   height: 76px;
   margin: 24px auto 0;
   display: grid;
+  /* auto 1fr auto 分别对应左侧 Logo、中间导航链接、右侧登录按钮 */
+  /* 如果想让中间区域更宽或更窄，可以调整这里的比例 */
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 24px;
-  padding: 0 34px;
+  padding: 0 var(--layout-content-gutter);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-pill);
   background: rgb(var(--color-surface-rgb) / 0.96);
@@ -148,7 +150,6 @@
 @media (max-width: 900px) {
   .nav {
     top: 14px;
-    width: calc(100vw - 32px);
     height: 58px;
     grid-template-columns: auto auto;
     justify-content: space-between;

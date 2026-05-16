@@ -13,7 +13,7 @@ const designCards = [
   {
     label: "定位",
     title: "先确定用户在哪里",
-    desc: "“别离家太远” 必须依赖定位或手动起点，本次示例为浙大紫金港。",
+    desc: "别离家太远必须依赖定位或手动起点，本次示例为浙大紫金港。",
   },
   {
     label: "规划",
@@ -60,11 +60,6 @@ const homeSections = [
 export function HomePage({ onNavigate, onOpenModal }: HomePageProps) {
   return (
     <div className={styles.homeLongPage}>
-      <div className={styles.floatingBubbles} aria-hidden="true">
-        {Array.from({ length: 36 }).map((_, index) => (
-          <span key={index} />
-        ))}
-      </div>
       <section className={`${styles.homeStage} ${styles.homeStageLanding}`}>
         <div className={styles.stageHalo} aria-hidden="true" />
         <motion.div
@@ -77,7 +72,7 @@ export function HomePage({ onNavigate, onOpenModal }: HomePageProps) {
           <h1>
             一款本地生活Agent!
             <br />
-            把周末从 “纠结” 到帮你彻底安排好!
+            把周末从 "纠结" 到帮你彻底安排好!
           </h1>
           <p className={styles.lead}>
             输入一句话，系统自动理解同行人、预算、天气、距离、餐饮偏好和备选预案，
@@ -94,7 +89,7 @@ export function HomePage({ onNavigate, onOpenModal }: HomePageProps) {
               ["约束检查", "12 项", "天气/距离/预算/排队"],
               ["备选方案", "3 套", "临时变化不慌"],
             ].map(([label, value, desc]) => (
-              <span className={styles.stat} key={label}>
+              <span className={styles.stat} key={label as string}>
                 <span>{label}</span>
                 <strong>{value}</strong>
                 <em>{desc}</em>
@@ -134,8 +129,8 @@ export function HomePage({ onNavigate, onOpenModal }: HomePageProps) {
                 ["19:30", "打车回家", "pink"],
               ].map(([time, stop, tone], index) => (
                 <motion.div
-                  className={`${styles.routeStop} ${styles[`routeStop${tone}`]}`}
-                  key={time}
+                  className={`${styles.routeStop} ${styles[`routeStop${tone as string}`]}`}
+                  key={time as string}
                   initial={{ opacity: 0, x: -12 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.05 * index }}

@@ -12,6 +12,7 @@ import { FlowPage } from "./pages/FlowPage";
 import { HomePage } from "./pages/HomePage";
 import { ProfilePage } from "./pages/ProfilePage";
 import styles from "./App.module.scss";
+import pageStyles from "./pages/Pages.module.scss";
 
 export function App() {
   const [active, setActive] = useState<NavKey>("home");
@@ -47,6 +48,11 @@ export function App() {
 
   return (
     <div className={styles.shell}>
+      <div className={pageStyles.floatingBubbles} aria-hidden="true">
+        {Array.from({ length: 36 }).map((_, index) => (
+          <span key={index} />
+        ))}
+      </div>
       <NavBar active={active} onNavigate={setActive} onOpenModal={setModal} user={user} onLogout={() => setUser(null)} />
       <main className={`${styles.content} ${styles.page}`}>{page}</main>
       <footer className={styles.footer}>
