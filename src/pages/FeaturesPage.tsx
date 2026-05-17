@@ -8,32 +8,39 @@ import { requestAgentPlan, type AgentPlanResponse } from "../lib/api";
 import type { ModalKey } from "../types";
 import styles from "./FeaturesPage.module.scss";
 
-const groupOrder = ["需求", "方案", "路线", "预订", "执行", "协作", "记忆", "账号", "开发者"];
+const groupOrder = ["开始", "位置", "资料", "方案", "路线", "预约", "支付", "执行", "协作", "变化", "记忆", "提醒", "确认", "开发者", "结果"];
 
 const kindLabel: Record<ProductScreenKind, string> = {
-  chat: "需求对话",
-  profile: "画像账号",
-  plans: "方案对比",
+  chat: "对话输入",
+  profile: "资料设置",
+  plans: "方案比较",
   map: "地图路线",
-  booking: "预订票务",
-  auth: "授权边界",
+  booking: "预约票务",
+  auth: "确认边界",
   execute: "执行状态",
   share: "分享协作",
-  memory: "重规划记忆",
-  developer: "开发者",
+  memory: "偏好记忆",
+  developer: "开发支持",
 };
 
 const planCards = [
-  { id: "A", title: "亲子西湖低负担", score: "92", body: "断桥短线、湖滨休息、海底捞提前锁桌。", active: true },
-  { id: "B", title: "朋友展览 Citywalk", score: "84", body: "展览、咖啡和轻社交，步行距离略高。", active: false },
-  { id: "C", title: "雨天室内兜底", score: "88", body: "切换室内亲子展，保留稳定晚餐。", active: false },
+  { id: "A", title: "武康路慢逛 + 晚餐", score: "92", body: "步行压力小，适合家庭与轻松出行。", active: true },
+  { id: "B", title: "展览 + 咖啡散步", score: "84", body: "更适合朋友见面，氛围感更强。", active: false },
+  { id: "C", title: "雨天室内替代", score: "88", body: "天气变化时依然能稳妥完成安排。", active: false },
 ];
 
 interface FeaturesPageProps {
   onOpenModal: (key: ModalKey) => void;
 }
 
-function ScreenPreview({ screen, prompt, setPrompt, onGenerate, isPlanning, result }: {
+function ScreenPreview({
+  screen,
+  prompt,
+  setPrompt,
+  onGenerate,
+  isPlanning,
+  result,
+}: {
   screen: ProductScreen;
   prompt: string;
   setPrompt: (value: string) => void;
@@ -50,7 +57,7 @@ function ScreenPreview({ screen, prompt, setPrompt, onGenerate, isPlanning, resu
       <div className={styles.planSwitch}>
         {result ? (
           <div className={styles.agentBanner}>
-            <strong>Agent 返回</strong>
+            <strong>推荐摘要</strong>
             <span>{result.summary}</span>
           </div>
         ) : null}
@@ -59,7 +66,7 @@ function ScreenPreview({ screen, prompt, setPrompt, onGenerate, isPlanning, resu
             <span>方案 {plan.id}</span>
             <strong>{plan.title}</strong>
             <p>{plan.body}</p>
-            <em>{plan.score} 可信度</em>
+            <em>{plan.score} 匹配度</em>
           </article>
         ))}
       </div>
@@ -69,9 +76,9 @@ function ScreenPreview({ screen, prompt, setPrompt, onGenerate, isPlanning, resu
   if (screen.kind === "chat") {
     return (
       <div className={styles.chatPreview}>
-        <p className={styles.userBubble}>今天下午从浙大紫金港出发，带孩子去西湖附近玩一圈，晚饭别太油。</p>
-        <p>我会先确认定位、同行人、预算和步行负担，再生成三套方案。</p>
-        <p>检测到家庭画像：孩子 5 岁，老婆减脂，优先少走路和可订餐厅。</p>
+        <p className={styles.userBubble}>周六下午想带爸妈在徐家汇附近走走，预算人均 200，晚饭想稳一点。</p>
+        <p>我会先确认出发点、同行人和预算，再给出几套合适的安排。</p>
+        <p>目前识别到家庭出行、轻松路线偏好，以及希望减少排队和长距离步行。</p>
         <div className={styles.composer}>
           <input aria-label="输入规划需求" value={prompt} onChange={(event) => setPrompt(event.target.value)} />
           <Button onClick={onGenerate} disabled={isPlanning}>{isPlanning ? "规划中" : "生成方案"}</Button>
@@ -109,7 +116,7 @@ function ScreenPreview({ screen, prompt, setPrompt, onGenerate, isPlanning, resu
 export function FeaturesPage({ onOpenModal }: FeaturesPageProps) {
   const [activeId, setActiveId] = useState(productScreens[0].id);
   const [query, setQuery] = useState("");
-  const [prompt, setPrompt] = useState("如果下午下雨，就换成室内方案");
+  const [prompt, setPrompt] = useState("周日下午想和朋友在市区随便逛逛，再吃顿晚饭。");
   const [agentResult, setAgentResult] = useState<AgentPlanResponse | null>(null);
   const [isPlanning, setIsPlanning] = useState(false);
 
@@ -134,8 +141,8 @@ export function FeaturesPage({ onOpenModal }: FeaturesPageProps) {
       setAgentResult({
         traceId: "local_fallback",
         selectedPlanId: "plan_a",
-        summary: "后端服务未启动，已使用前端 Mock 方案继续演示。推荐亲子西湖低负担方案，支付仍由用户本人确认。",
-        nextActions: ["确认起点", "选择方案", "授权预约", "分享给家人"],
+        summary: "当前先展示一版推荐结果，包含路线、餐饮与确认节点，方便继续往下选择。",
+        nextActions: ["确认偏好", "选择方案", "确认预约", "发给同行人"],
       });
     } finally {
       setIsPlanning(false);
@@ -150,15 +157,15 @@ export function FeaturesPage({ onOpenModal }: FeaturesPageProps) {
 
   return (
     <div className={styles.productShell}>
-      <aside className={styles.screenRail} aria-label="功能实现页面">
+      <aside className={styles.screenRail} aria-label="功能页面导航">
         <div className={styles.railHeader}>
-          <span className={styles.kicker}>功能实现 / 页面切换</span>
-          <h1>完整产品工作台</h1>
-          <p>按设计稿流程拆成可切换页面，不再把功能全堆在一个网页里。</p>
+          <span className={styles.kicker}>功能预览 / 页面切换</span>
+          <h1>查看完整规划链路</h1>
+          <p>从输入需求到生成方案、确认预约、发起协作和管理偏好，这里把关键页面按顺序串了起来。</p>
         </div>
         <label className={styles.searchBox}>
           <Search size={16} />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索页面 / 设计稿编号" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索页面或功能" />
         </label>
         <div className={styles.groupTabs}>
           {groupOrder.map((group) => (
@@ -229,7 +236,7 @@ export function FeaturesPage({ onOpenModal }: FeaturesPageProps) {
                 />
               </div>
               <aside className={styles.controlPanel}>
-                <h3>本页可操作</h3>
+                <h3>这一页会看到什么</h3>
                 <ul>
                   {activeScreen.details.map((detail) => (
                     <li key={detail}>{detail}</li>
@@ -241,7 +248,7 @@ export function FeaturesPage({ onOpenModal }: FeaturesPageProps) {
                   ) : activeScreen.id === "message-input" ? (
                     <Button onClick={handleGenerate} disabled={isPlanning}>{isPlanning ? "规划中" : "生成方案"}</Button>
                   ) : (
-                    <Button onClick={() => goTo(1)} disabled={activeIndex === productScreens.length - 1}>进入下一页</Button>
+                    <Button onClick={() => goTo(1)} disabled={activeIndex === productScreens.length - 1}>继续下一页</Button>
                   )}
                   <Button variant="ghost" onClick={() => goTo(-1)} disabled={activeIndex === 0}>上一页</Button>
                   <Button variant="ghost" onClick={() => goTo(1)} disabled={activeIndex === productScreens.length - 1}>下一页</Button>

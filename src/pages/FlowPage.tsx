@@ -15,7 +15,7 @@ const modeLabel = {
   page: "页面",
   modal: "弹窗",
   drawer: "抽屉",
-  sheet: "Sheet",
+  sheet: "底部弹层",
   state: "状态",
 };
 

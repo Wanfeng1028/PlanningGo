@@ -6,6 +6,7 @@ export type ModalKey =
   | "login"
   | "register"
   | "guest"
+  | "contact"
   | "identity"
   | "location"
   | "reservation"

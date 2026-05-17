@@ -16,27 +16,27 @@ export function ProfilePage({ onOpenModal }: ProfilePageProps) {
       <FlowPage
         blocks={profileBlocks}
         eyebrow="个人中心"
-        title="所有账号和画像页面都归到这里"
-        intro="43 页身份选择、游客画像、登录注册、画像设置，28 页差异登录稿和最终 100 页隐私记忆，都被归并为个人中心页面与弹窗流程。"
+        title="把账号、偏好和隐私集中管理"
+        intro="登录、注册、偏好设置、通知方式和隐私管理都放在这里，方便一次看清、一次改好。"
         onOpenModal={onOpenModal}
       />
       <section className={styles.section}>
         <SectionHeader
-          eyebrow="小明画像"
-          title="让下次规划少问一点"
-          intro="画像卡不是静态展示，后续后端会用它驱动约束合并、地点召回和风险校验。"
+          eyebrow="我的偏好"
+          title="下次规划会更懂你"
+          intro="这里不是静态资料页，而是会持续记录你的出行习惯、预算偏好和常见选择。"
         />
         <div className={styles.twoGrid}>
           <article className={styles.card}>
             <span className={styles.cardIcon}>
               <UserRound size={22} />
             </span>
-            <h3>家庭默认画像</h3>
-            <p>杭州，孩子 5 岁，周末下午偏好低负担路线；晚餐尽量照顾减脂习惯，避免长时间排队。</p>
+            <h3>家庭默认偏好</h3>
+            <p>已记录亲子出行、轻松路线、适中预算和减少排队等常见需求，后续还可以继续补充。</p>
             <div className={styles.actions}>
-              <Button onClick={() => onOpenModal("register")}>编辑画像</Button>
+              <Button onClick={() => onOpenModal("register")}>编辑偏好</Button>
               <Button variant="ghost" onClick={() => onOpenModal("privacy")}>
-                导出记忆
+                查看隐私
               </Button>
             </div>
           </article>
@@ -45,7 +45,7 @@ export function ProfilePage({ onOpenModal }: ProfilePageProps) {
               <ShieldCheck size={22} />
             </span>
             <h3>权限边界</h3>
-            <p>定位、日历、分享、通知、记忆导出均可单独管理。支付只做交接，不让 Agent 自动付款。</p>
+            <p>定位、通知、日历和支付等能力都会按步骤征得确认，不会在你不知情的情况下直接执行。</p>
             <div className={styles.grid}>
               {scoreboard.map((item) => {
                 const Icon = item.icon;

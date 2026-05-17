@@ -3,6 +3,61 @@
   gap: 28px;
 }
 
+@mixin glass-panel($radius: var(--radius-panel), $padding: null) {
+  min-width: 0;
+  position: relative;
+  isolation: isolate;
+  border: 1px solid rgb(255 255 255 / 0.62);
+  border-radius: $radius;
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.3) 0%, rgb(255 255 255 / 0.14) 52%, rgb(255 255 255 / 0.08) 100%),
+    rgb(255 255 255 / 0.06);
+  box-shadow:
+    0 18px 40px rgb(var(--color-text-primary-rgb) / 0.08),
+    inset 0 1px 0 rgb(255 255 255 / 0.74),
+    inset 0 -1px 0 rgb(255 255 255 / 0.18);
+  backdrop-filter: blur(24px) saturate(1.35);
+  -webkit-backdrop-filter: blur(24px) saturate(1.35);
+  overflow: hidden;
+
+  @if $padding != null {
+    padding: $padding;
+  }
+}
+
+@mixin glass-panel-overlay {
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  &::before {
+    background:
+      radial-gradient(circle at 18% 12%, rgb(255 255 255 / 0.8), transparent 28%),
+      linear-gradient(135deg, rgb(255 255 255 / 0.26), transparent 46%);
+    opacity: 0.84;
+  }
+
+  &::after {
+    inset: auto -10% -30% 34%;
+    height: 56%;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle, rgb(var(--color-brand-rgb) / 0.14) 0%, rgb(255 255 255 / 0.04) 58%, transparent 100%);
+    filter: blur(16px);
+    opacity: 0.76;
+    transform: rotate(-10deg);
+  }
+
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+}
+
 .productShell {
   display: grid;
   grid-template-columns: 360px minmax(0, 1fr);
@@ -14,11 +69,8 @@
 .screenStage,
 .previewPanel,
 .controlPanel {
-  min-width: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-panel);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-md);
+  @include glass-panel();
+  @include glass-panel-overlay;
 }
 
 .screenRail {
@@ -53,9 +105,11 @@
   align-items: center;
   gap: 10px;
   padding: 0 14px;
-  border: 1px solid var(--color-border);
+  border: 1px solid rgb(255 255 255 / 0.44);
   border-radius: var(--radius-pill);
-  background: var(--color-surface-muted);
+  background: rgb(255 255 255 / 0.26);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .searchBox input {
@@ -80,16 +134,19 @@
   min-height: 34px;
   padding: 0 12px;
   border-radius: var(--radius-pill);
-  background: var(--color-surface-muted);
+  border: 1px solid rgb(255 255 255 / 0.42);
+  background: rgb(255 255 255 / 0.22);
   color: var(--color-text-primary);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 800;
   white-space: nowrap;
   cursor: pointer;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .groupTabs button:hover {
-  background: rgb(var(--color-brand-rgb) / 0.24);
+  background: rgb(var(--color-brand-rgb) / 0.18);
 }
 
 .screenList {
@@ -107,27 +164,42 @@
   gap: 12px;
   align-items: center;
   padding: 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 18px;
-  background: var(--color-surface);
+  border: 1px solid rgb(255 255 255 / 0.46);
+  border-radius: 22px;
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.24), rgb(255 255 255 / 0.08)),
+    rgb(255 255 255 / 0.05);
   color: var(--color-text-primary);
   text-align: left;
   cursor: pointer;
+  box-shadow:
+    0 10px 24px rgb(var(--color-text-primary-rgb) / 0.05),
+    inset 0 1px 0 rgb(255 255 255 / 0.62);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   transition:
     transform 180ms var(--ease-out),
     background 180ms var(--ease-out),
-    box-shadow 180ms var(--ease-out);
+    box-shadow 180ms var(--ease-out),
+    border-color 180ms var(--ease-out);
 }
 
 .screenButton:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-xs);
+  border-color: rgb(255 255 255 / 0.68);
+  box-shadow:
+    0 14px 28px rgb(var(--color-text-primary-rgb) / 0.08),
+    inset 0 1px 0 rgb(255 255 255 / 0.72);
 }
 
 .screenButtonActive {
-  border-color: var(--color-brand);
-  background: rgb(var(--color-brand-rgb) / 0.2);
-  box-shadow: var(--shadow-sm);
+  border-color: rgb(255 255 255 / 0.72);
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.28), rgb(255 255 255 / 0.1)),
+    rgb(var(--color-brand-rgb) / 0.1);
+  box-shadow:
+    0 14px 28px rgb(var(--color-text-primary-rgb) / 0.08),
+    inset 0 1px 0 rgb(255 255 255 / 0.74);
 }
 
 .screenButton span {
@@ -193,11 +265,14 @@
   align-items: center;
   padding: 0 14px;
   border-radius: var(--radius-pill);
-  background: var(--color-surface-muted);
-  color: var(--color-text-secondary);
+  border: 1px solid rgb(255 255 255 / 0.42);
+  background: rgb(255 255 255 / 0.26);
+  color: rgb(var(--color-text-primary-rgb) / 0.62);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 800;
   white-space: nowrap;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .metricGrid {
@@ -236,12 +311,15 @@
 
 .controlPanel li {
   padding: 12px;
-  border-radius: 14px;
-  background: var(--color-surface-muted);
+  border: 1px solid rgb(255 255 255 / 0.4);
+  border-radius: 18px;
+  background: rgb(255 255 255 / 0.22);
   color: var(--color-text-secondary);
   font-size: 13px;
   font-weight: 800;
   line-height: 1.6;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .planSwitch,
@@ -261,17 +339,25 @@
   width: min(86%, 620px);
   margin: 0;
   padding: 16px;
-  border-radius: 20px;
-  background: var(--color-surface-muted);
+  border: 1px solid rgb(255 255 255 / 0.46);
+  border-radius: 22px;
+  background: rgb(255 255 255 / 0.28);
   color: var(--color-text-primary);
   font-size: 15px;
   font-weight: 800;
   line-height: 1.65;
+  box-shadow:
+    0 10px 24px rgb(var(--color-text-primary-rgb) / 0.05),
+    inset 0 1px 0 rgb(255 255 255 / 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .chatPreview .userBubble {
   justify-self: end;
-  background: var(--color-brand);
+  border-color: rgb(255 255 255 / 0.4);
+  background:
+    linear-gradient(180deg, rgb(255 216 77 / 0.92) 0%, rgb(255 201 40 / 0.92) 100%);
 }
 
 .planSwitch {
@@ -282,16 +368,16 @@
 }
 
 .miniPlan {
-  min-width: 0;
-  padding: 18px;
-  border: 1px solid var(--color-border);
-  border-radius: 20px;
-  background: var(--color-surface);
+  @include glass-panel(24px, 18px);
+  @include glass-panel-overlay;
 }
 
 .miniPlan[data-active="true"] {
-  border-color: var(--color-brand);
-  box-shadow: 0 0 0 4px rgb(var(--color-brand-rgb) / 0.18);
+  border-color: rgb(255 255 255 / 0.78);
+  box-shadow:
+    0 18px 38px rgb(var(--color-text-primary-rgb) / 0.09),
+    inset 0 1px 0 rgb(255 255 255 / 0.8),
+    0 0 0 4px rgb(var(--color-brand-rgb) / 0.12);
 }
 
 .miniPlan span,
@@ -337,20 +423,24 @@
   gap: 12px;
   align-items: center;
   padding: 14px;
-  border-radius: 16px;
-  background: var(--color-text-primary);
-  color: var(--color-text-inverse);
+  border: 1px solid rgb(255 255 255 / 0.4);
+  border-radius: 18px;
+  background: rgb(255 255 255 / 0.24);
+  color: var(--color-text-primary);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.56);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .statusRow {
   grid-template-columns: auto minmax(0, 1fr);
-  background: var(--color-surface-muted);
+  background: rgb(255 255 255 / 0.22);
   color: var(--color-text-primary);
 }
 
 .logRow span,
 .logRow em {
-  color: rgb(var(--color-text-inverse-rgb) / 0.68);
+  color: rgb(var(--color-text-primary-rgb) / 0.56);
   font-style: normal;
   font-size: 12px;
   font-weight: 900;
@@ -376,11 +466,8 @@
 .side,
 .mapCard,
 .planCard {
-  min-width: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-panel);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-md);
+  @include glass-panel();
+  @include glass-panel-overlay;
 }
 
 .panel {
@@ -424,9 +511,12 @@
 .quickStats span {
   min-width: 0;
   padding: 16px;
-  border: 1px solid var(--color-border);
-  border-radius: 18px;
-  background: var(--color-surface-muted);
+  border: 1px solid rgb(255 255 255 / 0.42);
+  border-radius: 20px;
+  background: rgb(255 255 255 / 0.22);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.58);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .quickStats strong {
@@ -459,13 +549,15 @@
   gap: 8px;
   padding: 0 18px;
   border-radius: var(--radius-pill);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  background: rgb(255 255 255 / 0.22);
+  border: 1px solid rgb(255 255 255 / 0.42);
   color: var(--color-text-primary);
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 800;
   white-space: nowrap;
   cursor: pointer;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   transition:
     transform 180ms var(--ease-out),
     background 180ms var(--ease-out),
@@ -478,9 +570,12 @@
 }
 
 .activeTab {
-  background: var(--color-brand);
-  border-color: var(--color-brand);
-  box-shadow: var(--shadow-sm);
+  background:
+    linear-gradient(180deg, rgb(255 216 77 / 0.92) 0%, rgb(255 201 40 / 0.92) 100%);
+  border-color: rgb(255 255 255 / 0.34);
+  box-shadow:
+    0 10px 24px rgb(var(--color-brand-rgb) / 0.18),
+    inset 0 1px 0 rgb(255 255 255 / 0.5);
   animation: activePop 240ms var(--ease-out) both;
 }
 
@@ -527,11 +622,13 @@
   min-width: 0;
   min-height: 48px;
   padding: 0 16px;
-  border: 1px solid var(--color-border);
+  border: 1px solid rgb(255 255 255 / 0.42);
   border-radius: var(--radius-pill);
-  background: var(--color-surface);
+  background: rgb(255 255 255 / 0.22);
   color: var(--color-text-primary);
   font-weight: 800;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .side {
@@ -559,13 +656,16 @@
 .toolList li,
 .timeline li {
   padding: 14px;
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
-  background: var(--color-surface-muted);
+  border: 1px solid rgb(255 255 255 / 0.4);
+  border-radius: 18px;
+  background: rgb(255 255 255 / 0.22);
   color: var(--color-text-secondary);
   font-size: 13px;
   font-weight: 800;
   line-height: 1.6;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.56);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .checkList strong,
@@ -588,9 +688,16 @@
   gap: 8px;
   margin: 0 0 18px;
   padding: 18px;
-  border: 1px solid var(--color-border);
-  border-radius: 20px;
-  background: rgb(var(--color-brand-rgb) / 0.18);
+  border: 1px solid rgb(255 255 255 / 0.42);
+  border-radius: 24px;
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.22), rgb(255 255 255 / 0.08)),
+    rgb(var(--color-brand-rgb) / 0.1);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.58),
+    0 12px 26px rgb(var(--color-text-primary-rgb) / 0.05);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   animation: messageIn 360ms var(--ease-out) both;
 }
 
@@ -612,8 +719,11 @@
 }
 
 .planCard[data-selected="true"] {
-  border-color: var(--color-brand);
-  box-shadow: 0 0 0 4px rgb(var(--color-brand-rgb) / 0.22), var(--shadow-md);
+  border-color: rgb(255 255 255 / 0.76);
+  box-shadow:
+    0 18px 38px rgb(var(--color-text-primary-rgb) / 0.09),
+    inset 0 1px 0 rgb(255 255 255 / 0.8),
+    0 0 0 4px rgb(var(--color-brand-rgb) / 0.12);
 }
 
 .planCard[data-selected="true"]::after {
@@ -651,8 +761,12 @@
 
 .metric {
   padding: 12px;
-  border-radius: 14px;
-  background: var(--color-surface-muted);
+  border: 1px solid rgb(255 255 255 / 0.4);
+  border-radius: 18px;
+  background: rgb(255 255 255 / 0.22);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.58);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .metric strong {
@@ -693,9 +807,12 @@
   align-items: center;
   padding: 0 12px;
   border-radius: var(--radius-pill);
-  background: rgb(var(--color-brand-rgb) / 0.2);
+  border: 1px solid rgb(255 255 255 / 0.4);
+  background: rgb(255 255 255 / 0.24);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 800;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 @keyframes activePop {
