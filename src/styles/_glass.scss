@@ -1,0 +1,87 @@
+// =============================================================================
+// Glass Card Mixins
+// 从 Pages.module.scss 中 .designCard / .whyChooseCard / .routeOverviewBoard
+// 已有玻璃拟态样式抽离，供页面卡片复用。
+// 主要参考：.designCard（首页第二部分页卡）
+// =============================================================================
+
+// 玻璃底座：半透明边框、渐变玻璃背景、backdrop-filter、柔和阴影、overflow
+@mixin glass-card-base {
+  position: relative;
+  isolation: isolate;
+  border: 1px solid rgb(255 255 255 / 0.46);
+  border-radius: 30px;
+  background:
+    linear-gradient(148deg, rgb(255 255 255 / 0.22) 0%, rgb(255 255 255 / 0.1) 48%, rgb(255 255 255 / 0.05) 100%),
+    rgb(255 255 255 / 0.04);
+  box-shadow:
+    0 14px 34px rgb(var(--color-text-primary-rgb) / 0.06),
+    inset 0 1px 0 rgb(255 255 255 / 0.62),
+    inset 0 -1px 0 rgb(255 255 255 / 0.12);
+  backdrop-filter: blur(26px) saturate(1.2);
+  -webkit-backdrop-filter: blur(26px) saturate(1.2);
+  overflow: hidden;
+  transition:
+    transform 180ms var(--ease-out),
+    box-shadow 180ms var(--ease-out),
+    border-color 180ms var(--ease-out),
+    background 180ms var(--ease-out);
+}
+
+// 顶部高光层（::before）
+@mixin glass-card-light {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 12%, rgb(255 255 255 / 0.62), transparent 24%),
+    linear-gradient(135deg, rgb(255 255 255 / 0.18), transparent 42%);
+  opacity: 0.88;
+}
+
+// 柔和品牌色光晕（::after）
+@mixin glass-card-glow {
+  content: "";
+  position: absolute;
+  inset: auto -8% -24% 38%;
+  height: 50%;
+  border-radius: 50%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle, rgb(var(--color-brand-rgb) / 0.1) 0%, rgb(255 255 255 / 0.03) 54%, transparent 100%);
+  filter: blur(18px);
+  opacity: 0.56;
+  transform: rotate(-10deg);
+}
+
+// hover 上浮 + 阴影增强 + 边框提亮
+@mixin glass-card-hover {
+  transform: translateY(-3px);
+  border-color: rgb(255 255 255 / 0.58);
+  box-shadow:
+    0 18px 40px rgb(var(--color-text-primary-rgb) / 0.08),
+    inset 0 1px 0 rgb(255 255 255 / 0.72),
+    inset 0 -1px 0 rgb(255 255 255 / 0.12);
+}
+
+// 选中状态：在玻璃效果上叠加淡淡品牌色高亮，不突兀
+@mixin glass-card-active {
+  border-color: rgb(var(--color-brand-rgb) / 0.45);
+  background:
+    linear-gradient(148deg, rgb(255 255 255 / 0.26) 0%, rgb(255 255 255 / 0.12) 48%, rgb(var(--color-brand-rgb) / 0.06) 100%),
+    rgb(var(--color-brand-rgb) / 0.04);
+  box-shadow:
+    0 14px 34px rgb(var(--color-text-primary-rgb) / 0.06),
+    0 0 0 1px rgb(var(--color-brand-rgb) / 0.12),
+    inset 0 1px 0 rgb(255 255 255 / 0.62),
+    inset 0 -1px 0 rgb(255 255 255 / 0.12);
+}
+
+// 内容层：确保子元素在伪元素之上
+@mixin glass-card-content-layer {
+  > * {
+    position: relative;
+    z-index: 1;
+  }
+}

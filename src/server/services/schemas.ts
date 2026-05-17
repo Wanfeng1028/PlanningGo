@@ -47,7 +47,7 @@ export const executionStepSchema = z.object({
    * - 亲子类行程应控制"游玩"类步骤的持续时间，避免孩子疲劳
    */
   actionType: z.enum(["就餐", "游玩", "交通", "休息", "购物", "接送"], {
-    errorMap: () => ({ message: "actionType 必须为 '就餐'、'游玩'、'交通'、'休息'、'购物' 或 '接送'" }),
+    error: "actionType 必须为 '就餐'、'游玩'、'交通'、'休息'、'购物' 或 '接送'",
   }),
 
   /**
@@ -381,7 +381,7 @@ export function safeValidateActivityPlan(data: unknown): [true, ActivityPlan] | 
   if (result.success) {
     return [true, result.data];
   }
-  return [false, result.error.errors.map((e) => e.message).join("; ")];
+  return [false, result.error.issues.map((e) => e.message).join("; ")];
 }
 
 /**
@@ -395,5 +395,5 @@ export function safeValidateFinalResponse(data: unknown): [true, FinalResponse] 
   if (result.success) {
     return [true, result.data];
   }
-  return [false, result.error.errors.map((e) => e.message).join("; ")];
+  return [false, result.error.issues.map((e) => e.message).join("; ")];
 }

@@ -1,3 +1,5 @@
+@use "../styles/glass" as glass;
+
 .homeLongPage {
   --home-max: 1360px;
   position: relative;
@@ -2537,5 +2539,153 @@
 
   .log {
     grid-template-columns: 1fr;
+  }
+}
+
+.profileGate {
+  min-height: calc(100vh - 260px);
+  padding: clamp(42px, 7vw, 96px) var(--layout-content-gutter) 24px;
+}
+
+.profileGateHero {
+  max-width: 720px;
+  margin-bottom: clamp(48px, 7vw, 84px);
+}
+
+.profileGateHero h1 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: clamp(2.6rem, 4vw, 4.25rem);
+  font-weight: 800;
+  line-height: 1.16;
+  letter-spacing: 0.01em;
+}
+
+.profileGateHero p {
+  margin: 18px 0 0;
+  color: var(--color-text-secondary);
+  font-size: clamp(1rem, 1.2vw, 1.25rem);
+  font-weight: 700;
+  line-height: 1.7;
+}
+
+.profileGateGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(24px, 4vw, 72px);
+}
+
+.profileGateCard {
+  @include glass.glass-card-base;
+  @include glass.glass-card-content-layer;
+
+  // 布局属性保留
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: clamp(28px, 3vw, 38px);
+  cursor: pointer;
+}
+
+.profileGateCard::before {
+  @include glass.glass-card-light;
+}
+
+.profileGateCard::after {
+  @include glass.glass-card-glow;
+}
+
+.profileGateCard:hover {
+  @include glass.glass-card-hover;
+}
+
+.profileGateCardActive {
+  @include glass.glass-card-active;
+}
+
+.profileGateCard h2 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: clamp(2rem, 2.2vw, 2.8rem);
+  font-weight: 800;
+  line-height: 1.18;
+}
+
+.profileGateCard p {
+  margin: 36px 0 0;
+  max-width: 92%;
+  color: var(--color-text-secondary);
+  font-size: clamp(0.98rem, 1vw, 1.08rem);
+  font-weight: 700;
+  line-height: 1.75;
+}
+
+.profileGateCard button {
+  min-width: 210px;
+  margin-top: auto;
+}
+
+.profileGateHint {
+  margin: 54px 0 0;
+  color: #f0a000;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.7;
+}
+
+.profileGateBottomActions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 22px;
+  margin-top: clamp(72px, 10vw, 140px);
+}
+
+.profileGateBottomActions button {
+  min-width: 180px;
+}
+
+ @media (max-width: 1100px) {
+  .profileGateGrid {
+    gap: 24px;
+  }
+
+  .profileGateCard {
+    min-height: 280px;
+  }
+}
+
+ @media (max-width: 900px) {
+  .profileGate {
+    padding-top: 36px;
+  }
+
+  .profileGateGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .profileGateCard {
+    min-height: auto;
+    gap: 24px;
+  }
+
+  .profileGateCard p {
+    margin-top: 14px;
+  }
+
+  .profileGateCard button {
+    margin-top: 8px;
+    width: 100%;
+  }
+
+  .profileGateBottomActions {
+    display: grid;
+    grid-template-columns: 1fr;
+    margin-top: 48px;
+  }
+
+  .profileGateBottomActions button {
+    width: 100%;
   }
 }

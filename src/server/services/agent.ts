@@ -164,7 +164,7 @@ const SYSTEM_PROMPT = `你是美团本地生活规划专家，专注于为用户
 /**
  * 将 Zod Schema 转换为 JSON Schema，用于 LLM 的 structured output
  */
-const outputJsonSchema = zodToJsonSchema(finalResponseSchema, "FinalResponse");
+const outputJsonSchema = zodToJsonSchema(finalResponseSchema as unknown as Parameters<typeof zodToJsonSchema>[0], "FinalResponse");
 
 // ============================================================================
 // Tool Execution Map
@@ -259,7 +259,9 @@ async function callLlm(
       throw new Error(`LLM API 调用失败: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
 
     // 提取 assistant 的回复内容
     const assistantMessage = data.choices?.[0]?.message?.content;
@@ -462,8 +464,8 @@ export async function runLlmPlanningAgent(
         if ("tool_calls" in parsed && Array.isArray(parsed.tool_calls)) {
           // 执行所有工具调用
           const toolResults = await Promise.all(
-            parsed.tool_calls.map(async (toolCall) => {
-              const toolName = toolCall.function?.name ?? toolCall.name;
+            parsed.tool_calls.map(async (toolCall: { id?: string; function?: { name?: string; arguments?: string }; name?: string; arguments?: string }) => {
+              const toolName = toolCall.function?.name ?? toolCall.name ?? "unknown";
               const argsString = toolCall.function?.arguments ?? toolCall.arguments ?? "{}";
 
               usedTools.add(toolName);
@@ -488,7 +490,7 @@ export async function runLlmPlanningAgent(
           });
 
           for (const toolResult of toolResults) {
-            messages.push(toolResult as { role: "tool"; content: string; name: string });
+            messages.push(toolResult as { role: "system" | "user" | "assistant"; content: string });
           }
 
           continue;
