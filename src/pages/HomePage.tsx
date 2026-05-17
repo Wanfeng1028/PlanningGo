@@ -296,8 +296,8 @@ export function HomePage({ onNavigate, onOpenModal }: HomePageProps) {
       <section className={styles.whyChooseScreen}>
         <div className={styles.whyChooseIntro}>
           <span>WHY CHOOSE US</span>
-          <h2>为什么选择我们</h2>
-          <p>我们帮你把灵感变成计划，把计划变成美好的回忆。</p>
+          <h2>小美可以帮你做什么</h2>
+          <p>把灵感变成计划，把计划变成美好的回忆。</p>
         </div>
         <div className={styles.whyChooseGrid}>
           {whyChooseCards.map((card) => (

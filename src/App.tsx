@@ -3,6 +3,7 @@ import { AuthModal } from "./components/AuthModal";
 import { BottomTabs } from "./components/BottomTabs";
 import { Modal } from "./components/Modal";
 import { NavBar } from "./components/NavBar";
+import { PageTransition } from "./components/PageTransition";
 import { designHighlights } from "./data/content";
 import type { ModalKey, NavKey, SessionUser } from "./types";
 import { CasesPage } from "./pages/CasesPage";
@@ -104,7 +105,9 @@ export function App() {
         }}
       />
 
-      <main className={`${styles.content} ${styles.page}`}>{page}</main>
+      <main className={`${styles.content} ${styles.page}`}>
+        <PageTransition pageKey={active}>{page}</PageTransition>
+      </main>
 
       <footer className={styles.footer}>
         <span>周末有谱 · 本地生活规划 Agent</span>
