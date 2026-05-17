@@ -83,7 +83,7 @@ const whyChooseCards = [
   {
     icon: "🗓",
     tone: "green",
-    title: "帮你执行",
+    title: "行程可执行",
     desc: "精确到每个时间段，包含交通、游玩、用餐等安排",
   },
   {
@@ -100,21 +100,18 @@ const whyChooseCards = [
   },
 ];
 
+const AUTO_SLIDE_INTERVAL = 3600;
+
 export function HomePage({ onNavigate, onOpenModal }: HomePageProps) {
   const [activeSection, setActiveSection] = useState(0);
-  const [isCarouselPaused, setIsCarouselPaused] = useState(false);
 
   useEffect(() => {
-    if (isCarouselPaused) {
-      return undefined;
-    }
-
     const timer = window.setInterval(() => {
       setActiveSection((current) => (current + 1) % homeSections.length);
-    }, 5600);
+    }, AUTO_SLIDE_INTERVAL);
 
     return () => window.clearInterval(timer);
-  }, [isCarouselPaused]);
+  }, []);
 
   const prevSection = () => {
     setActiveSection((current) => (current - 1 + homeSections.length) % homeSections.length);
@@ -220,11 +217,7 @@ export function HomePage({ onNavigate, onOpenModal }: HomePageProps) {
       </section>
 
       <section className={styles.designScreen}>
-        <div
-          className={styles.designCarouselFrame}
-          onMouseEnter={() => setIsCarouselPaused(true)}
-          onMouseLeave={() => setIsCarouselPaused(false)}
-        >
+        <div className={styles.designCarouselFrame}>
           <div className={styles.designCarouselTopbar}>
             <div className={styles.designCarouselDots} aria-label="首页功能轮播分页">
               {homeSections.map((section, index) => (
@@ -352,29 +345,29 @@ export function HomePage({ onNavigate, onOpenModal }: HomePageProps) {
             </div>
           </div>
           <div className={styles.mapDemo}>
-          <div className={styles.mapRoad}>
-            <span className={`${styles.routeNode} ${styles.routeNodeStart}`} aria-hidden="true" />
-            <span className={`${styles.routeNode} ${styles.routeNodeFood}`} aria-hidden="true" />
-            <span className={`${styles.routeNode} ${styles.routeNodeShop}`} aria-hidden="true" />
-            <span className={`${styles.routeNode} ${styles.routeNodeEnd}`} aria-hidden="true" />
-            <span className={styles.routeCar} aria-hidden="true">🚗</span>
-          </div>
-          <span className={styles.routeCallout}>推荐路线</span>
-          <article className={styles.routeSummary}>
-            <h4>路线摘要</h4>
-            <p>从浙大紫金港出发，优先 40 分钟内可达的晚餐地点。</p>
-            <div>
-              <span><strong>4.5h</strong>总时长</span>
-              <span><strong>￥420</strong>预算</span>
+            <div className={styles.mapRoad}>
+              <span className={`${styles.routeNode} ${styles.routeNodeStart}`} aria-hidden="true" />
+              <span className={`${styles.routeNode} ${styles.routeNodeFood}`} aria-hidden="true" />
+              <span className={`${styles.routeNode} ${styles.routeNodeShop}`} aria-hidden="true" />
+              <span className={`${styles.routeNode} ${styles.routeNodeEnd}`} aria-hidden="true" />
+              <span className={styles.routeCar} aria-hidden="true">🚗</span>
             </div>
-            <button
-              className={`${styles.yellowCta} ${styles.routeSummaryAction}`}
-              type="button"
-              onClick={() => onNavigate("features")}
-            >
-              查看详情
-            </button>
-          </article>
+            <span className={styles.routeCallout}>推荐路线</span>
+            <article className={styles.routeSummary}>
+              <h4>路线摘要</h4>
+              <p>从浙大紫金港出发，优先 40 分钟内可达的晚餐地点。</p>
+              <div>
+                <span><strong>4.5h</strong>总时长</span>
+                <span><strong>￥420</strong>预算</span>
+              </div>
+              <button
+                className={`${styles.yellowCta} ${styles.routeSummaryAction}`}
+                type="button"
+                onClick={() => onNavigate("features")}
+              >
+                查看详情
+              </button>
+            </article>
           </div>
         </div>
       </section>
