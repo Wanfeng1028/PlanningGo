@@ -1,5 +1,6 @@
 import { memories, reservations, shareRooms } from "../data/mockData";
 import type { ApiKeyRecord, ExecutionStep, MemoryItem, Reservation, ShareRoom, WebhookRecord } from "../types";
+import type { ExecutionAction } from "../modules/planning/schemas";
 
 const reservationStore = new Map(reservations.map((item) => [item.id, item]));
 const shareStore = new Map(shareRooms.map((item) => [item.id, item]));
@@ -205,4 +206,69 @@ export function exportPrivacyBundle() {
 export function clearLongTermMemory() {
   memoryStore.clear();
   return { ok: true, memories: [] };
+}
+
+// ============================================================================
+// Action Store - 可执行动作状态管理
+// ============================================================================
+
+const actionStore = new Map<string, ExecutionAction>();
+
+export function listActions(planId?: string): ExecutionAction[] {
+  const all = Array.from(actionStore.values());
+  return planId ? all.filter((a) => a.planId === planId) : all;
+}
+
+export function getAction(id: string): ExecutionAction | undefined {
+  return actionStore.get(id);
+}
+
+export function saveActions(actions: ExecutionAction[]): void {
+  for (const action of actions) {
+    actionStore.set(action.id, action);
+  }
+}
+
+export function updateActionStatus(id: string, status: ExecutionAction["status"]): ExecutionAction | null {
+  const action = actionStore.get(id);
+  if (!action) return null;
+  const next = { ...action, status };
+  actionStore.set(id, next);
+  return next;
+}
+
+export function quoteAction(id: string): ExecutionAction | null {
+  const action = actionStore.get(id);
+  if (!action) return null;
+  const next: ExecutionAction = { ...action, status: "quoted" };
+  actionStore.set(id, next);
+  return next;
+}
+
+export function confirmAction(id: string): ExecutionAction | null {
+  const action = actionStore.get(id);
+  if (!action) return null;
+  if (!action.confirmationRequired) {
+    const next: ExecutionAction = { ...action, status: "success" };
+    actionStore.set(id, next);
+    return next;
+  }
+  const next: ExecutionAction = { ...action, status: "executing" };
+  actionStore.set(id, next);
+  // 模拟执行完成
+  const final: ExecutionAction = { ...next, status: "success" };
+  actionStore.set(id, final);
+  return final;
+}
+
+export function cancelAction(id: string): ExecutionAction | null {
+  const action = actionStore.get(id);
+  if (!action) return null;
+  const next: ExecutionAction = { ...action, status: "cancelled" };
+  actionStore.set(id, next);
+  return next;
+}
+
+export function clearActions(): void {
+  actionStore.clear();
 }

@@ -367,7 +367,7 @@ export function safeValidateExecutionStep(data: unknown): [true, ExecutionStep] 
   if (result.success) {
     return [true, result.data];
   }
-  return [false, result.error.errors.map((e) => e.message).join("; ")];
+  return [false, result.error.issues.map((e) => e.message).join("; ")];
 }
 
 /**

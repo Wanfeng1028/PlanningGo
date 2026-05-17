@@ -1,5 +1,6 @@
 node_modules/
 dist/
+docx/
 .env
 .env.*
 !.env.example

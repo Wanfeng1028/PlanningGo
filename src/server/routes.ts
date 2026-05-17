@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 import { z } from "zod";
 import { demoProfile, pois, baseToolLogs, planOptions, trafficRoutes, weather } from "./data/mockData";
 import { parseDemand, planningRequestSchema, runPlanningAgent, simulateWhatIf } from "./services/agent";
+import { runPlanningPipeline } from "./modules/agent/orchestrator";
 import {
   advanceExecution,
   clearLongTermMemory,
@@ -28,6 +29,11 @@ import {
   upsertMemory,
   upsertReservation,
   vote,
+  saveActions,
+  listActions,
+  quoteAction,
+  confirmAction,
+  cancelAction,
 } from "./services/store";
 
 const authSchema = z.object({
@@ -59,11 +65,12 @@ export async function registerRoutes(app: FastifyInstance) {
     groups: [
       { group: "Auth", endpoints: ["POST /api/auth/login", "POST /api/auth/register", "POST /api/auth/guest"] },
       { group: "Profile", endpoints: ["GET /api/profile/demo", "PATCH /api/profile/demo", "GET /api/profile/demo/permissions", "PATCH /api/profile/demo/permissions"] },
-      { group: "Planning Agent", endpoints: ["POST /api/agent/parse", "POST /api/agent/plan", "POST /api/agent/what-if"] },
+      { group: "Planning Agent", endpoints: ["POST /api/agent/parse", "POST /api/agent/plan", "POST /api/agent/plan/legacy", "POST /api/agent/what-if"] },
       { group: "Mock Data", endpoints: ["GET /api/mock/pois", "GET /api/mock/weather", "GET /api/mock/routes"] },
       { group: "Plans", endpoints: ["GET /api/plans/demo", "POST /api/plans/select"] },
       { group: "Reservations", endpoints: ["GET /api/reservations", "POST /api/reservations", "PATCH /api/reservations/:id/status"] },
       { group: "Execution", endpoints: ["GET /api/execution/demo", "POST /api/execution/advance", "PATCH /api/execution/:key", "GET /api/tools/logs"] },
+      { group: "Actions", endpoints: ["GET /api/actions", "POST /api/actions/:id/quote", "POST /api/actions/:id/confirm", "POST /api/actions/:id/cancel"] },
       { group: "Share", endpoints: ["GET /api/share/rooms", "POST /api/share/rooms", "POST /api/share/rooms/:id/vote"] },
       { group: "Memory", endpoints: ["GET /api/memories", "POST /api/memories", "DELETE /api/memories/:id"] },
       { group: "Developer", endpoints: ["GET /api/developer/dashboard", "GET /api/developer/api-keys", "POST /api/developer/api-keys", "POST /api/developer/api-keys/:id/revoke", "GET /api/developer/webhooks", "POST /api/developer/webhooks", "POST /api/developer/webhooks/:id/replay"] },
@@ -184,6 +191,27 @@ export async function registerRoutes(app: FastifyInstance) {
   app.post("/api/agent/plan", async (request, reply) => {
     try {
       const input = planningRequestSchema.parse(request.body);
+      const result = await runPlanningPipeline(input);
+      // 保存生成的 actions 到 store
+      if (result.executableActions.length > 0) {
+        saveActions(result.executableActions);
+      }
+      return result;
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return reply.status(400).send({
+          error: "INVALID_REQUEST",
+          issues: error.issues,
+        });
+      }
+      throw error;
+    }
+  });
+
+  // Legacy mock 规划接口，出问题时可快速回退
+  app.post("/api/agent/plan/legacy", async (request, reply) => {
+    try {
+      const input = planningRequestSchema.parse(request.body);
       return runPlanningAgent(input);
     } catch (error) {
       if (error instanceof ZodError) {
@@ -246,6 +274,38 @@ export async function registerRoutes(app: FastifyInstance) {
     if (!next) return reply.status(404).send({ error: "EXECUTION_STEP_NOT_FOUND" });
     return next;
   });
+
+  // ========== Actions API ==========
+
+  app.get("/api/actions", async (request) => {
+    const query = z.object({ planId: z.string().optional() }).parse(request.query);
+    return { items: listActions(query.planId) };
+  });
+
+  app.post("/api/actions/:id/quote", async (request, reply) => {
+    const params = z.object({ id: z.string() }).parse(request.params);
+    const result = quoteAction(params.id);
+    if (!result) return reply.status(404).send({ ok: false, error: "ACTION_NOT_FOUND" });
+    return result;
+  });
+
+  app.post("/api/actions/:id/confirm", async (request, reply) => {
+    const params = z.object({ id: z.string() }).parse(request.params);
+    const body = z.object({ userConfirmed: z.boolean().default(true) }).parse(request.body ?? {});
+    if (!body.userConfirmed) return reply.status(400).send({ ok: false, error: "CONFIRM_REQUIRED" });
+    const result = confirmAction(params.id);
+    if (!result) return reply.status(404).send({ ok: false, error: "ACTION_NOT_FOUND" });
+    return result;
+  });
+
+  app.post("/api/actions/:id/cancel", async (request, reply) => {
+    const params = z.object({ id: z.string() }).parse(request.params);
+    const result = cancelAction(params.id);
+    if (!result) return reply.status(404).send({ ok: false, error: "ACTION_NOT_FOUND" });
+    return result;
+  });
+
+  // ========== Share API ==========
 
   app.get("/api/share/rooms", async () => ({ items: listShareRooms() }));
 

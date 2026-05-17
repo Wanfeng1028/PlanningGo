@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(npm run *)",
-      "Bash(npx *)"
+      "Bash(npx *)",
+      "Bash(mkdir *)",
+      "Bash(npm install *)",
+      "Bash(findstr *)",
+      "Bash(git stash)",
+      "Bash(timeout *)",
+      "Bash(curl *)",
+      "Bash(del *)"
     ]
   },
   "$version": 4
