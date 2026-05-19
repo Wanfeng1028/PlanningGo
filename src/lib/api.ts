@@ -186,6 +186,128 @@ export async function selectPlan(planId: string) {
   });
 }
 
+// ── Agent 规划工作台 ──
+
+export interface PlanningTimelineStep {
+  id: string;
+  startTime: string;
+  endTime: string;
+  type: string;
+  title: string;
+  poiName: string | null;
+  durationMinutes: number;
+  transport: string;
+  reasoning: string;
+  bookingNeeded: boolean;
+}
+
+export interface PlanningOption {
+  id: string;
+  planId: string;
+  title: string;
+  targetGroup: string;
+  score: number;
+  summary: string;
+  totalDurationMinutes: number;
+  totalCostMin: number;
+  totalCostMax: number;
+  walkingKm?: number;
+  assumptions: string[];
+  highlights: string[];
+  risks: string[];
+  timeline: PlanningTimelineStep[];
+  backupPlan?: string;
+}
+
+export interface PlanningExecutableAction {
+  id: string;
+  planId: string;
+  optionId: string;
+  type: string;
+  status: string;
+  title: string;
+  description: string;
+  confirmationRequired: boolean;
+  priceEstimate?: string;
+}
+
+export interface PlanningResult {
+  traceId: string;
+  planId: string;
+  summary: string;
+  selectedPlanId: string;
+  options: PlanningOption[];
+  executableActions: PlanningExecutableAction[];
+  nextActions: string[];
+}
+
+export async function requestPlanning(input: {
+  prompt: string;
+  city?: string;
+  startPoint?: string;
+  companions?: "family" | "friends" | "couple" | "solo";
+  budget?: number;
+}): Promise<PlanningResult> {
+  return apiJson<PlanningResult>("/api/agent/plan", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function requestWhatIf(planId: string, scenario: "rain" | "late" | "budget" | "traffic") {
+  return apiJson<{ basePlan: string; scenario: string; title: string; changes: string[]; score: number }>(
+    "/api/agent/what-if",
+    { method: "POST", body: JSON.stringify({ planId, scenario }) },
+  );
+}
+
+// ── Actions API ──
+
+export interface ActionItem {
+  id: string;
+  planId: string;
+  optionId: string;
+  type: string;
+  status: string;
+  title: string;
+  description: string;
+  confirmationRequired: boolean;
+  priceEstimate?: string;
+}
+
+export async function getActions(planId?: string): Promise<{ items: ActionItem[] }> {
+  const qs = planId ? `?planId=${encodeURIComponent(planId)}` : "";
+  return apiJson<{ items: ActionItem[] }>(`/api/actions${qs}`);
+}
+
+export async function quoteAction(actionId: string): Promise<ActionItem> {
+  return apiJson<ActionItem>(`/api/actions/${actionId}/quote`, { method: "POST" });
+}
+
+export async function confirmAction(actionId: string): Promise<ActionItem> {
+  return apiJson<ActionItem>(`/api/actions/${actionId}/confirm`, {
+    method: "POST",
+    body: JSON.stringify({ userConfirmed: true }),
+  });
+}
+
+export async function cancelAction(actionId: string): Promise<ActionItem> {
+  return apiJson<ActionItem>(`/api/actions/${actionId}/cancel`, { method: "POST" });
+}
+
+// ── Calendar ──
+
+export async function createIcs(title: string, date?: string): Promise<string> {
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (_authToken) headers.authorization = `Bearer ${_authToken}`;
+  const response = await fetch(`${API_BASE}/api/ics`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ title, date }),
+  });
+  return response.text();
+}
+
 export async function createReservation(input: { type: string; title: string; status?: string; price?: string; detail: string }) {
   return apiJson("/api/reservations", {
     method: "POST",

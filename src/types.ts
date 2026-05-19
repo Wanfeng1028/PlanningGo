@@ -376,3 +376,73 @@ export interface ProfileBundle {
   permissions: PermissionSettings;
   stats: ProfileStats;
 }
+
+// ── 对话式规划工作台类型 ──
+
+export type ChatPhase =
+  | "idle"
+  | "understanding"
+  | "need_clarification"
+  | "planning"
+  | "result"
+  | "selected"
+  | "executing"
+  | "done"
+  | "error";
+
+export interface TimelineStep {
+  time: string;
+  title: string;
+  subtitle?: string;
+}
+
+export interface PlanningPlanCard {
+  id: string;
+  title: string;
+  summary: string;
+  reason?: string;
+  timeline: TimelineStep[];
+  tags: string[];
+  budget: string;
+  distance?: string;
+  risk?: string;
+}
+
+export type ExecutionActionType =
+  | "restaurant_reservation"
+  | "ticket_lock"
+  | "calendar_event"
+  | "share_message"
+  | "navigation"
+  | "memory_save";
+
+export interface ExecutionActionCard {
+  id: string;
+  type: ExecutionActionType;
+  title: string;
+  description: string;
+  status: "draft" | "quoted" | "waiting_confirm" | "executing" | "success" | "failed" | "cancelled";
+  confirmLabel?: string;
+  cancelLabel?: string;
+  priceEstimate?: string;
+}
+
+export type ChatMessage =
+  | {
+      id: string;
+      role: "user";
+      content: string;
+      createdAt: string;
+    }
+  | {
+      id: string;
+      role: "assistant";
+      content: string;
+      status?: "thinking" | "success" | "error";
+      chips?: string[];
+      plans?: PlanningPlanCard[];
+      actions?: ExecutionActionCard[];
+      actionQuotingId?: string;
+      actionQuotedPreview?: string;
+      createdAt: string;
+    };

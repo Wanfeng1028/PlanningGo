@@ -9,7 +9,7 @@ import { requestBrowserLocation } from "./lib/location";
 import type { ModalKey, NavKey, SessionUser } from "./types";
 import { CasesPage } from "./pages/CasesPage";
 import DevelopersPage from "./pages/DevelopersPage";
-import { FeaturesPage } from "./pages/FeaturesPage";
+import FeaturesPage from "./pages/FeaturesPage";
 import { HomePage } from "./pages/HomePage";
 import { ProfileGatePage } from "./pages/ProfileGatePage";
 import { ProfilePage } from "./pages/ProfilePage";
@@ -101,7 +101,7 @@ export function App() {
         return <HomePage onNavigate={setActive} onOpenModal={openModal} />;
 
       case "features":
-        return <FeaturesPage onOpenModal={openModal} />;
+        return <FeaturesPage user={user} onOpenModal={openModal} onRequestLocation={handleRequestLocation} />;
 
       case "cases":
         return <CasesPage onOpenModal={openModal} onNavigate={setActive} />;
@@ -152,11 +152,11 @@ export function App() {
         }}
       />
 
-      <main className={`${styles.content} ${styles.page}`}>
+      <main className={`${styles.content} ${active === "features" ? styles.pageFull : styles.page}`}>
         <PageTransition pageKey={active}>{page}</PageTransition>
       </main>
 
-      <footer className={styles.footer}>
+      <footer className={`${styles.footer} ${active === "features" ? styles.footerHidden : ""}`}>
         <span>周末有谱 · 本地生活规划 Agent</span>
         <span></span>
       </footer>

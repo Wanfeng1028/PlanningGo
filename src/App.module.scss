@@ -30,6 +30,18 @@
   padding: 96px 0 120px;
 }
 
+.pageFull {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  height: calc(100vh - 100px);
+  overflow: hidden;
+}
+
+.footerHidden {
+  display: none;
+}
+
 .footer {
   position: relative;
   z-index: 1;
