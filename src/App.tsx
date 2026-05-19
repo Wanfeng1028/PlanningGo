@@ -10,7 +10,6 @@ import type { ModalKey, NavKey, SessionUser } from "./types";
 import { CasesPage } from "./pages/CasesPage";
 import DevelopersPage from "./pages/DevelopersPage";
 import { FeaturesPage } from "./pages/FeaturesPage";
-import { FlowPage } from "./pages/FlowPage";
 import { HomePage } from "./pages/HomePage";
 import { ProfileGatePage } from "./pages/ProfileGatePage";
 import { ProfilePage } from "./pages/ProfilePage";
@@ -106,14 +105,6 @@ export function App() {
 
       case "cases":
         return <CasesPage onOpenModal={openModal} onNavigate={setActive} />;
-
-      case "design":
-        return (
-          <FlowPage
-            onOpenModal={openModal}
-            onNavigate={setActive}
-          />
-        );
 
       case "developers":
         return <DevelopersPage onOpenModal={openModal} user={user} />;

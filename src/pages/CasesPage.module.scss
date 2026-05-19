@@ -1,0 +1,1383 @@
+@use "../styles/glass" as glass;
+
+/* ═══════════════════════════════════════════════════════════════════
+   CasesPage — 3D 周末规划舞台
+   warm · immersive · cinematic · depth
+   ═══════════════════════════════════════════════════════════════════ */
+
+.page {
+  position: relative;
+  z-index: 1;
+  overflow-x: hidden;
+}
+
+/* ── section wrapper ──────────────────────────────────────────────── */
+
+.section {
+  width: min(1280px, calc(100vw - 64px));
+  margin: 0 auto;
+  padding: clamp(48px, 8vw, 96px) 0;
+}
+
+/* ═══════ Hero — 纯 3D 舞台，无文案 ══════════════════════════════════ */
+
+.casesHeroStageOnly {
+  position: relative;
+  min-height: calc(100vh - 72px);
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 16px 0 0;
+  margin: 0;
+}
+
+/* ── 背景氛围 ────────────────────────────────────────────────────── */
+
+.casesHeroAtmosphere {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 70% 35%, rgba(255, 199, 44, 0.28), transparent 34%),
+    radial-gradient(circle at 42% 56%, rgba(255, 230, 150, 0.22), transparent 28%),
+    radial-gradient(circle at 78% 70%, rgba(185, 221, 215, 0.20), transparent 28%);
+}
+
+/* ── 3D 舞台外壳 ────────────────────────────────────────────────── */
+
+.casesStageShell {
+  position: relative;
+  width: 100%;
+  height: calc(100vh - 88px);
+  min-height: 640px;
+  perspective: 1600px;
+  transform-style: preserve-3d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.casesStageInner {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: min(1440px, 100vw);
+  height: 100%;
+  transform: translate(-50%, -50%);
+  transform-style: preserve-3d;
+}
+
+/* ── 地图底板 ────────────────────────────────────────────────────── */
+
+.casesHeroMapPlane {
+  position: absolute;
+  left: 50%;
+  top: 54%;
+  width: clamp(1120px, 112vw, 1680px);
+  height: clamp(620px, 78vh, 920px);
+  transform: translate(-50%, -50%) rotateX(64deg) rotateZ(-8deg) translateZ(-120px);
+  transform-style: preserve-3d;
+  border-radius: 48px;
+  background:
+    linear-gradient(145deg, rgb(var(--color-surface-rgb) / 0.5), rgb(var(--color-surface-rgb) / 0.18)),
+    linear-gradient(to bottom, rgb(var(--color-brand-rgb) / 0.06), transparent);
+  border: 1px solid rgb(255 255 255 / 0.14);
+  box-shadow:
+    0 30px 80px rgb(var(--color-text-primary-rgb) / 0.07),
+    inset 0 1px 0 rgb(255 255 255 / 0.35);
+  overflow: hidden;
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.casesMapGrid {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.casesRoutePath {
+  stroke-dasharray: 14 10;
+  animation: routeFlow 5s linear infinite;
+}
+
+.casesRouteNode {
+  animation: pulseNode 2.8s ease-in-out infinite;
+}
+
+/* ── 中央主行程卡 ────────────────────────────────────────────────── */
+
+.casesHeroPlanCard {
+  @include glass.glass-card-base;
+  @include glass.glass-card-content-layer;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: clamp(640px, 54vw, 880px);
+  min-height: clamp(420px, 42vh, 560px);
+  padding: clamp(36px, 4vw, 56px);
+  border-radius: 40px;
+  transform: translate(-50%, -50%) rotateX(7deg) rotateY(-10deg) translateZ(120px);
+  transform-style: preserve-3d;
+  z-index: 3;
+  pointer-events: auto;
+  animation: heroFloat 7s ease-in-out infinite;
+  transition: transform 320ms var(--ease-out), box-shadow 320ms var(--ease-out);
+  backdrop-filter: blur(28px) saturate(1.5);
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+  box-shadow:
+    0 40px 80px rgb(var(--color-text-primary-rgb) / 0.1),
+    0 0 1px 1px rgb(var(--color-brand-rgb) / 0.12),
+    inset 0 1px 0 rgb(255 255 255 / 0.72),
+    inset 0 -1px 0 rgb(255 255 255 / 0.12);
+}
+
+.casesHeroPlanCard::before {
+  @include glass.glass-card-light;
+}
+
+.casesHeroPlanCard::after {
+  @include glass.glass-card-glow;
+}
+
+.casesHeroPlanCard:hover {
+  animation-play-state: paused;
+  transform: translate(-50%, -50%) rotateX(4deg) rotateY(-6deg) translateZ(120px) translateY(-8px);
+  box-shadow:
+    0 50px 100px rgb(var(--color-text-primary-rgb) / 0.12),
+    0 0 1px 1px rgb(var(--color-brand-rgb) / 0.2),
+    inset 0 1px 0 rgb(255 255 255 / 0.8),
+    inset 0 -1px 0 rgb(255 255 255 / 0.15);
+}
+
+.planCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.planCardDate {
+  font-family: var(--font-number);
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--color-text-tertiary);
+}
+
+.planCardBadge {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 16px;
+  border-radius: var(--radius-pill);
+  background: rgb(var(--color-success-rgb) / 0.14);
+  color: var(--color-success);
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.planCardTitle {
+  font-size: clamp(32px, 3vw, 52px);
+  font-weight: 900;
+  color: var(--color-text-primary);
+  line-height: 1.15;
+  margin: 0 0 14px;
+}
+
+.planCardTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 20px;
+}
+
+.planTag {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  background: rgb(var(--color-brand-rgb) / 0.14);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* ── 行程时间线 ──────────────────────────────────────────────────── */
+
+.planCardTimeline {
+  display: grid;
+  gap: 0;
+  margin: 10px 0;
+}
+
+.planStep {
+  display: grid;
+  grid-template-columns: 64px 14px 1fr auto;
+  align-items: start;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.planStepTime {
+  font-family: var(--font-number);
+  font-size: 17px;
+  font-weight: 900;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+  padding-top: 1px;
+}
+
+.planStepDot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--color-brand);
+  margin-top: 7px;
+  position: relative;
+  flex-shrink: 0;
+  animation: pulseNode 2.8s ease-in-out infinite;
+}
+
+.planStep:not(:last-child) .planStepDot::after {
+  content: "";
+  position: absolute;
+  top: 11px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: calc(100% + 11px);
+  background: var(--color-brand);
+  opacity: 0.18;
+}
+
+.planStepLabel {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  line-height: 1.25;
+}
+
+.planStepMeta {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+
+.planCardDivider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 12px 0;
+}
+
+.planCardBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.planBadge {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  background: rgb(var(--color-brand-rgb) / 0.12);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+/* ── 漂浮信息卡 ──────────────────────────────────────────────────── */
+
+.casesFloatCard {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  border-radius: 18px;
+  border: 1px solid rgb(255 255 255 / 0.5);
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.55) 0%, rgb(255 255 255 / 0.28) 100%);
+  box-shadow:
+    0 10px 28px rgb(var(--color-text-primary-rgb) / 0.07),
+    inset 0 1px 0 rgb(255 255 255 / 0.65);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  white-space: nowrap;
+  transform-style: preserve-3d;
+}
+
+.casesFloatCard1 {
+  top: 14%;
+  left: 10%;
+  transform: translateZ(35px) rotate(-3deg);
+  animation: orbitFloat 8s ease-in-out infinite;
+  animation-delay: 0s;
+}
+
+.casesFloatCardBudget {
+  top: 4%;
+  right: 2%;
+  z-index: 8;
+  min-width: 220px;
+  padding: 14px 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  box-shadow: 0 18px 42px rgba(49, 38, 12, 0.12);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  color: #111;
+  transform: translateZ(150px) rotate(1.5deg);
+  animation: orbitFloat 9s ease-in-out infinite;
+  animation-delay: -2s;
+}
+
+.casesFloatCard3 {
+  bottom: 18%;
+  left: 12%;
+  transform: translateZ(25px) rotate(-2deg);
+  animation: orbitFloat 10s ease-in-out infinite;
+  animation-delay: -4s;
+}
+
+.casesFloatCard4 {
+  bottom: 16%;
+  right: 10%;
+  transform: translateZ(45px) rotate(3deg);
+  animation: orbitFloat 8.5s ease-in-out infinite;
+  animation-delay: -6s;
+}
+
+.floatCardIcon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.floatCardTitle {
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--color-text-primary);
+}
+
+.floatCardDesc {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+}
+
+/* ── SVG 连接线 ──────────────────────────────────────────────────── */
+
+.casesConnectLines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.casesConnectLines line {
+  animation: routeFlow 4s linear infinite;
+}
+
+/* ── 滚动引导 ────────────────────────────────────────────────────── */
+
+.heroScrollCue {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  pointer-events: none;
+
+  span {
+    display: block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-text-tertiary);
+    opacity: 0.45;
+    animation: scrollCue 2.4s ease-in-out infinite;
+  }
+}
+
+/* ═══════ Section intro ═══════════════════════════════════════════════ */
+
+.sectionIntro {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-family: Inter, "SF Pro Display", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  font-size: clamp(30px, 3.5vw, 52px);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  color: var(--color-text-primary);
+}
+
+/* ═══════ 场景选择 — 胶片 strip + 详情面板 ════════════════════════════ */
+
+.showcase {
+  padding-bottom: clamp(48px, 8vw, 96px);
+}
+
+.showcaseIntro {
+  text-align: center;
+  margin-bottom: 36px;
+}
+
+.showcaseContent {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+/* ── 胶片 strip ──────────────────────────────────────────────────── */
+
+.filmstrip {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  position: sticky;
+  top: 120px;
+}
+
+.frame {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+  border-radius: 16px;
+  border: 2px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  text-align: center;
+  width: 100%;
+  transition:
+    border-color 200ms var(--ease-out),
+    background 200ms var(--ease-out),
+    transform 200ms var(--ease-out),
+    box-shadow 200ms var(--ease-out);
+
+  &:hover {
+    border-color: rgb(var(--color-brand-rgb) / 0.3);
+    background: rgb(var(--color-surface-rgb) / 0.6);
+    transform: translateX(4px);
+  }
+}
+
+.frameActive {
+  composes: frame;
+  border-color: var(--color-brand) !important;
+  background: var(--color-surface) !important;
+  box-shadow: var(--shadow-sm);
+  transform: translateX(4px) !important;
+}
+
+/* 胶片齿孔 */
+.frameHoleTop,
+.frameHoleBottom {
+  height: 6px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 12px;
+
+  &::before,
+  &::after {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 2px;
+    background: var(--color-border);
+  }
+}
+
+.frameContent {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.frameTitle {
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--color-text-primary);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.frameMetric {
+  font-family: var(--font-number);
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--color-brand);
+  white-space: nowrap;
+}
+
+.frameMetricLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+}
+
+/* ── 详情面板 ────────────────────────────────────────────────────── */
+
+.detailPanel {
+  @include glass.glass-card-base;
+  @include glass.glass-card-content-layer;
+  padding: 28px;
+  border-radius: 24px;
+  min-height: 420px;
+}
+
+.detailPanel::before {
+  @include glass.glass-card-light;
+}
+
+.detailPanel::after {
+  @include glass.glass-card-glow;
+}
+
+.detailInner {
+  animation: detailFadeSlide 380ms var(--ease-out) both;
+}
+
+.detailTitle {
+  font-size: clamp(1.2rem, 2vw, 1.5rem);
+  font-weight: 900;
+  color: var(--color-text-primary);
+  line-height: 1.15;
+  margin: 0 0 6px;
+}
+
+.detailPain {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
+
+.detailInput {
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: var(--color-text-primary);
+  color: var(--color-text-inverse);
+  margin-bottom: 14px;
+}
+
+.detailInputLabel {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.55;
+  margin-bottom: 3px;
+}
+
+.detailInputText {
+  display: block;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.detailTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 16px;
+}
+
+.detailTag {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  background: rgb(var(--color-brand-rgb) / 0.14);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.detailTimeline {
+  display: grid;
+  gap: 0;
+  margin-bottom: 16px;
+}
+
+.detailStep {
+  display: grid;
+  grid-template-columns: 44px 10px 1fr auto;
+  align-items: start;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.detailStepTime {
+  font-family: var(--font-number);
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.detailStepDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-brand);
+  margin-top: 5px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.detailStep:not(:last-child) .detailStepDot::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: calc(100% + 8px);
+  background: var(--color-brand);
+  opacity: 0.18;
+}
+
+.detailStepLabel {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  line-height: 1.25;
+}
+
+.detailStepStatus {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+
+.detailBackups {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.detailBackupsLabel {
+  display: block;
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--color-text-tertiary);
+  margin-bottom: 8px;
+}
+
+.detailBackupList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.detailBackupItem {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 14px;
+  background: rgb(var(--color-surface-rgb) / 0.8);
+  border: 1px solid var(--color-border);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.detailBackupArrow {
+  color: var(--color-brand);
+  font-weight: 900;
+}
+
+.detailFooter {
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: var(--color-brand);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.detailMetric {
+  font-family: var(--font-number);
+  font-size: clamp(1.3rem, 2vw, 1.7rem);
+  font-weight: 900;
+  color: var(--color-text-primary);
+}
+
+.detailMetricLabel {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  opacity: 0.7;
+}
+
+/* ═══════ 完整路线看板 ════════════════════════════════════════════════ */
+
+.routeBoard {
+  @include glass.glass-card-base;
+  @include glass.glass-card-content-layer;
+  padding: clamp(24px, 3vw, 40px);
+  border-radius: 28px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+.routeBoard::before {
+  @include glass.glass-card-light;
+}
+
+.routeBoard::after {
+  @include glass.glass-card-glow;
+}
+
+/* ── 输入卡 ──────────────────────────────────────────────────────── */
+
+.routeInput {
+  padding: 16px 20px;
+  border-radius: 20px;
+  background: var(--color-text-primary);
+  color: var(--color-text-inverse);
+}
+
+.routeInputLabel {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.55;
+  margin-bottom: 4px;
+}
+
+.routeInputText {
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+/* ── 路线地图容器 ────────────────────────────────────────────────── */
+
+.routeMap {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 20px;
+  align-items: start;
+}
+
+/* ── SVG 路线地图 ────────────────────────────────────────────────── */
+
+.routeMapArea {
+  position: relative;
+  border-radius: 20px;
+  overflow: hidden;
+  background:
+    linear-gradient(145deg, rgb(var(--color-surface-rgb) / 0.5), rgb(var(--color-surface-rgb) / 0.2));
+  border: 1px solid var(--color-border);
+}
+
+.routeMapSvg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.routeMapPath {
+  stroke-dasharray: 10 6;
+  animation: routeDash 3s linear infinite;
+}
+
+.routeMapLabel {
+  fill: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 800;
+  font-family: var(--font-sans);
+}
+
+/* ── 兜底策略 ────────────────────────────────────────────────────── */
+
+.routeBackups {
+  display: grid;
+  gap: 10px;
+}
+
+.routeBackupsTitle {
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--color-text-primary);
+  margin: 0 0 4px;
+}
+
+.routeBackupCard {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: rgb(var(--color-surface-rgb) / 0.6);
+  border: 1px solid var(--color-border);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  transition: background 180ms var(--ease-out);
+
+  &:hover {
+    background: rgb(var(--color-surface-rgb) / 0.92);
+  }
+}
+
+.routeBackupCondition {
+  font-weight: 900;
+  color: var(--color-text-primary);
+}
+
+.routeBackupArrow {
+  color: var(--color-brand);
+  font-weight: 900;
+}
+
+.routeBackupAction {
+  color: var(--color-text-secondary);
+}
+
+/* ── 确认条 ──────────────────────────────────────────────────────── */
+
+.routeConfirm {
+  padding: 12px 18px;
+  border-radius: 16px;
+  background: var(--color-brand);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.routeConfirmText {
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--color-text-primary);
+}
+
+.routeConfirmBadge {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  background: rgb(var(--color-text-primary-rgb) / 0.08);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+/* ═══════ Before / After ══════════════════════════════════════════════ */
+
+.compareArea {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 24px;
+  align-items: center;
+}
+
+.compareLeft,
+.compareRight {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.compareLabel {
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--color-text-tertiary);
+}
+
+.compareCenter {
+  display: flex;
+  align-items: center;
+}
+
+.compareArrow {
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--color-brand);
+}
+
+/* ── 左侧散乱卡 ─────────────────────────────────────────────────── */
+
+.compareCardLeft {
+  @include glass.glass-card-base;
+  @include glass.glass-card-content-layer;
+  padding: 28px;
+  border-radius: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  min-height: 240px;
+  align-items: center;
+}
+
+.compareCardLeft::before {
+  @include glass.glass-card-light;
+}
+
+.compareCardLeft::after {
+  @include glass.glass-card-glow;
+}
+
+.scatterCard {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  transform: rotate(var(--r, 0deg)) translate(var(--x, 0), var(--y, 0));
+  transition: transform 300ms var(--ease-out);
+
+  &:hover {
+    transform: rotate(0deg) translate(0, -2px);
+  }
+}
+
+.scatterIcon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.scatterText {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+/* ── 右侧整合卡 ─────────────────────────────────────────────────── */
+
+.compareCardRight {
+  @include glass.glass-card-base;
+  @include glass.glass-card-content-layer;
+  padding: 28px;
+  border-radius: 24px;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transition:
+    transform 220ms var(--ease-out),
+    border-color 220ms var(--ease-out),
+    box-shadow 220ms var(--ease-out);
+  border-color: var(--color-brand);
+}
+
+.compareCardRight::before {
+  @include glass.glass-card-light;
+}
+
+.compareCardRight::after {
+  @include glass.glass-card-glow;
+}
+
+.compareCardRight:hover {
+  transform: translateY(-4px);
+  border-color: var(--color-brand);
+  box-shadow:
+    0 20px 40px rgb(var(--color-brand-rgb) / 0.12),
+    inset 0 1px 0 rgb(255 255 255 / 0.72),
+    inset 0 -1px 0 rgb(255 255 255 / 0.12);
+}
+
+.integratedTitle {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--color-text-primary);
+  margin: 0 0 12px;
+}
+
+.integratedChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.integratedChip {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-brand);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.integratedTimeline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.integratedStop {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: 12px;
+  background: rgb(var(--color-surface-rgb) / 0.8);
+  border: 1px solid var(--color-border);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.integratedFooter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.integratedMetric {
+  font-family: var(--font-number);
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--color-text-primary);
+}
+
+.integratedBadge {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  background: rgb(var(--color-success-rgb) / 0.14);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--color-success);
+  white-space: nowrap;
+}
+
+/* ═══════ CTA ══════════════════════════════════════════════════════════ */
+
+.cta {
+  text-align: center;
+  padding-bottom: 24px;
+}
+
+.ctaTitle {
+  margin: 0;
+  font-family: Inter, "SF Pro Display", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  font-size: clamp(28px, 3.5vw, 48px);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  color: var(--color-text-primary);
+}
+
+.ctaSubtitle {
+  margin: 14px 0 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.ctaActions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 28px;
+}
+
+/* ═══════ Animations ══════════════════════════════════════════════════ */
+
+@keyframes heroFloat {
+  0%, 100% { transform: translate(-50%, -50%) rotateX(7deg) rotateY(-10deg) translateZ(120px) translateY(0); }
+  50% { transform: translate(-50%, -50%) rotateX(7deg) rotateY(-10deg) translateZ(120px) translateY(-14px); }
+}
+
+@keyframes orbitFloat {
+  0%, 100% { transform: translateZ(var(--tz, 30px)) rotate(var(--r, 0deg)) translateY(0); }
+  25% { transform: translateZ(var(--tz, 30px)) rotate(var(--r, 0deg)) translateY(-6px) translateX(4px); }
+  50% { transform: translateZ(var(--tz, 30px)) rotate(var(--r, 0deg)) translateY(-3px) translateX(-3px); }
+  75% { transform: translateZ(var(--tz, 30px)) rotate(var(--r, 0deg)) translateY(-8px) translateX(2px); }
+}
+
+@keyframes routeFlow {
+  from { stroke-dashoffset: 40; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes pulseNode {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+@keyframes routeDash {
+  from { stroke-dashoffset: 40; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes floatSoft {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-10px); }
+}
+
+@keyframes detailFadeSlide {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scrollCue {
+  0%, 100% { transform: translateY(0); opacity: 0.45; }
+  50% { transform: translateY(8px); opacity: 0.2; }
+}
+
+/* ═══════ Responsive ══════════════════════════════════════════════════ */
+
+@media (max-width: 1024px) {
+  .casesHeroStageOnly {
+    min-height: auto;
+    padding: 100px 20px 64px;
+  }
+
+  .casesStageShell {
+    width: 100%;
+    height: auto;
+    min-height: 540px;
+  }
+
+  .casesStageInner {
+    width: min(90vw, 800px);
+    height: 540px;
+  }
+
+  .casesHeroPlanCard {
+    width: min(62vw, 620px);
+    transform: translate(-50%, -50%) rotateX(5deg) rotateY(-8deg) translateZ(80px);
+  }
+
+  .casesHeroMapPlane {
+    width: clamp(600px, 62vw, 900px);
+    height: clamp(380px, 42vw, 560px);
+    transform: translate(-50%, -50%) rotateX(56deg) rotateZ(-6deg) translateZ(-80px);
+  }
+
+  .showcaseContent {
+    grid-template-columns: 1fr;
+  }
+
+  .filmstrip {
+    position: static;
+    display: flex;
+    overflow-x: auto;
+    gap: 8px;
+    padding-bottom: 8px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  .frame,
+  .frameActive {
+    flex: 0 0 auto;
+    min-width: 130px;
+  }
+
+  .compareArea {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .compareCenter {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 768px) {
+  .casesHeroStageOnly {
+    min-height: calc(100vh - 80px);
+    padding: 96px 16px 40px;
+  }
+
+  .casesStageShell {
+    width: 100%;
+    height: min(620px, calc(100vh - 140px));
+    min-height: 520px;
+  }
+
+  .casesStageInner {
+    width: 100%;
+    height: 100%;
+  }
+
+  .casesHeroPlanCard {
+    width: min(92vw, 460px);
+    min-height: auto;
+    padding: 24px;
+    transform: translate(-50%, -50%) rotateX(4deg) rotateY(-5deg) translateZ(60px);
+  }
+
+  .casesHeroMapPlane {
+    width: 620px;
+    height: 420px;
+    transform: translate(-50%, -50%) rotateX(50deg) rotateZ(-5deg) translateZ(-50px);
+  }
+
+  .casesFloatCard3,
+  .casesFloatCard4 {
+    display: none;
+  }
+
+  .casesFloatCardBudget {
+    top: 4%;
+    right: 50%;
+    transform: translateX(50%) translateZ(80px);
+    min-width: 190px;
+  }
+
+  .routeBoard {
+    padding: 18px;
+  }
+
+  .detailPanel {
+    padding: 20px;
+    min-height: auto;
+  }
+
+  .compareCardLeft,
+  .compareCardRight {
+    padding: 20px;
+    min-height: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .section {
+    padding: clamp(36px, 6vw, 72px) 0;
+  }
+
+  .casesHeroStageOnly {
+    padding: 80px 12px 32px;
+  }
+
+  .casesStageShell {
+    min-height: 440px;
+    perspective: 1000px;
+  }
+
+  .casesStageInner {
+    height: 440px;
+  }
+
+  .casesHeroPlanCard {
+    width: min(90vw, 380px);
+    transform: translate(-50%, -50%) rotateX(3deg) rotateY(-4deg) translateZ(40px);
+  }
+
+  .casesHeroMapPlane {
+    width: min(92vw, 480px);
+    height: min(56vw, 320px);
+    opacity: 0.5;
+  }
+
+  .casesFloatCard {
+    display: none;
+  }
+
+  .casesConnectLines {
+    display: none;
+  }
+
+  .heroScrollCue {
+    display: none;
+  }
+
+  .routeMapArea {
+    display: none;
+  }
+}
+
+/* ── reduced motion ──────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .casesHeroPlanCard {
+    animation: none;
+  }
+
+  .casesFloatCard,
+  .casesFloatCard1,
+  .casesFloatCardBudget,
+  .casesFloatCard3,
+  .casesFloatCard4 {
+    animation: none;
+  }
+
+  .casesRoutePath,
+  .routePath,
+  .routeMapPath {
+    animation: none;
+  }
+
+  .casesRouteNode,
+  .planStepDot {
+    animation: none;
+  }
+
+  .casesConnectLines line {
+    animation: none;
+  }
+
+  .detailInner {
+    animation: none;
+  }
+}

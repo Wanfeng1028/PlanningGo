@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 
-export type NavKey = "home" | "features" | "cases" | "design" | "developers" | "profile";
+export type NavKey = "home" | "features" | "cases" | "developers" | "profile";
 
 export type ModalKey =
   | "login"

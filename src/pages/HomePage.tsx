@@ -46,7 +46,7 @@ const designCards = [
 
 const homeSections = [
   {
-    title: "这不是搜索推荐，是帮你把事做完",
+    title: "小美Agent帮你把事做完",
     intro: "从一句话到可执行安排：路线、餐厅、票务、日历、分享与记忆。",
   },
   {

@@ -15,7 +15,8 @@
       "Bash(node *)",
       "Bash(type *)",
       "Bash(powershell *)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(rmdir *)"
     ]
   },
   "$version": 4

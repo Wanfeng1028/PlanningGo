@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { RevealGroup } from "../components/RevealGroup";
 import { Button } from "../components/Button";
 import type { ModalKey, NavKey } from "../types";
-import styles from "./Pages.module.scss";
+import styles from "./FlowPage.module.scss";
 
 /* ── props ────────────────────────────────────────────────────────── */
 
@@ -10,236 +11,299 @@ interface FlowPageProps {
   onNavigate: (key: NavKey) => void;
 }
 
-/* ── 设计原则 Bento 数据 ──────────────────────────────────────────── */
+/* ── 数据 ─────────────────────────────────────────────────────────── */
 
-const PRINCIPLES = [
+const LAYERS = [
   {
-    id: "conclusion",
-    title: "先给结论",
-    desc: "先看到能执行的路线，再决定要不要看细节。",
-    example: "首选方案 · 可信度 · 关键标签",
-    size: "large" as const,
+    key: "intent",
+    icon: "💬",
+    title: "理解意图",
+    desc: "一句话里的地点、时间、人数和偏好",
+    input: "周六下午带孩子出去玩，别太累",
+    parsed: ["周六", "亲子", "轻松", "下午"],
+    color: "#8b5cf6",
   },
   {
-    id: "explain",
-    title: "解释理由",
-    desc: "推荐不是黑箱，每条都说明为什么。",
-    example: "少排队 · 距离合适 · 餐厅可订",
-    size: "medium" as const,
+    key: "reason",
+    icon: "🧠",
+    title: "推荐理由",
+    desc: "每个推荐为什么适合你",
+    reasons: [
+      { name: "亲子展览", score: 94 },
+      { name: "公园散步", score: 88 },
+      { name: "室内乐园", score: 82 },
+    ],
+    color: "#2196f3",
   },
   {
-    id: "confirm",
-    title: "动作可确认",
-    desc: "重要动作都要用户确认，不会偷偷发生。",
-    example: "预约 · 分享 · 日历",
-    size: "medium" as const,
+    key: "timeline",
+    icon: "🕐",
+    title: "时间线",
+    desc: "按时间排序，标注可预约和可替代",
+    stops: [
+      { time: "14:00", label: "咖啡", tag: "可预约" },
+      { time: "15:10", label: "展览", tag: "可替代" },
+      { time: "17:30", label: "晚餐", tag: "已确认" },
+    ],
+    color: "#16a34a",
   },
   {
-    id: "backup",
-    title: "变化有备选",
-    desc: "下雨、晚出发、排队变长时，界面直接给替代方案。",
-    example: "雨天 · 晚出发 · 排队变长",
-    size: "wide" as const,
+    key: "action",
+    icon: "✅",
+    title: "可执行动作",
+    desc: "预约、导航、投票，直接执行",
+    actions: ["一键预约", "发送路线", "确认时间", "查看备选"],
+    color: "#f59e0b",
   },
 ];
 
-/* ── 视觉语言数据 ──────────────────────────────────────────────────── */
-
-const VISUAL_TOKENS = [
-  { id: "cream", label: "奶油白", desc: "降低焦虑", swatch: "#f7f1e7" },
-  { id: "yellow", label: "黄色", desc: "提示下一步", swatch: "#ffcc33" },
-  { id: "black", label: "黑色", desc: "承载确认", swatch: "#111213" },
-  { id: "glass", label: "玻璃卡", desc: "分层信息", swatch: "glass" },
-  { id: "radius", label: "圆角", desc: "弱化工具感", swatch: "radius" },
-  { id: "pill", label: "标签", desc: "快速判断", swatch: "pill" },
+const BENTO = [
+  {
+    key: "reason",
+    span: "7",
+    title: "推荐会说明为什么",
+    desc: "每个推荐不是只给一个名字",
+    reasons: [
+      { name: "亲子展览", active: true },
+      { name: "公园散步", active: false },
+      { name: "室内乐园", active: false },
+    ],
+  },
+  {
+    key: "timeline",
+    span: "5",
+    title: "行程按时间排好",
+    desc: "预约、距离和替代都清楚",
+    timeline: ["14:00 咖啡", "15:10 展览", "17:30 晚餐"],
+  },
+  {
+    key: "backup",
+    span: "5",
+    title: "变化来了不重来",
+    desc: "下雨和排队都有备用路径",
+    paths: [
+      { from: "下雨", to: "室内方案" },
+      { from: "排队", to: "换餐厅" },
+    ],
+  },
+  {
+    key: "action",
+    span: "7",
+    title: "结果可以直接执行",
+    desc: "不用再切应用",
+    actions: ["一键预约", "发送路线", "确认时间", "查看备选"],
+  },
 ];
 
-/* ── 状态系统数据 ──────────────────────────────────────────────────── */
-
-const STATE_TOKENS = [
-  { name: "可执行", next: "保存并分享", color: "green" },
-  { name: "待确认", next: "确认预约", color: "yellow" },
-  { name: "朋友投票中", next: "等待结果", color: "blue" },
-  { name: "排队风险高", next: "查看替代", color: "orange" },
-  { name: "雨天可切换", next: "查看室内备选", color: "blue" },
-  { name: "已保存", next: "分享给家人", color: "green" },
-  { name: "可重试", next: "重试或换方案", color: "red" },
-];
-
-/* ── 页面一致性数据 ───────────────────────────────────────────────── */
-
-const PAGE_FRAGMENTS = [
-  { id: "home", title: "首页", desc: "一句话开始", icon: "💬" },
-  { id: "features", title: "功能页", desc: "生成方案", icon: "⚡" },
-  { id: "cases", title: "场景页", desc: "理解生活", icon: "🎯" },
-  { id: "profile", title: "个人中心", desc: "画像与记忆", icon: "👤" },
-];
-
-/* ── 界面剖面层级 ─────────────────────────────────────────────────── */
-
-const CARD_LAYERS = [
-  { layer: "1", label: "用户意图", desc: "一句话需求", color: "#ffcc33" },
-  { layer: "2", label: "推荐理由", desc: "为什么适合你", color: "#27ae60" },
-  { layer: "3", label: "时间线", desc: "路线和节点", color: "#2196f3" },
-  { layer: "4", label: "可执行动作", desc: "预约 · 分享 · 日历", color: "#111213" },
+const STATES = [
+  { key: "input", label: "输入", icon: "💬", active: true },
+  { key: "parse", label: "解析", icon: "🔍", active: true },
+  { key: "reason", label: "推荐", icon: "🧠", active: true },
+  { key: "plan", label: "路线", icon: "🗺", active: true },
+  { key: "confirm", label: "确认", icon: "✅", active: true },
 ];
 
 /* ── component ────────────────────────────────────────────────────── */
 
 export function FlowPage({ onOpenModal, onNavigate }: FlowPageProps) {
+  const [expandedLayer, setExpandedLayer] = useState<string | null>(null);
+
   return (
-    <>
-      {/* ═══════ Hero — 设计理念发布页 ═══════ */}
-      <section className={styles.flowHero}>
-        <div className={styles.flowHeroContent}>
+    <div className={styles.page}>
+      {/* ═══════ Hero — 四层剖面 ═══════ */}
+      <section className={`${styles.section} ${styles.hero}`}>
+        <div className={styles.heroCopy}>
           <RevealGroup>
-            <span className={styles.heroEyebrow}>设计亮点</span>
-            <h1 className={styles.heroTitle}>
-              复杂计划，也能一眼看懂
-            </h1>
+            <span className={styles.eyebrow}>产品逻辑</span>
+            <h1 className={styles.heroTitle}>每一层都在做一件事</h1>
             <p className={styles.heroSubtitle}>
-              把地点、路线、预算、天气和动作状态，整理成能判断、能确认、能改变的界面。
+              从理解意图到生成可执行动作，四层各司其职。
             </p>
             <div className={styles.heroActions}>
-              <Button onClick={() => onOpenModal("guest")}>开始体验</Button>
-              <Button variant="ghost" onClick={() => onNavigate("cases")}>
-                查看场景案例
-              </Button>
+              <Button onClick={() => onOpenModal("guest")}>体验完整流程</Button>
+              <Button variant="ghost" onClick={() => onNavigate("features")}>回到总览</Button>
             </div>
           </RevealGroup>
         </div>
 
-        {/* Hero 右侧：界面剖面卡 */}
-        <div className={styles.flowHeroPreview}>
-          <div className={styles.breakdownPanel}>
-            <div className={styles.breakdownPanelTitle}>方案卡片 · 四层拆解</div>
-            <div className={styles.breakdownLayers}>
-              {CARD_LAYERS.map((l) => (
-                <div key={l.layer} className={styles.breakdownLayer}>
-                  <span className={styles.breakdownLayerNum} style={{ background: l.color }}>{l.layer}</span>
-                  <span className={styles.breakdownLayerLabel}>{l.label}</span>
-                  <span className={styles.breakdownLayerDesc}>{l.desc}</span>
+        <div className={styles.heroLayers}>
+          {LAYERS.map((layer, i) => (
+            <div
+              key={layer.key}
+              className={expandedLayer === layer.key ? styles.layerExpanded : styles.layerCard}
+              style={{ "--layer-i": i, "--layer-color": layer.color } as React.CSSProperties}
+              onMouseEnter={() => setExpandedLayer(layer.key)}
+              onMouseLeave={() => setExpandedLayer(null)}
+            >
+              <div className={styles.layerHeader}>
+                <span className={styles.layerIcon}>{layer.icon}</span>
+                <div className={styles.layerInfo}>
+                  <span className={styles.layerTitle}>{layer.title}</span>
+                  <span className={styles.layerDesc}>{layer.desc}</span>
                 </div>
-              ))}
+              </div>
+
+              {/* 展开时显示的详情 */}
+              {expandedLayer === layer.key && (
+                <div className={styles.layerDetail}>
+                  {layer.key === "intent" && (
+                    <div className={styles.intentPreview}>
+                      <span className={styles.intentInputLabel}>输入</span>
+                      <strong className={styles.intentInputText}>「{layer.input}」</strong>
+                      <div className={styles.intentParsed}>
+                        {layer.parsed!.map((p, j) => (
+                          <span key={j} className={styles.intentChip}>{p}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {layer.key === "reason" && (
+                    <div className={styles.reasonPreview}>
+                      {layer.reasons!.map((r, j) => (
+                        <div key={j} className={styles.reasonItem}>
+                          <span className={styles.reasonName}>{r.name}</span>
+                          <div className={styles.reasonBar}>
+                            <div className={styles.reasonBarFill} style={{ width: `${r.score}%` } as React.CSSProperties} />
+                          </div>
+                          <span className={styles.reasonScore}>{r.score}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {layer.key === "timeline" && (
+                    <div className={styles.timelinePreview}>
+                      {layer.stops!.map((s, j) => (
+                        <div key={j} className={styles.timelineItem}>
+                          <span className={styles.timelineTime}>{s.time}</span>
+                          <span className={styles.timelineDot} />
+                          <span className={styles.timelineLabel}>{s.label}</span>
+                          <span className={styles.timelineTag}>{s.tag}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {layer.key === "action" && (
+                    <div className={styles.actionPreview}>
+                      {layer.actions!.map((a, j) => (
+                        <button key={j} className={styles.actionBtn} type="button">{a}</button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 层间连接线 */}
+              {i < LAYERS.length - 1 && (
+                <svg className={styles.layerBeam} viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <line x1="10" y1="10" x2="10" y2="20" stroke="var(--color-brand)" strokeWidth="2" strokeDasharray="4 3" />
+                </svg>
+              )}
             </div>
-            <div className={styles.breakdownNote}>
-              每一层都可独立理解，合在一起就是一张完整方案。
-            </div>
-          </div>
+          ))}
         </div>
       </section>
 
-      {/* ═══════ 设计原则 Bento Grid ═══════ */}
-      <section className={styles.flowSection}>
+      {/* ═══════ Bento Grid ═══════ */}
+      <section className={styles.section}>
         <div className={styles.sectionIntro}>
-          <span className={styles.sectionEyebrow}>设计原则</span>
-          <h2 className={styles.sectionTitle}>四个原则，让 AI 计划变得可信</h2>
+          <h2 className={styles.sectionTitle}>四个设计原则</h2>
         </div>
 
-        <RevealGroup className={styles.bentoGrid}>
-          {PRINCIPLES.map((p) => (
+        <div className={styles.bentoGrid}>
+          {BENTO.map((item) => (
             <div
-              key={p.id}
-              className={`${styles.bentoCard} ${styles[`bento${p.size}`]}`}
+              key={item.key}
+              className={styles.bentoItem}
+              style={{ "--span": item.span } as React.CSSProperties}
             >
-              <h3 className={styles.bentoTitle}>{p.title}</h3>
-              <p className={styles.bentoDesc}>{p.desc}</p>
-              <div className={styles.bentoExample}>
-                <span className={styles.bentoExampleLabel}>示例</span>
-                <span className={styles.bentoExampleText}>{p.example}</span>
+              <h3 className={styles.bentoTitle}>{item.title}</h3>
+              <p className={styles.bentoDesc}>{item.desc}</p>
+
+              <div className={styles.bentoMockup}>
+                {item.key === "reason" && (
+                  <div className={styles.bentoReasonMock}>
+                    {item.reasons!.map((r, i) => (
+                      <div key={i} className={r.active ? styles.bentoChipActive : styles.bentoChip}>
+                        {r.name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {item.key === "timeline" && (
+                  <div className={styles.bentoTimelineMock}>
+                    {item.timeline!.map((t, i) => (
+                      <div key={i} className={styles.bentoTimelineItem}>
+                        <span className={styles.bentoTimelineDot} />
+                        <span className={styles.bentoTimelineText}>{t}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {item.key === "backup" && (
+                  <div className={styles.bentoBackupMock}>
+                    {item.paths!.map((p, i) => (
+                      <div key={i} className={styles.bentoBackupPath}>
+                        <span className={styles.bentoBackupCondition}>{p.from}</span>
+                        <span className={styles.bentoBackupArrow}>→</span>
+                        <span className={styles.bentoBackupAction}>{p.to}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {item.key === "action" && (
+                  <div className={styles.bentoActionMock}>
+                    {item.actions!.map((a, i) => (
+                      <button key={i} className={styles.bentoActionBtn} type="button">{a}</button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ))}
-        </RevealGroup>
+        </div>
       </section>
 
-      {/* ═══════ 视觉语言标本墙 ═══════ */}
-      <section className={styles.flowSection}>
+      {/* ═══════ 状态轨道 ═══════ */}
+      <section className={styles.section}>
         <div className={styles.sectionIntro}>
-          <h2 className={styles.sectionTitle}>温和，但不含糊</h2>
+          <h2 className={styles.sectionTitle}>状态轨道</h2>
         </div>
 
-        <RevealGroup className={styles.specimenGrid}>
-          {VISUAL_TOKENS.map((t) => (
-            <div key={t.id} className={styles.specimenCard}>
-              {t.swatch === "glass" ? (
-                <div className={styles.specimenSwatchGlass} />
-              ) : t.swatch === "radius" ? (
-                <div className={styles.specimenSwatchRadius} />
-              ) : t.swatch === "pill" ? (
-                <div className={styles.specimenSwatchPill}>
-                  <span className={styles.caseTag}>可预约</span>
-                </div>
-              ) : (
-                <div className={styles.specimenSwatch} style={{ background: t.swatch }} />
+        <div className={styles.stateTrack}>
+          {STATES.map((state, i) => (
+            <div key={state.key} className={styles.stateGroup}>
+              <div className={state.active ? styles.statePillActive : styles.statePill}>
+                <span className={styles.stateIcon}>{state.icon}</span>
+                <span className={styles.stateLabel}>{state.label}</span>
+              </div>
+              {i < STATES.length - 1 && (
+                <svg className={styles.stateArrow} viewBox="0 0 40 20" fill="none" aria-hidden="true">
+                  <line x1="0" y1="10" x2="30" y2="10" stroke="var(--color-brand)" strokeWidth="2" strokeDasharray="4 3" />
+                  <polygon points="30,5 40,10 30,15" fill="var(--color-brand)" />
+                </svg>
               )}
-              <span className={styles.specimenLabel}>{t.label}</span>
-              <span className={styles.specimenDesc}>{t.desc}</span>
             </div>
           ))}
-        </RevealGroup>
-      </section>
-
-      {/* ═══════ 状态系统 ═══════ */}
-      <section className={styles.flowSection}>
-        <div className={styles.sectionIntro}>
-          <h2 className={styles.sectionTitle}>状态不只是颜色，而是下一步</h2>
-        </div>
-
-        <RevealGroup className={styles.stateTrack}>
-          {STATE_TOKENS.map((st) => (
-            <div key={st.name} className={styles.stateCapsule}>
-              <span className={`${styles.stateDot} ${styles[`stateDot${st.color}`]}`} />
-              <span className={styles.stateCapsuleName}>{st.name}</span>
-              <span className={styles.stateCapsuleArrow}>→</span>
-              <span className={styles.stateCapsuleNext}>{st.next}</span>
-            </div>
-          ))}
-        </RevealGroup>
-      </section>
-
-      {/* ═══════ 页面一致性 ═══════ */}
-      <section className={styles.flowSection}>
-        <div className={styles.sectionIntro}>
-          <h2 className={styles.sectionTitle}>从首页到个人中心，都说同一种语言</h2>
-        </div>
-
-        <RevealGroup className={styles.pageFragmentsGrid}>
-          {PAGE_FRAGMENTS.map((pg) => (
-            <div key={pg.id} className={styles.pageFragmentCard}>
-              <span className={styles.pageFragmentIcon}>{pg.icon}</span>
-              <h4 className={styles.pageFragmentTitle}>{pg.title}</h4>
-              <span className={styles.pageFragmentDesc}>{pg.desc}</span>
-            </div>
-          ))}
-        </RevealGroup>
-
-        <div className={styles.consistencyBar}>
-          <RevealGroup className={styles.consistencyBarList}>
-            <span className={styles.consistencyBarItem}>相同卡片层级</span>
-            <span className={styles.consistencyBarItem}>相同按钮规则</span>
-            <span className={styles.consistencyBarItem}>相同标签语言</span>
-            <span className={styles.consistencyBarItem}>相同玻璃质感</span>
-            <span className={styles.consistencyBarItem}>相同安全确认</span>
-          </RevealGroup>
         </div>
       </section>
 
       {/* ═══════ CTA ═══════ */}
-      <section className={styles.flowCta}>
+      <section className={`${styles.section} ${styles.cta}`}>
         <RevealGroup>
-          <h2 className={styles.ctaTitle}>好的设计，是让用户放心交给它</h2>
-          <p className={styles.ctaSubtitle}>
-            清楚、可信、可执行，这是 PlanningGo 的设计目标。
-          </p>
+          <h2 className={styles.ctaTitle}>每个推荐都说明为什么</h2>
+          <p className={styles.ctaSubtitle}>不是黑盒推荐，而是透明可解释的推荐。</p>
           <div className={styles.ctaActions}>
-            <Button onClick={() => onOpenModal("guest")}>开始体验</Button>
-            <Button variant="ghost" onClick={() => onNavigate("cases")}>
-              查看场景案例
-            </Button>
+            <Button onClick={() => onOpenModal("guest")}>游客体验</Button>
+            <Button variant="ghost" onClick={() => onNavigate("features")}>回到总览</Button>
           </div>
         </RevealGroup>
       </section>
-    </>
+    </div>
   );
 }
