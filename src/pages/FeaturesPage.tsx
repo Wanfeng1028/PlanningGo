@@ -1,37 +1,32 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { v4 as uuid } from "uuid";
 import { Button } from "../components/Button";
 import {
   requestPlanning,
-  selectPlan,
   quoteAction as apiQuoteAction,
   confirmAction as apiConfirmAction,
   cancelAction as apiCancelAction,
+  checkHealth,
+  getApiBase,
   type PlanningOption,
   type PlanningExecutableAction,
 } from "../lib/api";
 import type { ModalKey, SessionUser } from "../types";
 import styles from "./FeaturesPage.module.scss";
 
-/* ---------- 相关类型 ---------- */
+/* ── Types ── */
 
 type Phase =
   | "idle"
   | "understanding"
   | "planning"
-  | "need_clarification"
   | "result"
   | "selected"
   | "executing"
   | "done"
   | "error";
 
-type UserMessage = {
-  id: string;
-  role: "user";
-  content: string;
-  ts: number;
-};
+type UserMessage = { id: string; role: "user"; content: string; ts: number };
 
 type AssistantMessage = {
   id: string;
@@ -41,8 +36,6 @@ type AssistantMessage = {
   ts: number;
   plans?: PlanningPlanCard[];
   actions?: ExecutionActionCard[];
-  actionQuotingId?: string | null;
-  actionQuotedPreview?: { title: string; price?: string; cancelLabel?: string } | null;
 };
 
 type ChatMessage = UserMessage | AssistantMessage;
@@ -70,12 +63,12 @@ type ExecutionActionCard = {
   priceEstimate?: string;
 };
 
-/* ---------- 常量 ---------- */
+/* ── Constants ── */
 
 const EXAMPLE_CHIPS = [
   { label: "👨‍👩‍👧 带娃半日游", prompt: "明天带娃半天，三个小时，要有趣又有教育意义" },
   { label: "👫 情侣约会", prompt: "周六情侣约会，浪漫一点，预算 500 以内" },
-  { label: "🎓 毕业打卡", prompt: "大学毕业旅行，打卡经典地标，拍出朋友圈大片" },
+  { label: "🌧️ 雨天室内", prompt: "下雨天适合去哪里玩，最好在室内，交通方便" },
   { label: "🎤 演唱会夜", prompt: "晚上有演唱会，白天怎么安排最充实" },
 ];
 
@@ -85,7 +78,7 @@ const WHAT_IF_OPTIONS = [
   { key: "budget" as const, label: "💰 预算减半" },
 ];
 
-/* ---------- Props ---------- */
+/* ── Props ── */
 
 interface FeaturesPageProps {
   user?: SessionUser | null;
@@ -93,12 +86,340 @@ interface FeaturesPageProps {
   onRequestLocation?: () => void;
 }
 
-/* ========== Component ========== */
+/* ── Attachment type ── */
+
+type AttachmentItem = {
+  id: string;
+  file: File;
+  previewUrl?: string;
+};
+
+/* ── Inline Toast component ── */
+
+function InlineToast({ message, onDone }: { message: string; onDone: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 2200);
+    return () => clearTimeout(t);
+  }, [onDone]);
+  return <div className={styles.composerToast}>{message}</div>;
+}
+
+/* ── Ambient background (idle only) ── */
+
+function AmbientBackground() {
+  return (
+    <div className={styles.featureAmbient} aria-hidden="true">
+      <div className={`${styles.bgOrb} ${styles.bgOrb1}`} />
+      <div className={`${styles.bgOrb} ${styles.bgOrb2}`} />
+      <div className={`${styles.bgOrb} ${styles.bgOrb3}`} />
+      <div className={`${styles.bgOrb} ${styles.bgOrb4}`} />
+      <div className={`${styles.bgCard} ${styles.bgCard1}`}>
+        <span>🍜</span>
+        <strong>武康路晚餐</strong>
+        <em>17:30 · 人均 ¥180</em>
+      </div>
+      <div className={`${styles.bgCard} ${styles.bgCard2}`}>
+        <span>☀️</span>
+        <strong>周六 24℃</strong>
+        <em>傍晚可能有雨</em>
+      </div>
+      <div className={`${styles.bgCard} ${styles.bgCard3}`}>
+        <span>🗺️</span>
+        <strong>3 套备选方案</strong>
+        <em>亲子 / 雨天 / 朋友</em>
+      </div>
+      <div className={styles.bgGrid} />
+    </div>
+  );
+}
+
+/* ── Gemini-style Composer ── */
+
+interface ComposerProps {
+  compact?: boolean;
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  value: string;
+  onChange: (v: string) => void;
+  onSubmit: (attachments: AttachmentItem[]) => void;
+  disabled?: boolean;
+  placeholder?: string;
+  showMeta?: boolean;
+  user?: SessionUser | null;
+  city?: string;
+  onOpenModal?: (key: ModalKey) => void;
+  onToast?: (msg: string) => void;
+}
+
+/* ── Speech Recognition typings ── */
+interface SpeechRecognitionEvent {
+  results: SpeechRecognitionResultList;
+  resultIndex: number;
+}
+interface SpeechRecognitionErrorEvent {
+  error: string;
+}
+
+function Composer({
+  compact,
+  textareaRef,
+  value,
+  onChange,
+  onSubmit,
+  disabled,
+  placeholder,
+  showMeta,
+  user,
+  city,
+  onOpenModal,
+  onToast,
+}: ComposerProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const valueRef = useRef(value);
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+
+  // Keep ref in sync so speech recognition callback always sees latest value
+  useEffect(() => { valueRef.current = value; }, [value]);
+
+  /* ── Cleanup preview URLs on unmount ── */
+  useEffect(() => {
+    return () => {
+      attachments.forEach((a) => {
+        if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* ── File pick handler ── */
+  const handleFilePick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFilesSelected = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+
+      const newItems: AttachmentItem[] = [];
+      for (const file of Array.from(files)) {
+        const isImage = file.type.startsWith("image/");
+        newItems.push({
+          id: uuid(),
+          file,
+          previewUrl: isImage ? URL.createObjectURL(file) : undefined,
+        });
+      }
+
+      setAttachments((prev) => {
+        const next = [...prev, ...newItems];
+        if (next.length > 9) {
+          onToast?.("最多附加 9 个文件");
+          return next.slice(0, 9);
+        }
+        return next;
+      });
+
+      // reset input so same file can be re-selected
+      e.target.value = "";
+    },
+    [onToast],
+  );
+
+  const handleRemoveAttachment = useCallback((id: string) => {
+    setAttachments((prev) => {
+      const item = prev.find((a) => a.id === id);
+      if (item?.previewUrl) URL.revokeObjectURL(item.previewUrl);
+      return prev.filter((a) => a.id !== id);
+    });
+  }, []);
+
+  /* ── Voice recording ── */
+  const SpeechRecognitionCtor = useMemo(() => {
+    const w = window as any;
+    return w.SpeechRecognition || w.webkitSpeechRecognition || null;
+  }, []);
+
+  const toggleRecording = useCallback(() => {
+    if (isRecording && recognitionRef.current) {
+      recognitionRef.current.stop();
+      return;
+    }
+
+    if (!SpeechRecognitionCtor) {
+      onToast?.("当前浏览器不支持语音输入，请使用 Chrome");
+      return;
+    }
+
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = "zh-CN";
+    recognition.interimResults = true;
+    recognition.continuous = true;
+    recognition.maxAlternatives = 1;
+
+    let finalTranscript = "";
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interim += transcript;
+        }
+      }
+      const combined = (valueRef.current ? valueRef.current : "") + finalTranscript + interim;
+      onChange(combined);
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      if (event.error !== "aborted") {
+        onToast?.(`语音识别出错：${event.error}`);
+      }
+      setIsRecording(false);
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+      recognitionRef.current = null;
+      // Focus textarea after recording ends
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsRecording(true);
+    onToast?.("正在录音，点击麦克风停止");
+  }, [isRecording, SpeechRecognitionCtor, onChange, onToast, textareaRef]);
+
+  /* ── Submit ── */
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
+
+  const handleSubmit = () => {
+    if (disabled) return;
+    onSubmit(attachments);
+    // Clean up attachment previews
+    attachments.forEach((a) => {
+      if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
+    });
+    setAttachments([]);
+  };
+
+  const fileIcon = (file: File) => {
+    if (file.type.startsWith("image/")) return null;
+    if (file.type.includes("pdf")) return "📄";
+    if (file.type.includes("word") || file.name.endsWith(".doc") || file.name.endsWith(".docx"))
+      return "📝";
+    if (file.type.includes("sheet") || file.name.endsWith(".xls") || file.name.endsWith(".xlsx"))
+      return "📊";
+    return "📎";
+  };
+
+  return (
+    <div className={`${styles.featureComposer} ${compact ? styles.featureComposerCompact : ""}`}>
+      {/* hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+        style={{ display: "none" }}
+        onChange={handleFilesSelected}
+      />
+
+      {/* attachment previews */}
+      {attachments.length > 0 && (
+        <div className={styles.composerAttachments}>
+          {attachments.map((att) => (
+            <div key={att.id} className={styles.composerAttachmentThumb}>
+              {att.previewUrl ? (
+                <img src={att.previewUrl} alt={att.file.name} />
+              ) : (
+                <span className={styles.attachmentFileIcon}>{fileIcon(att.file)}</span>
+              )}
+              <button
+                className={styles.composerAttachmentRemove}
+                type="button"
+                aria-label={`移除 ${att.file.name}`}
+                onClick={() => handleRemoveAttachment(att.id)}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className={styles.composerInputRow}>
+        <button
+          className={styles.composerIconButton}
+          type="button"
+          aria-label="添加附件"
+          onClick={handleFilePick}
+          disabled={disabled}
+        >
+          +
+        </button>
+        <textarea
+          ref={textareaRef}
+          className={styles.composerTextarea}
+          placeholder={placeholder || "明天带娃半天，预算 300，想玩点不一样的…"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          rows={1}
+        />
+        <button
+          className={`${styles.composerIconButton} ${isRecording ? styles.composerVoiceActive : ""}`}
+          type="button"
+          aria-label={isRecording ? "停止录音" : "语音输入"}
+          onClick={toggleRecording}
+          disabled={disabled && !isRecording}
+        >
+          {isRecording ? <span className={styles.voiceDot} /> : "🎙"}
+        </button>
+        <button
+          className={styles.composerSendButton}
+          type="button"
+          disabled={disabled || (!value.trim() && attachments.length === 0)}
+          onClick={handleSubmit}
+        >
+          开始规划
+        </button>
+      </div>
+      {showMeta && (
+        <div className={styles.composerMetaRow}>
+          <span className={styles.composerMetaItem}>📍 {city || "上海"}</span>
+          {user ? (
+            <span className={styles.composerMetaItem}>👤 {user.name || "已登录"}</span>
+          ) : (
+            <button
+              className={styles.composerMetaLink}
+              onClick={() => onOpenModal?.("login")}
+            >
+              登录解锁更多
+            </button>
+          )}
+          <span className={styles.composerMetaItem}>预约和付款前会先确认</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Main Component ── */
 
 export default function FeaturesPage({ user, onOpenModal, onRequestLocation }: FeaturesPageProps) {
   void onRequestLocation;
 
-  /* ── 状态 ── */
+  /* ── State ── */
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [city] = useState("上海");
@@ -113,53 +434,48 @@ export default function FeaturesPage({ user, onOpenModal, onRequestLocation }: F
     cancelLabel?: string;
   } | null>(null);
   const [cachedActions, setCachedActions] = useState<ExecutionActionCard[]>([]);
+  const [backendOk, setBackendOk] = useState<boolean | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const endRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lastPlanIdRef = useRef<string | null>(null);
 
-  /* ── 滚动 ── */
-  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+  const isBusy = phase === "understanding" || phase === "planning";
+  const isChat = phase !== "idle";
+
+  /* ── Health check ── */
+  useEffect(() => {
+    let cancelled = false;
+    checkHealth().then((res) => {
+      if (!cancelled) setBackendOk(res.ok);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  /* ── Auto-scroll messages ── */
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     requestAnimationFrame(() => {
       endRef.current?.scrollIntoView({ behavior });
     });
-  };
+  }, []);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, actionQuotedPreview, actionQuotingId]);
+    if (isChat) scrollToBottom();
+  }, [messages, actionQuotedPreview, actionQuotingId, isChat, scrollToBottom]);
 
-  /* ── textarea 自适应高度 ── */
-  useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
-  }, [inputValue]);
-
-  /* ── 计算派生状态 ── */
-  const showWhatIfBar = phase === "selected" || phase === "done";
-
-  /* ── 辅助函数 ── */
-  const addMessage = (msg: ChatMessage) => {
-    setMessages((prev) => [...prev, msg]);
-  };
+  /* ── Helpers ── */
+  const addMessage = (msg: ChatMessage) => setMessages((prev) => [...prev, msg]);
 
   const appendAssistantText = (content: string) => {
-    addMessage({
-      id: uuid(),
-      role: "assistant",
-      type: "text",
-      content,
-      ts: Date.now(),
-    });
+    addMessage({ id: uuid(), role: "assistant", type: "text", content, ts: Date.now() });
   };
 
   const removeMessage = (id: string) => {
     setMessages((prev) => prev.filter((m) => m.id !== id));
   };
 
-  /* ── 适配器：后端 PlanningOption → 前端 PlanningPlanCard ── */
+  /* ── Adapters ── */
   const adaptPlan = (opt: PlanningOption): PlanningPlanCard => ({
     id: opt.id,
     title: opt.title,
@@ -201,9 +517,9 @@ export default function FeaturesPage({ user, onOpenModal, onRequestLocation }: F
     return "确认";
   };
 
-  /* ── 核心流程：提交规划请求 ── */
+  /* ── Core: submit planning request ── */
   const doSubmit = async (prompt: string) => {
-    if (!prompt || phase === "understanding" || phase === "planning") return;
+    if (!prompt || isBusy) return;
 
     setError(null);
     setInputValue("");
@@ -213,7 +529,7 @@ export default function FeaturesPage({ user, onOpenModal, onRequestLocation }: F
     addMessage({ id: uuid(), role: "user", content: prompt, ts: Date.now() });
     setPhase("understanding");
 
-    // 流式打字效果
+    // Streaming typewriter
     const understandingId = uuid();
     const fullText = "正在理解你的需求，马上生成方案…";
     let currentText = "";
@@ -245,18 +561,16 @@ export default function FeaturesPage({ user, onOpenModal, onRequestLocation }: F
 
     try {
       const result = await requestPlanning({ prompt, city });
-
+      setBackendOk(true);
       removeMessage(understandingId);
 
       const planCards = result.options.map(adaptPlan);
       const actions = adaptActions(result.executableActions);
-
       setPlanId(result.planId);
       setCachedActions(actions);
       lastPlanIdRef.current = result.planId;
 
       appendAssistantText(result.summary || "这是为你生成的方案：");
-
       addMessage({
         id: uuid(),
         role: "assistant",
@@ -265,38 +579,46 @@ export default function FeaturesPage({ user, onOpenModal, onRequestLocation }: F
         plans: planCards,
         ts: Date.now(),
       });
-
       setPhase("result");
     } catch (err) {
       removeMessage(understandingId);
-      const msg = err instanceof Error ? err.message : "请求失败";
-      setError(msg);
+      const raw = err instanceof Error ? err.message : "请求失败";
+      const isNetwork = raw.includes("无法连接") || raw.includes("Failed to fetch") || raw.includes("网络");
+      const friendly = isNetwork
+        ? "没有连上规划服务。请确认后端已启动：npm run dev:api，并检查 VITE_API_BASE 配置。"
+        : raw;
+      setBackendOk(false);
+      setError(friendly);
       setPhase("error");
     }
   };
 
-  const handleComposerSubmit = () => {
-    doSubmit(inputValue.trim());
+  const handleComposerSubmit = () => doSubmit(inputValue.trim());
+
+  const handleExampleChip = (prompt: string) => doSubmit(prompt);
+
+  const handleChipToInput = (prompt: string) => {
+    setInputValue(prompt);
+    requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
-  const handleExampleChip = (prompt: string) => {
-    doSubmit(prompt);
-  };
+  /* ── Composer buttons ── */
+  const handlePlusClick = () => setToast("附件与更多输入方式稍后接入");
+  const handleVoiceClick = () => setToast("语音输入稍后接入");
 
+  /* ── Plan selection ── */
   const handleSelectPlan = async (cardId: string, title: string) => {
     if (phase === "executing") return;
     setPhase("executing");
     setActionQuotedPreview(null);
     setActionQuotingId(null);
-
     appendAssistantText(`已选择「${title}」，正在处理…`);
 
     try {
-      await selectPlan(cardId);
-
-      const selectedActions = cachedActions.filter(
-        (a) => (a as any).optionId === cardId || cachedActions.length > 0
-      );
+      const selectedActions =
+        cachedActions.length > 0
+          ? cachedActions.filter((a) => !(a as any).optionId || (a as any).optionId === cardId)
+          : [];
 
       if (selectedActions.length > 0) {
         addMessage({
@@ -307,20 +629,20 @@ export default function FeaturesPage({ user, onOpenModal, onRequestLocation }: F
           actions: selectedActions,
           ts: Date.now(),
         });
+      } else {
+        appendAssistantText("这套方案已选中，后续将接入预约、日历和分享。");
       }
-
       setPhase("selected");
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "选择方案失败";
-      appendAssistantText(msg);
+      appendAssistantText(err instanceof Error ? err.message : "选择方案失败");
       setPhase("error");
     }
   };
 
+  /* ── Action operations ── */
   const handleQuoteAction = async (actionId: string) => {
     setActionQuotingId(actionId);
     setActionQuotedPreview(null);
-
     try {
       const result = await apiQuoteAction(actionId);
       setCachedActions((prev) =>
@@ -345,13 +667,10 @@ export default function FeaturesPage({ user, onOpenModal, onRequestLocation }: F
 
   const handleConfirmAction = async (actionId: string) => {
     setActionQuotingId(actionId);
-
     try {
       const result = await apiConfirmAction(actionId);
       setCachedActions((prev) =>
-        prev.map((a) =>
-          a.id === actionId ? { ...a, status: result.status } : a
-        )
+        prev.map((a) => (a.id === actionId ? { ...a, status: result.status } : a))
       );
       setActionQuotedPreview(null);
 
@@ -363,13 +682,11 @@ export default function FeaturesPage({ user, onOpenModal, onRequestLocation }: F
           : action?.type.includes("calendar")
             ? "ICS 已生成"
             : "操作成功";
-
       appendAssistantText(`✅ ${label} — ${action?.title || ""}`);
 
       if (action?.type.includes("share")) {
         appendAssistantText("📋 已复制分享链接，快发给朋友吧！");
       }
-
       if (action?.type.includes("memory") && user?.id) {
         appendAssistantText("记忆已同步到个人主页 🧠");
       }
@@ -392,13 +709,10 @@ export default function FeaturesPage({ user, onOpenModal, onRequestLocation }: F
 
   const handleCancelAction = async (actionId: string) => {
     setActionQuotingId(actionId);
-
     try {
       const result = await apiCancelAction(actionId);
       setCachedActions((prev) =>
-        prev.map((a) =>
-          a.id === actionId ? { ...a, status: result.status } : a
-        )
+        prev.map((a) => (a.id === actionId ? { ...a, status: result.status } : a))
       );
       setActionQuotedPreview(null);
 
@@ -426,7 +740,6 @@ export default function FeaturesPage({ user, onOpenModal, onRequestLocation }: F
         : scenario === "late"
           ? "如果迟到 1 小时怎么办"
           : "预算减半怎么调整";
-
     doSubmit(`${prompt}，基于当前方案调整`);
   };
 
@@ -439,10 +752,10 @@ export default function FeaturesPage({ user, onOpenModal, onRequestLocation }: F
     setActionQuotedPreview(null);
     setActionQuotingId(null);
     lastPlanIdRef.current = null;
+    requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
-  /* ── 渲染辅助 ── */
-
+  /* ── Message renderer ── */
   const renderMessage = (msg: ChatMessage) => {
     if (msg.role === "user") {
       return (
@@ -483,10 +796,7 @@ export default function FeaturesPage({ user, onOpenModal, onRequestLocation }: F
             {msg.content && <p>{msg.content}</p>}
             <div className={styles.featurePlanCardsScroll}>
               {msg.plans.map((card) => (
-                <div
-                  key={card.id}
-                  className={styles.featurePlanCard}
-                >
+                <div key={card.id} className={styles.featurePlanCard}>
                   <div className={styles.featurePlanCardHeader}>
                     <h4>{card.title}</h4>
                   </div>
@@ -518,9 +828,7 @@ export default function FeaturesPage({ user, onOpenModal, onRequestLocation }: F
                     <span>💰 {card.budget}</span>
                     {card.distance && <span>🚶 {card.distance}</span>}
                   </div>
-                  {card.risk && (
-                    <p className={styles.featurePlanRisk}>⚠️ {card.risk}</p>
-                  )}
+                  {card.risk && <p className={styles.featurePlanRisk}>⚠️ {card.risk}</p>}
                   {phase === "result" && (
                     <Button
                       variant="primary"
@@ -571,7 +879,6 @@ export default function FeaturesPage({ user, onOpenModal, onRequestLocation }: F
                   </div>
                   <p className={styles.featureActionDesc}>{action.description}</p>
 
-                  {/* 报价预览 */}
                   {actionQuotedPreview?.actionId === action.id && (
                     <div className={styles.featureActionPreview}>
                       <div className={styles.featureActionPreviewContent}>
@@ -608,40 +915,45 @@ export default function FeaturesPage({ user, onOpenModal, onRequestLocation }: F
                     </div>
                   )}
 
-                  {/* 操作按钮 */}
-                  {action.status !== "confirmed" && action.status !== "cancelled" && !actionQuotedPreview?.actionId && (
-                    <div className={styles.featureActionBtns}>
-                      {action.priceEstimate && action.status === "quoted" ? (
-                        <>
+                  {action.status !== "confirmed" &&
+                    action.status !== "cancelled" &&
+                    !actionQuotedPreview?.actionId && (
+                      <div className={styles.featureActionBtns}>
+                        {action.priceEstimate && action.status === "quoted" ? (
+                          <>
+                            <Button
+                              variant="primary"
+                              size="small"
+                              disabled={actionQuotingId === action.id}
+                              onClick={() => handleConfirmAction(action.id)}
+                            >
+                              {actionQuotingId === action.id
+                                ? "处理中…"
+                                : action.confirmLabel || "确认"}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="small"
+                              disabled={actionQuotingId === action.id}
+                              onClick={() => handleCancelAction(action.id)}
+                            >
+                              取消
+                            </Button>
+                          </>
+                        ) : (
                           <Button
                             variant="primary"
                             size="small"
                             disabled={actionQuotingId === action.id}
-                            onClick={() => handleConfirmAction(action.id)}
+                            onClick={() => handleQuoteAction(action.id)}
                           >
-                            {actionQuotingId === action.id ? "处理中…" : (action.confirmLabel || "确认")}
+                            {actionQuotingId === action.id
+                              ? "查询中…"
+                              : action.confirmLabel || "查看详情"}
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="small"
-                            disabled={actionQuotingId === action.id}
-                            onClick={() => handleCancelAction(action.id)}
-                          >
-                            取消
-                          </Button>
-                        </>
-                      ) : (
-                        <Button
-                          variant="primary"
-                          size="small"
-                          disabled={actionQuotingId === action.id}
-                          onClick={() => handleQuoteAction(action.id)}
-                        >
-                          {actionQuotingId === action.id ? "查询中…" : (action.confirmLabel || "查看详情")}
-                        </Button>
-                      )}
-                    </div>
-                  )}
+                        )}
+                      </div>
+                    )}
                 </div>
               ))}
             </div>
@@ -663,89 +975,41 @@ export default function FeaturesPage({ user, onOpenModal, onRequestLocation }: F
     return null;
   };
 
-  /* ── JSX ── */
+  /* ── Show what-if bar ── */
+  const showWhatIfBar = phase === "selected" || phase === "done";
 
-  if (phase === "idle") {
+  /* ═══════════════════════════════════════════════
+     IDLE STATE — Gemini-style centered entry
+     ═══════════════════════════════════════════════ */
+  if (!isChat) {
     return (
-      <div className={`${styles.featureShell} ${styles.featureShellIdle}`}>
-        {/* 3D 背景装饰 */}
-        <div className={styles.featureBg3D} aria-hidden="true">
-          <div className={`${styles.bgOrb} ${styles.bgOrb1}`} />
-          <div className={`${styles.bgOrb} ${styles.bgOrb2}`} />
-          <div className={`${styles.bgOrb} ${styles.bgOrb3}`} />
-          <div className={`${styles.bgOrb} ${styles.bgOrb4}`} />
-          <div className={`${styles.bgCard} ${styles.bgCard1}`}>
-            <span>🍜</span>
-            <strong>武康路晚餐</strong>
-            <em>17:30 · 人均 ¥180</em>
-          </div>
-          <div className={`${styles.bgCard} ${styles.bgCard2}`}>
-            <span>☀️</span>
-            <strong>周六 24℃</strong>
-            <em>傍晚可能有雨</em>
-          </div>
-          <div className={`${styles.bgCard} ${styles.bgCard3}`}>
-            <span>🗺️</span>
-            <strong>3 套备选方案</strong>
-            <em>亲子 / 雨天 / 朋友</em>
-          </div>
-          <div className={styles.bgGrid} />
-        </div>
+      <div className={styles.featureShell}>
+        <AmbientBackground />
 
-        <div className={styles.featureComposerHero}>
-          <div className={styles.featureHeroTitle}>
-            <span className={styles.featureHeroIcon}>✨</span>
-            <h1>周末去哪儿</h1>
-            <p className={styles.featureHeroSub}>输入一句话，AI 帮你规划完美周末</p>
-          </div>
-          <div className={styles.featureHeroComposer}>
-            <textarea
-              ref={textareaRef}
-              className={styles.featureTextarea}
-              placeholder="明天带娃半天，预算 300，想玩点不一样的…"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleComposerSubmit();
-                }
-              }}
-              rows={3}
-            />
-            <div className={styles.featureHeroComposerActions}>
-              <div className={styles.featureHeroComposerLeft}>
-                <span className={styles.featureComposerCity}>
-                  📍 {city}
-                </span>
-                {user ? (
-                  <span className={styles.featureComposerUser}>
-                    👤 {user.name || "已登录"}
-                  </span>
-                ) : (
-                  <button
-                    className={styles.featureComposerLoginLink}
-                    onClick={() => onOpenModal?.("login")}
-                  >
-                    登录解锁更多
-                  </button>
-                )}
-              </div>
-              <Button
-                variant="primary"
-                size="small"
-                onClick={handleComposerSubmit}
-                disabled={!inputValue.trim()}
-              >
-                开始规划
-              </Button>
-            </div>
-          </div>
-          <div className={styles.featureExampleChips}>
+        <div className={styles.featureHome}>
+          <h1 className={styles.featureTitle}>周末去哪儿</h1>
+          <p className={styles.featureSubtitle}>输入一句话，Agent帮你规划完美周末</p>
+
+          <Composer
+            textareaRef={textareaRef}
+            value={inputValue}
+            onChange={setInputValue}
+            onSubmit={handleComposerSubmit}
+            disabled={isBusy}
+            showMeta
+            user={user}
+            city={city}
+            onOpenModal={onOpenModal}
+            onToast={setToast}
+          />
+
+          {toast && <InlineToast message={toast} onDone={() => setToast(null)} />}
+
+          <div className={styles.featurePromptChips}>
             {EXAMPLE_CHIPS.map((chip) => (
               <button
                 key={chip.label}
-                className={styles.featureChip}
+                className={styles.featurePromptChip}
                 onClick={() => handleExampleChip(chip.prompt)}
               >
                 {chip.label}
@@ -753,14 +1017,25 @@ export default function FeaturesPage({ user, onOpenModal, onRequestLocation }: F
             ))}
           </div>
         </div>
+
+        {backendOk === false && (
+          <div className={styles.featureHealthHint}>
+            规划服务暂时没连上，请确认 <code>npm run dev:api</code> 已启动
+          </div>
+        )}
       </div>
     );
   }
 
+  /* ═══════════════════════════════════════════════
+     CHAT STATE — single-viewport workspace
+     ═══════════════════════════════════════════════ */
   return (
     <div className={styles.featureShell}>
-      <div className={styles.featureChatWorkspace}>
-        {/* 消息列表 */}
+      <AmbientBackground />
+
+      <div className={styles.featureChat}>
+        {/* Messages */}
         <div className={styles.featureMessages}>
           <div className={styles.featureMessagesInner}>
             {messages.map(renderMessage)}
@@ -784,10 +1059,10 @@ export default function FeaturesPage({ user, onOpenModal, onRequestLocation }: F
           </div>
         )}
 
-        {/* 错误状态 */}
+        {/* Error card */}
         {phase === "error" && error && (
           <div className={styles.featureErrorCard}>
-            <div className={styles.featureErrorTitle}>网络异常，请稍后重试</div>
+            <div className={styles.featureErrorTitle}>{error}</div>
             <div className={styles.featureErrorActions}>
               <Button
                 variant="primary"
@@ -800,58 +1075,61 @@ export default function FeaturesPage({ user, onOpenModal, onRequestLocation }: F
               >
                 重试
               </Button>
-              <Button
-                variant="ghost"
-                size="small"
-                onClick={handleNewRound}
-              >
+              <Button variant="ghost" size="small" onClick={handleNewRound}>
                 新一轮
               </Button>
+              {backendOk === false && (
+                <button
+                  className={styles.featureErrorHelpToggle}
+                  onClick={(e) => {
+                    const el = e.currentTarget.nextElementSibling as HTMLElement;
+                    if (el) el.hidden = !el.hidden;
+                  }}
+                >
+                  查看启动说明
+                </button>
+              )}
             </div>
+            {backendOk === false && (
+              <div className={styles.featureErrorHelp} hidden>
+                <pre>{`npm run dev          # 启动前端 (5173)
+npm run dev:api      # 启动后端 (3001)
+
+# .env.local
+VITE_API_BASE=${getApiBase()}
+PORT=3001`}</pre>
+              </div>
+            )}
           </div>
         )}
 
-        {/* 底部 composer */}
+        {/* Docked composer */}
         <div className={styles.featureComposerDock}>
-          <div className={styles.featureDockCard}>
-            <textarea
-              ref={textareaRef}
-              className={styles.featureTextarea}
+          <div className={styles.featureComposerDockInner}>
+            <button
+              className={styles.featureNewRoundBtn}
+              onClick={handleNewRound}
+              title="新一轮规划"
+            >
+              🔄
+            </button>
+            <Composer
+              compact
+              textareaRef={textareaRef}
+              value={inputValue}
+              onChange={setInputValue}
+              onSubmit={handleComposerSubmit}
+              disabled={isBusy}
               placeholder={
                 phase === "result"
-                  ? "对方案满意吗？选择一个开始执行…"
+                  ? "选一个方案，或继续描述…"
                   : phase === "selected" || phase === "done"
-                    ? "还想调整什么？输入 what-if…"
-                    : "继续描述你的需求…"
+                    ? "还想调整什么？"
+                    : "继续描述…"
               }
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleComposerSubmit();
-                }
-              }}
-              rows={2}
+              onToast={setToast}
             />
-            <div className={styles.featureDockActions}>
-              <span className={styles.featureComposerCity}>📍 {city}</span>
-              <Button
-                variant="primary"
-                size="small"
-                onClick={handleComposerSubmit}
-                disabled={!inputValue.trim() || phase === "understanding" || phase === "planning"}
-              >
-                发送
-              </Button>
-              <button
-                className={styles.featureNewRoundBtn}
-                onClick={handleNewRound}
-                title="新一轮规划"
-              >
-                🔄
-              </button>
-            </div>
+            {toast && <InlineToast message={toast} onDone={() => setToast(null)} />}
           </div>
         </div>
       </div>

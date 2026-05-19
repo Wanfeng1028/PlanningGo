@@ -131,12 +131,14 @@ export function App() {
   })();
 
   return (
-    <div className={styles.shell}>
-      <div className={pageStyles.floatingBubbles} aria-hidden="true">
-        {Array.from({ length: 36 }).map((_, index) => (
-          <span key={index} />
-        ))}
-      </div>
+    <div className={`${styles.shell} ${active === "features" ? styles.shellFull : ""}`}>
+      {active !== "features" && (
+        <div className={pageStyles.floatingBubbles} aria-hidden="true">
+          {Array.from({ length: 36 }).map((_, index) => (
+            <span key={index} />
+          ))}
+        </div>
+      )}
 
       <NavBar
         active={active}
@@ -152,7 +154,7 @@ export function App() {
         }}
       />
 
-      <main className={`${styles.content} ${active === "features" ? styles.pageFull : styles.page}`}>
+      <main className={`${active === "features" ? styles.contentFull : styles.content} ${active === "features" ? styles.pageFull : styles.page}`}>
         <PageTransition pageKey={active}>{page}</PageTransition>
       </main>
 

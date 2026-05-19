@@ -52,7 +52,7 @@ export interface AuthResponse {
   expiresInMinutes?: number;
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:3001";
+const API_BASE: string = import.meta.env.VITE_API_BASE || "http://127.0.0.1:3001";
 
 // ── Token 管理 ──
 let _authToken: string | null = localStorage.getItem("pg_token");
@@ -65,6 +65,35 @@ export function setAuthToken(token: string | null) {
 
 export function getAuthToken() {
   return _authToken;
+}
+
+export function getApiBase(): string {
+  return API_BASE;
+}
+
+// ── Health Check ──
+
+export interface HealthCheckResult {
+  ok: boolean;
+  service?: string;
+  error?: string;
+}
+
+export async function checkHealth(): Promise<HealthCheckResult> {
+  try {
+    const response = await fetch(`${API_BASE}/api/health`, {
+      method: "GET",
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) {
+      return { ok: false, error: `服务返回 ${response.status}` };
+    }
+    const body = (await response.json()) as { ok?: boolean; service?: string };
+    return { ok: body.ok === true, service: body.service };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: msg };
+  }
 }
 
 export async function requestAgentPlan(prompt: string): Promise<AgentPlanResponse> {
@@ -97,10 +126,19 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
     headers.authorization = `Bearer ${_authToken}`;
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("fetch")) {
+      throw new Error("无法连接规划服务，请确认后端已启动（npm run dev:api）并检查 VITE_API_BASE 配置。");
+    }
+    throw new Error(`网络请求失败：${msg}`);
+  }
 
   let body: unknown;
   try {
@@ -110,20 +148,30 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (!response.ok) {
-    const msg =
-      (body && typeof body === "object" && "message" in body && typeof (body as Record<string, unknown>).message === "string"
-        ? (body as Record<string, unknown>).message
-        : undefined) ??
-      (body && typeof body === "object" && "error" in body && typeof (body as Record<string, unknown>).error === "object"
-        ? ((body as Record<string, unknown>).error as Record<string, unknown>)?.message
-        : undefined) ??
-      `请求失败 (${response.status})`;
+    // 提取后端返回的错误信息
+    let msg: string | undefined;
+    if (body && typeof body === "object") {
+      const obj = body as Record<string, unknown>;
+      if (typeof obj.message === "string") {
+        msg = obj.message;
+      } else if (typeof obj.error === "string") {
+        msg = obj.error;
+      } else if (obj.error && typeof obj.error === "object" && "message" in (obj.error as Record<string, unknown>)) {
+        msg = (obj.error as Record<string, unknown>).message as string;
+      }
+    }
+
+    if (!msg) {
+      if (response.status === 400) msg = "请求参数不完整，我需要再确认城市或出发地。";
+      else if (response.status === 500) msg = "规划服务刚刚出错了，可以重试一次。";
+      else msg = `请求失败 (${response.status})`;
+    }
 
     if (import.meta.env.DEV) {
       console.warn(`[api] ${path} ${response.status}`, body);
     }
 
-    throw new Error(typeof msg === "string" ? msg : `请求失败 (${response.status})`);
+    throw new Error(msg);
   }
 
   // 兼容 { ok, data } 包装格式和扁平格式

@@ -1,37 +1,28 @@
 @use "../styles/glass" as *;
 
-/* ---------- Variables ---------- */
+/* ── Variables ── */
 $brand: #ffcc33;
-$brand-rgb: 255, 204, 51;
-$text-primary: #1a1a2e;
+$text: #1a1a2e;
 $text-secondary: #6b7280;
-$bg-page: #f7f1e7;
 $bg-glass: rgba(255, 255, 255, 0.72);
 $border-glass: rgba(255, 255, 255, 0.62);
-$radius-lg: 20px;
-$radius-md: 14px;
-$radius-sm: 10px;
-$radius-xs: 8px;
 
-/* ---------- Shell ---------- */
+/* ───────────────────────────────────────────────
+   Shell — single viewport frame, no page scroll
+   ─────────────────────────────────────────────── */
 .featureShell {
+  position: relative;
   height: 100%;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   background: transparent;
   padding: 0;
 }
 
-/* idle 模式：单屏不滚动 */
-.featureShellIdle {
-  position: relative;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-}
-
-/* ========== 3D 背景装饰 ========== */
-.featureBg3D {
+/* ── Ambient background — absolute, never in flow ── */
+.featureAmbient {
   position: absolute;
   inset: 0;
   z-index: 0;
@@ -43,10 +34,10 @@ $radius-xs: 8px;
 
 .bgGrid {
   position: absolute;
-  inset: -10% -10% -10% -10%;
+  inset: -10%;
   background-image:
-    linear-gradient(rgba($text-primary, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba($text-primary, 0.05) 1px, transparent 1px);
+    linear-gradient(rgba($text, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba($text, 0.05) 1px, transparent 1px);
   background-size: 56px 56px;
   transform: rotateX(62deg) translateZ(-180px) translateY(8%);
   transform-origin: center 70%;
@@ -65,37 +56,28 @@ $radius-xs: 8px;
 }
 
 .bgOrb1 {
-  width: 380px;
-  height: 380px;
-  top: -80px;
-  right: -60px;
+  width: 380px; height: 380px;
+  top: -80px; right: -60px;
   background: radial-gradient(circle, rgba($brand, 0.55), transparent 70%);
-  animation-delay: 0s;
 }
 
 .bgOrb2 {
-  width: 300px;
-  height: 300px;
-  bottom: -60px;
-  left: -40px;
+  width: 300px; height: 300px;
+  bottom: -60px; left: -40px;
   background: radial-gradient(circle, rgba(120, 180, 255, 0.45), transparent 70%);
   animation-delay: -4s;
 }
 
 .bgOrb3 {
-  width: 220px;
-  height: 220px;
-  top: 30%;
-  left: 8%;
+  width: 220px; height: 220px;
+  top: 30%; left: 8%;
   background: radial-gradient(circle, rgba(255, 170, 120, 0.4), transparent 70%);
   animation-delay: -8s;
 }
 
 .bgOrb4 {
-  width: 260px;
-  height: 260px;
-  top: 18%;
-  right: 12%;
+  width: 260px; height: 260px;
+  top: 18%; right: 12%;
   background: radial-gradient(circle, rgba(180, 220, 200, 0.42), transparent 70%);
   animation-delay: -2s;
 }
@@ -112,273 +94,421 @@ $radius-xs: 8px;
   backdrop-filter: blur(18px) saturate(1.4);
   -webkit-backdrop-filter: blur(18px) saturate(1.4);
   box-shadow:
-    0 24px 50px rgba($text-primary, 0.1),
+    0 24px 50px rgba($text, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.85);
   transform-style: preserve-3d;
-  animation: bgCardFloat 8s ease-in-out infinite;
   will-change: transform;
 
-  span {
-    font-size: 22px;
-  }
-
-  strong {
-    font-size: 14px;
-    font-weight: 700;
-    color: $text-primary;
-  }
-
-  em {
-    font-size: 12px;
-    color: $text-secondary;
-    font-style: normal;
-  }
+  span { font-size: 22px; }
+  strong { font-size: 14px; font-weight: 700; color: $text; }
+  em { font-size: 12px; color: $text-secondary; font-style: normal; }
 }
 
 .bgCard1 {
-  top: 16%;
-  left: 9%;
+  top: 16%; left: 9%;
   transform: rotate(-6deg) translateZ(40px);
-  animation-delay: -1s;
+  animation: bgCard1Float 8s ease-in-out infinite;
 }
-
 .bgCard2 {
-  top: 22%;
-  right: 10%;
+  top: 22%; right: 10%;
   transform: rotate(5deg) translateZ(60px);
-  animation-delay: -3s;
+  animation: bgCard2Float 8s ease-in-out infinite;
 }
-
 .bgCard3 {
-  bottom: 14%;
-  left: 14%;
+  bottom: 14%; left: 14%;
   transform: rotate(-3deg) translateZ(30px);
-  animation-delay: -5s;
+  animation: bgCard3Float 8s ease-in-out infinite;
 }
 
 @keyframes bgOrbFloat {
   0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(20px, -28px, 0) scale(1.06); }
+  50%      { transform: translate3d(20px, -28px, 0) scale(1.06); }
 }
-
-@keyframes bgCardFloat {
-  0%, 100% { transform: translateY(0) rotate(var(--rot, 0deg)) translateZ(40px); }
-  50% { transform: translateY(-12px) rotate(var(--rot, 0deg)) translateZ(40px); }
-}
-
-/* 单独覆盖以使每张卡保留各自的旋转角 */
-.bgCard1 { animation-name: bgCard1Float; }
-.bgCard2 { animation-name: bgCard2Float; }
-.bgCard3 { animation-name: bgCard3Float; }
-
 @keyframes bgCard1Float {
   0%, 100% { transform: translateY(0) rotate(-6deg) translateZ(40px); }
-  50% { transform: translateY(-14px) rotate(-4deg) translateZ(40px); }
+  50%      { transform: translateY(-14px) rotate(-4deg) translateZ(40px); }
 }
 @keyframes bgCard2Float {
   0%, 100% { transform: translateY(0) rotate(5deg) translateZ(60px); }
-  50% { transform: translateY(-16px) rotate(7deg) translateZ(60px); }
+  50%      { transform: translateY(-16px) rotate(7deg) translateZ(60px); }
 }
 @keyframes bgCard3Float {
   0%, 100% { transform: translateY(0) rotate(-3deg) translateZ(30px); }
-  50% { transform: translateY(-10px) rotate(-1deg) translateZ(30px); }
+  50%      { transform: translateY(-10px) rotate(-1deg) translateZ(30px); }
 }
 
-/* ========== Idle: Hero Composer ========== */
-.featureComposerHero {
+/* ───────────────────────────────────────────────
+   Idle home — Gemini-style centered entry
+   ─────────────────────────────────────────────── */
+.featureHome {
   position: relative;
-  z-index: 1;
+  z-index: 5;
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 0 24px;
-  gap: 14px;
-  transform: translateY(-24px);
+  transform: translateY(-36px);
   animation: featureFadeIn 0.5s ease-out;
 }
 
-.featureHeroTitle {
+.featureTitle {
+  font-family: var(--font-display);
+  font-size: clamp(34px, 4.2vw, 58px);
+  line-height: 1;
+  letter-spacing: -0.055em;
+  font-weight: 850;
+  margin: 0 0 10px;
+  color: $text;
   text-align: center;
-
-  .featureHeroIcon {
-    font-size: 30px;
-    display: block;
-    margin-bottom: 4px;
-    animation: featurePulse 2s ease-in-out infinite;
-  }
-
-  h1 {
-    font-family: var(--font-display);
-    font-size: clamp(28px, 4vw, 42px);
-    font-weight: 700;
-    color: $text-primary;
-    margin: 0;
-    line-height: 1.15;
-    letter-spacing: -0.02em;
-  }
 }
 
-.featureHeroSub {
-  font-size: 13px;
-  color: $text-secondary;
-  margin: 4px 0 0;
-  font-weight: 400;
+.featureSubtitle {
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba($text-secondary, 0.7);
+  margin: 0 0 28px;
+  text-align: center;
 }
 
-.featureHeroComposer {
-  width: 100%;
-  max-width: 720px;
-  background: $bg-glass;
-  border: 1px solid $border-glass;
-  border-radius: 24px;
-  padding: 14px 18px 12px;
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  box-shadow:
-    0 20px 60px rgba($text-primary, 0.1),
-    0 4px 16px rgba($text-primary, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+/* ───────────────────────────────────────────────
+   Composer — Gemini-style slim capsule
+   ─────────────────────────────────────────────── */
+.featureComposer {
+  width: min(760px, calc(100vw - 48px));
+  min-height: 64px;
+  max-height: 156px;
+  border-radius: 999px;
+  padding: 8px 10px 8px 12px;
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(255, 255, 255, 0.88);
+  box-shadow: 0 18px 48px rgba($text, 0.1);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
   transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
 
   &:focus-within {
-    border-color: rgba($brand, 0.55);
-    box-shadow:
-      0 24px 70px rgba($text-primary, 0.12),
-      0 0 0 4px rgba($brand, 0.14),
-      inset 0 1px 0 rgba(255, 255, 255, 0.85);
-    transform: translateY(-2px);
+    box-shadow: 0 22px 56px rgba($text, 0.12);
   }
 }
 
-.featureTextarea {
-  width: 100%;
-  border: none;
+.composerInputRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+}
+
+.composerTextarea {
+  flex: 1;
+  min-height: 38px;
+  max-height: 96px;
+  resize: none;
+  border: 0;
   outline: none;
   background: transparent;
   font-family: inherit;
   font-size: 15px;
-  line-height: 1.45;
-  color: $text-primary;
-  resize: none;
-  padding: 0;
-  min-height: 44px;
-  max-height: 120px;
+  line-height: 1.55;
+  color: $text;
+  padding: 8px 10px;
   overflow-y: auto;
 
   &::placeholder {
-    color: rgba($text-secondary, 0.6);
+    color: rgba($text-secondary, 0.5);
   }
+
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.1); border-radius: 2px; }
 }
 
-.featureHeroComposerActions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.featureHeroComposerLeft {
+.composerMetaRow {
   display: flex;
   align-items: center;
   gap: 12px;
+  padding: 4px 12px 2px;
+  overflow: hidden;
 }
 
-.featureComposerCity {
-  font-size: 13px;
-  color: $text-secondary;
-  display: flex;
+.composerMetaItem {
+  font-size: 12px;
+  color: rgba($text-secondary, 0.7);
+  display: inline-flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
 }
 
-.featureComposerUser {
-  font-size: 13px;
-  color: $text-secondary;
-}
-
-.featureComposerLoginLink {
-  font-size: 13px;
+.composerMetaLink {
+  font-size: 12px;
   color: $brand;
   background: none;
   border: none;
   cursor: pointer;
-  font-weight: 500;
+  font-weight: 600;
   padding: 0;
+  white-space: nowrap;
   text-decoration: underline;
   text-underline-offset: 2px;
+  transition: color 0.18s;
 
-  &:hover {
-    color: darken($brand, 12%);
+  &:hover { color: darken($brand, 15%); }
+}
+
+.composerIconButton {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 0;
+  background: rgba($text, 0.04);
+  color: $text;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 180ms ease, background 180ms ease;
+
+  &:hover:not(:disabled) {
+    background: rgba($text, 0.09);
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 }
 
-/* ---------- Example Chips ---------- */
-.featureExampleChips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-  max-width: 640px;
+.composerSendButton {
+  min-width: 76px;
+  height: 40px;
+  border-radius: 999px;
+  border: 0;
+  background: $brand;
+  color: $text;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 10px 24px rgba($brand, 0.22);
+  transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 32px rgba($brand, 0.3);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
 }
 
-.featureChip {
+/* ── composer compact (chat dock) ── */
+.featureComposerCompact {
+  max-height: 136px;
+
+  .composerMetaRow { display: none; }
+  .composerSendButton { min-width: 58px; height: 36px; font-size: 13px; }
+  .composerIconButton { width: 36px; height: 36px; font-size: 16px; }
+  .composerTextarea { min-height: 34px; max-height: 80px; font-size: 14px; }
+}
+
+/* ── inline toast feedback ── */
+.composerToast {
+  font-size: 12px;
+  color: $text-secondary;
+  padding: 0 12px 4px;
+  animation: featureFadeIn 0.2s ease-out;
+}
+
+/* ── voice recording button ── */
+.composerVoiceActive {
+  position: relative;
+  background: rgba(#ef4444, 0.08) !important;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: 999px;
+    border: 2px solid rgba(#ef4444, 0.35);
+    animation: voicePulseRing 1.2s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  .voiceDot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ef4444;
+    animation: voiceDotBlink 0.8s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes voicePulseRing {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.4; transform: scale(1.18); }
+}
+
+@keyframes voiceDotBlink {
+  from { opacity: 0.4; }
+  to   { opacity: 1; }
+}
+
+/* ── attachment previews ── */
+.composerAttachments {
+  display: flex;
+  gap: 8px;
+  padding: 6px 12px 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+.composerAttachmentThumb {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgba($text, 0.04);
+  border: 1px solid rgba($text, 0.08);
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .attachmentFileIcon {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+  }
+}
+
+.composerAttachmentRemove {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: rgba($text, 0.65);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+
+  &:hover { background: #ef4444; }
+}
+
+/* ───────────────────────────────────────────────
+   Prompt chips — Gemini suggestions
+   ─────────────────────────────────────────────── */
+.featurePromptChips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  max-width: 760px;
+  margin-top: 20px;
+}
+
+.featurePromptChip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 14px;
+  padding: 8px 16px;
   border-radius: 999px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba($text, 0.08);
   background: rgba(255, 255, 255, 0.6);
-  font-size: 12px;
-  color: $text-primary;
+  font-size: 13px;
+  font-weight: 500;
+  color: $text;
   cursor: pointer;
-  transition: all 0.2s;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  transition: all 0.2s;
 
   &:hover {
     background: rgba($brand, 0.12);
     border-color: rgba($brand, 0.3);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba($text-primary, 0.06);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba($text, 0.06);
   }
 }
 
-/* ========== Chat Workspace ========== */
-.featureChatWorkspace {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  position: relative;
+/* ── health hint in idle ── */
+.featureHealthHint {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  font-size: 13px;
+  color: #b45309;
+  text-align: center;
+  padding: 8px 20px;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.15);
+  border-radius: 999px;
+  white-space: nowrap;
   animation: featureFadeIn 0.3s ease-out;
-  overflow: hidden;
+
+  code {
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+    background: rgba(0, 0, 0, 0.05);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
 }
 
-/* ---------- Messages ---------- */
+/* ───────────────────────────────────────────────
+   Chat layout — single-viewport workspace
+   ─────────────────────────────────────────────── */
+.featureChat {
+  position: relative;
+  z-index: 5;
+  width: min(900px, calc(100vw - 48px));
+  height: 100%;
+  min-height: 0;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: featureFadeIn 0.3s ease-out;
+}
+
+/* ── Messages scroll area ── */
 .featureMessages {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 24px 16px 180px;
+  padding: 24px 0 112px;
   scroll-behavior: smooth;
 
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.08);
-    border-radius: 3px;
-  }
+  &::-webkit-scrollbar { width: 6px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.08); border-radius: 3px; }
 }
 
 .featureMessagesInner {
@@ -389,7 +519,7 @@ $radius-xs: 8px;
   gap: 16px;
 }
 
-/* ---------- Message Rows ---------- */
+/* ── Message rows ── */
 .featureMessageRowRight {
   display: flex;
   justify-content: flex-end;
@@ -402,13 +532,13 @@ $radius-xs: 8px;
   animation: featureMsgIn 0.3s ease-out;
 }
 
-/* ---------- User Bubble ---------- */
+/* ── User bubble ── */
 .featureUserBubble {
   max-width: 72%;
   padding: 12px 18px;
-  border-radius: $radius-md $radius-md 4px $radius-md;
+  border-radius: 20px 20px 4px 20px;
   background: $brand;
-  color: $text-primary;
+  color: $text;
   box-shadow: 0 2px 8px rgba($brand, 0.2);
 
   p {
@@ -420,30 +550,28 @@ $radius-xs: 8px;
   }
 }
 
-/* ---------- Assistant Bubble ---------- */
+/* ── Assistant bubble ── */
 .featureAssistantBubble {
   max-width: 85%;
   padding: 16px 20px;
-  border-radius: 4px $radius-md $radius-md $radius-md;
+  border-radius: 4px 20px 20px 20px;
   background: $bg-glass;
   border: 1px solid $border-glass;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 2px 12px rgba($text-primary, 0.04);
+  box-shadow: 0 2px 12px rgba($text, 0.04);
 
   p {
     margin: 0 0 12px;
     font-size: 15px;
     line-height: 1.6;
-    color: $text-primary;
+    color: $text;
 
-    &:last-child {
-      margin-bottom: 0;
-    }
+    &:last-child { margin-bottom: 0; }
   }
 }
 
-/* ---------- Thinking Dots ---------- */
+/* ── Thinking dots ── */
 .featureThinkingDots {
   display: flex;
   gap: 6px;
@@ -455,24 +583,17 @@ $radius-xs: 8px;
     border-radius: 50%;
     background: rgba($text-secondary, 0.4);
     animation: featureDotPulse 1.4s ease-in-out infinite;
-
     &:nth-child(2) { animation-delay: 0.2s; }
     &:nth-child(3) { animation-delay: 0.4s; }
   }
 }
 
 @keyframes featureDotPulse {
-  0%, 80%, 100% {
-    opacity: 0.3;
-    transform: scale(0.8);
-  }
-  40% {
-    opacity: 1;
-    transform: scale(1);
-  }
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40%            { opacity: 1; transform: scale(1); }
 }
 
-/* ========== Plan Cards ========== */
+/* ── Plan cards ── */
 .featurePlanCardsScroll {
   display: flex;
   flex-direction: column;
@@ -483,13 +604,13 @@ $radius-xs: 8px;
 .featurePlanCard {
   background: rgba(255, 255, 255, 0.5);
   border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: $radius-md;
+  border-radius: 16px;
   padding: 16px;
   transition: all 0.2s;
 
   &:hover {
     border-color: rgba($brand, 0.25);
-    box-shadow: 0 4px 16px rgba($text-primary, 0.06);
+    box-shadow: 0 4px 16px rgba($text, 0.06);
   }
 }
 
@@ -504,18 +625,9 @@ $radius-xs: 8px;
     margin: 0;
     font-size: 16px;
     font-weight: 600;
-    color: $text-primary;
+    color: $text;
     font-family: var(--font-display);
   }
-}
-
-.featurePlanCardBadge {
-  font-size: 12px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba($brand, 0.2);
-  color: darken($brand, 25%);
-  font-weight: 500;
 }
 
 .featurePlanCardSummary {
@@ -533,7 +645,6 @@ $radius-xs: 8px;
   opacity: 0.8;
 }
 
-/* ---------- Timeline ---------- */
 .featureTimeline {
   display: flex;
   flex-direction: column;
@@ -541,7 +652,7 @@ $radius-xs: 8px;
   margin: 10px 0;
   padding: 10px 12px;
   background: rgba(0, 0, 0, 0.02);
-  border-radius: $radius-sm;
+  border-radius: 10px;
   border: 1px solid rgba(0, 0, 0, 0.04);
 }
 
@@ -562,7 +673,7 @@ $radius-xs: 8px;
 }
 
 .featureTimelineTitle {
-  color: $text-primary;
+  color: $text;
   font-weight: 500;
 }
 
@@ -571,7 +682,6 @@ $radius-xs: 8px;
   font-size: 12px;
 }
 
-/* ---------- Plan Tags ---------- */
 .featurePlanTags {
   display: flex;
   flex-wrap: wrap;
@@ -588,7 +698,6 @@ $radius-xs: 8px;
   border: 1px solid rgba($brand, 0.15);
 }
 
-/* ---------- Plan Meta ---------- */
 .featurePlanMeta {
   display: flex;
   gap: 16px;
@@ -608,7 +717,7 @@ $radius-xs: 8px;
   width: 100%;
 }
 
-/* ========== Action Cards ========== */
+/* ── Action cards ── */
 .featureActionCardsGrid {
   display: flex;
   flex-direction: column;
@@ -619,13 +728,11 @@ $radius-xs: 8px;
 .featureActionCard {
   background: rgba(255, 255, 255, 0.45);
   border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: $radius-sm;
+  border-radius: 10px;
   padding: 14px 16px;
   transition: all 0.2s;
 
-  &:hover {
-    border-color: rgba($brand, 0.2);
-  }
+  &:hover { border-color: rgba($brand, 0.2); }
 }
 
 .featureActionCardConfirmed {
@@ -633,9 +740,7 @@ $radius-xs: 8px;
   background: rgba(34, 197, 94, 0.04);
 }
 
-.featureActionCardCancelled {
-  opacity: 0.5;
-}
+.featureActionCardCancelled { opacity: 0.5; }
 
 .featureActionCardHeader {
   display: flex;
@@ -644,28 +749,17 @@ $radius-xs: 8px;
   margin-bottom: 6px;
 }
 
-.featureActionTypeIcon {
-  font-size: 18px;
-  flex-shrink: 0;
-}
+.featureActionTypeIcon { font-size: 18px; flex-shrink: 0; }
 
 .featureActionTitle {
   font-size: 14px;
   font-weight: 600;
-  color: $text-primary;
+  color: $text;
   flex: 1;
 }
 
-.featureActionConfirmedBadge {
-  font-size: 12px;
-  color: #16a34a;
-  font-weight: 500;
-}
-
-.featureActionCancelledBadge {
-  font-size: 12px;
-  color: $text-secondary;
-}
+.featureActionConfirmedBadge { font-size: 12px; color: #16a34a; font-weight: 500; }
+.featureActionCancelledBadge { font-size: 12px; color: $text-secondary; }
 
 .featureActionDesc {
   font-size: 13px;
@@ -680,29 +774,27 @@ $radius-xs: 8px;
   margin-top: 8px;
 }
 
-/* ---------- Action Preview (quote result) ---------- */
+/* ── Action preview (quote) ── */
 .featureActionPreview {
   margin: 10px 0;
   padding: 12px;
   background: rgba($brand, 0.06);
   border: 1px solid rgba($brand, 0.15);
-  border-radius: $radius-sm;
+  border-radius: 10px;
 }
 
-.featureActionPreviewContent {
-  margin-bottom: 10px;
-}
+.featureActionPreviewContent { margin-bottom: 10px; }
 
 .featureActionPreviewTitle {
   font-size: 14px;
   font-weight: 600;
-  color: $text-primary;
+  color: $text;
 }
 
 .featureActionPreviewPrice {
   font-size: 18px;
   font-weight: 700;
-  color: $text-primary;
+  color: $text;
   margin-top: 4px;
 }
 
@@ -711,12 +803,12 @@ $radius-xs: 8px;
   gap: 8px;
 }
 
-/* ========== What-if Bar ========== */
+/* ── What-if bar ── */
 .featureWhatIfBar {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 20px;
+  padding: 10px 0;
   max-width: 800px;
   margin: 0 auto;
   width: 100%;
@@ -739,7 +831,7 @@ $radius-xs: 8px;
   border: 1px solid rgba(0, 0, 0, 0.08);
   background: rgba(255, 255, 255, 0.5);
   font-size: 13px;
-  color: $text-primary;
+  color: $text;
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
@@ -749,13 +841,10 @@ $radius-xs: 8px;
     border-color: rgba($brand, 0.3);
   }
 
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
-/* ========== Error Card ========== */
+/* ── Error card ── */
 .featureErrorCard {
   max-width: 800px;
   margin: 0 auto 8px;
@@ -763,7 +852,7 @@ $radius-xs: 8px;
   padding: 16px 20px;
   background: rgba(239, 68, 68, 0.06);
   border: 1px solid rgba(239, 68, 68, 0.15);
-  border-radius: $radius-md;
+  border-radius: 16px;
   animation: featureFadeIn 0.3s ease-out;
 }
 
@@ -772,78 +861,85 @@ $radius-xs: 8px;
   color: #b91c1c;
   font-weight: 500;
   margin-bottom: 12px;
+  white-space: pre-wrap;
 }
 
 .featureErrorActions {
   display: flex;
   gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
-/* ========== Composer Dock ========== */
+.featureErrorHelpToggle {
+  font-size: 13px;
+  color: $text-secondary;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 0;
+
+  &:hover { color: $text; }
+}
+
+.featureErrorHelp {
+  margin-top: 12px;
+  animation: featureFadeIn 0.2s ease-out;
+
+  pre {
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+    line-height: 1.6;
+    background: rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin: 0;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    color: $text;
+  }
+}
+
+/* ── Composer dock (chat state) ── */
 .featureComposerDock {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
   z-index: 20;
-  padding: 0 16px 20px;
+  padding: 0 0 16px;
   pointer-events: none;
 
-  > * {
-    pointer-events: auto;
-  }
+  > * { pointer-events: auto; }
 }
 
-.featureDockCard {
+.featureComposerDockInner {
   max-width: 800px;
   margin: 0 auto;
-  background: $bg-glass;
-  border: 1px solid $border-glass;
-  border-radius: 24px;
-  padding: 14px 18px 12px;
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  box-shadow:
-    0 20px 60px rgba($text-primary, 0.1),
-    0 4px 16px rgba($text-primary, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  transition: border-color 0.2s, box-shadow 0.2s;
-
-  .featureTextarea {
-    min-height: 44px;
-    max-height: 80px;
-  }
-
-  &:focus-within {
-    border-color: rgba($brand, 0.55);
-    box-shadow:
-      0 24px 70px rgba($text-primary, 0.12),
-      0 0 0 4px rgba($brand, 0.14),
-      inset 0 1px 0 rgba(255, 255, 255, 0.85);
-  }
-}
-
-.featureDockActions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: 800px;
-  margin: 8px auto 0;
-  justify-content: flex-end;
+  position: relative;
 }
 
 .featureNewRoundBtn {
+  position: absolute;
+  top: -44px;
+  right: 16px;
   width: 36px;
   height: 36px;
   border-radius: 50%;
   border: 1px solid rgba(0, 0, 0, 0.08);
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.7);
   font-size: 16px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   transition: all 0.2s;
+  pointer-events: auto;
 
   &:hover {
     background: rgba($brand, 0.12);
@@ -852,64 +948,93 @@ $radius-xs: 8px;
   }
 }
 
-/* ========== Animations ========== */
+/* ───────────────────────────────────────────────
+   Animations
+   ─────────────────────────────────────────────── */
 @keyframes featureFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes featureMsgIn {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes featurePulse {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.08);
-  }
-}
-
-/* ========== Responsive ========== */
+/* ───────────────────────────────────────────────
+   Responsive
+   ─────────────────────────────────────────────── */
 @media (max-width: 760px) {
-  .featureComposerHero {
-    padding: 0 16px;
-    transform: translateY(-16px);
+  .featureHome {
+    transform: translateY(-20px);
+    padding: 0 8px;
   }
 
-  .featureHeroTitle h1 {
-    font-size: 28px;
+  .featureTitle {
+    font-size: clamp(28px, 6vw, 40px);
   }
 
-  .featureHeroComposer {
-    padding: 12px 14px;
+  .featureSubtitle {
+    font-size: 13px;
+    margin-bottom: 20px;
   }
 
-  .featureExampleChips {
-    gap: 8px;
+  .featureComposer {
+    width: 100%;
+    min-height: 62px;
+    border-radius: 28px;
+    padding: 8px;
   }
 
-  .featureChip {
-    padding: 8px 14px;
+  .composerIconButton {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  .composerSendButton {
+    min-width: 52px;
+    height: 36px;
     font-size: 13px;
   }
 
+  .composerTextarea {
+    font-size: 14px;
+    min-height: 34px;
+    padding: 6px 8px;
+  }
+
+  .composerMetaRow {
+    gap: 8px;
+    padding: 3px 8px 0;
+  }
+
+  .composerMetaItem { font-size: 11px; }
+
+  .featurePromptChips {
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+    padding: 0 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    &::-webkit-scrollbar { display: none; }
+  }
+
+  .featurePromptChip {
+    padding: 7px 14px;
+    font-size: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .featureChat {
+    width: 100%;
+  }
+
   .featureMessages {
-    padding: 16px 12px 160px;
+    padding: 16px 12px 112px;
   }
 
   .featureUserBubble {
@@ -923,28 +1048,37 @@ $radius-xs: 8px;
   }
 
   .featureComposerDock {
-    padding: 0 12px 16px;
+    padding: 0 0 12px;
   }
 
   .featureWhatIfBar {
-    padding: 8px 12px;
+    padding: 8px 0;
     flex-wrap: wrap;
+  }
+
+  .featureHealthHint {
+    font-size: 12px;
+    padding: 6px 14px;
   }
 }
 
-@media (max-height: 700px) {
-  .featureComposerHero {
-    gap: 10px;
-    transform: translateY(-12px);
+@media (max-height: 680px) {
+  .featureHome {
+    transform: translateY(-16px);
   }
 
-  .featureExampleChips {
+  .featureTitle {
+    font-size: clamp(26px, 4vw, 36px);
+    margin-bottom: 6px;
+  }
+
+  .featureSubtitle {
+    font-size: 12px;
+    margin-bottom: 16px;
+  }
+
+  .featurePromptChips {
     max-height: 38px;
     overflow: hidden;
-  }
-
-  .featureHeroTitle .featureHeroIcon {
-    font-size: 24px;
-    margin-bottom: 2px;
   }
 }
