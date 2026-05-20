@@ -31,7 +31,12 @@ function sanitizePreview(obj: Record<string, unknown> | null | undefined): Recor
 }
 
 export async function registerDeveloperRoutes(app: FastifyInstance) {
-  const repo = new DeveloperRepository(app.db);
+  if (!app.db) {
+    app.log.warn("Developer routes disabled (no PostgreSQL)");
+    return;
+  }
+  const db = app.db;
+  const repo = new DeveloperRepository(db);
 
   // ── Dashboard ──
   app.get("/api/developer/dashboard", { preHandler: [app.authGuard] }, async (request, reply) => {
@@ -125,7 +130,7 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
     });
 
     // 写审计日志
-    await app.db.auditLog.create({
+    await db.auditLog.create({
       data: {
         userId,
         action: "api_key.created",
@@ -161,7 +166,7 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
     const revoked = await repo.revokeApiKey(id, userId);
     if (!revoked) return sendError(reply, 404, "API_KEY_NOT_FOUND", "API Key 不存在");
 
-    await app.db.auditLog.create({
+    await db.auditLog.create({
       data: {
         userId,
         action: "api_key.revoked",
@@ -188,7 +193,7 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
     const userId = uid(request);
     const count = await repo.revokeAllApiKeys(userId);
 
-    await app.db.auditLog.create({
+    await db.auditLog.create({
       data: {
         userId,
         action: "api_key.revoked_all",
@@ -270,7 +275,7 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
 
     const { webhook, secret } = await repo.createWebhook(userId, input);
 
-    await app.db.auditLog.create({
+    await db.auditLog.create({
       data: {
         userId,
         action: "webhook.created",
@@ -464,7 +469,7 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
     const [apiKeys, webhooks, recentAudits] = await Promise.all([
       repo.listApiKeys(userId),
       repo.listWebhooks(userId),
-      app.db.auditLog.findMany({
+      db.auditLog.findMany({
         where: { userId },
         orderBy: { createdAt: "desc" },
         take: 10,

@@ -78,6 +78,7 @@ export function AuthModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [googleNotice, setGoogleNotice] = useState(false);
+  const [meituanNotice, setMeituanNotice] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [form, setForm] = useState({
@@ -564,6 +565,32 @@ export function AuthModal({
         </svg>
         {mode === "login" ? "使用 Google 登录" : "使用 Google 注册"}
       </button>
+
+      <button
+        type="button"
+        className={styles.googleButton}
+        onClick={() => setMeituanNotice(true)}
+      >
+        <svg
+          className={styles.googleIcon}
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            fill="#FFD100"
+            d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"
+          />
+          <path
+            fill="#FF6B00"
+            d="M12 4c-4.41 0-8 3.59-8 8s3.59 8 8 8 8-3.59 8-8-3.59-8-8-8zm3.5 11.5c0 .28-.22.5-.5.5H9c-.28 0-.5-.22-.5-.5v-7c0-.28.22-.5.5-.5h6c.28 0 .5.22.5.5v7z"
+          />
+          <path
+            fill="#FFF"
+            d="M15 8.5h-6v7h6v-7zm-1.5 5.5h-3v-1h3v1zm0-2h-3v-1h3v1z"
+          />
+        </svg>
+        {mode === "login" ? "使用美团登录" : "使用美团注册"}
+      </button>
     </>
   );
 
@@ -690,6 +717,28 @@ export function AuthModal({
               <h3>暂未接入</h3>
               <p>Google 登录功能正在准备中，请先使用邮箱登录或注册。</p>
               <Button size="small" onClick={() => setGoogleNotice(false)}>
+                知道了
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {meituanNotice ? (
+          <div
+            className={styles.noticeLayer}
+            role="presentation"
+            onMouseDown={() => setMeituanNotice(false)}
+          >
+            <div
+              className={styles.noticeCard}
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <h3>美团登录说明</h3>
+              <p>
+                美团登录授权需要在美团开放平台完成应用审核后获取
+                AppKey。目前开发环境暂未配置，你可以先使用邮箱登录或游客体验。
+              </p>
+              <Button size="small" onClick={() => setMeituanNotice(false)}>
                 知道了
               </Button>
             </div>

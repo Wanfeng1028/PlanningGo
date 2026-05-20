@@ -5,8 +5,10 @@ import {
   sendOk,
   sendCreated,
   sendNoContent,
+  sendError,
 } from "../common/response.js";
 import { NotFoundError, UnauthorizedError } from "../common/errors.js";
+import * as mem from "../services/memoryStore.js";
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -132,11 +134,111 @@ async function ensureNotificationPrefs(db: PrismaClient, userId: string) {
 // ────────────────────────────────────────────────────────────────────
 
 export async function registerProfileRoutes(app: FastifyInstance) {
-  const db: PrismaClient = app.db;
+  const db: PrismaClient | null = app.db;
 
-  // Protect ALL routes in this plugin
-  app.addHook("onRequest", async (request) => {
-    await (request as any).jwtVerify();
+  // ── 内存 fallback 模式 ──
+  if (!db) {
+    app.log.info("📝 Profile routes using in-memory store (no PostgreSQL)");
+
+    // GET /api/profile/me
+    app.get("/api/profile/me", { preHandler: [app.authGuard] }, async (request, reply) => {
+      const userId = uid(request);
+      const profile = mem.getFullProfile(userId);
+      if (!profile) return sendError(reply, 404, "USER_NOT_FOUND", "用户不存在");
+      sendOk(reply, {
+        user: { id: profile.id, email: profile.email, displayName: profile.displayName, mode: profile.mode, role: profile.role, createdAt: profile.createdAt },
+        profile: {
+          displayName: profile.displayName,
+          city: profile.city,
+          startPoint: profile.startPoint,
+          secondaryStartPoints: [],
+          favoriteAreas: [],
+          defaultTimeWindow: "下午14:00-18:00",
+          transportMode: "any",
+          distanceLimitKm: 10,
+          walkingTolerance: "moderate",
+          queueTolerance: "normal",
+          pace: "balanced",
+          indoorPreference: "mixed",
+          budgetMin: profile.budgetMin,
+          budgetMax: profile.budgetMax,
+          dietPreference: [],
+          avoidFoods: [],
+          healthGoal: "none",
+          dinnerTimePreference: "18:00-20:00",
+          activityTags: [],
+          avoidActivityTags: [],
+          riskPreference: "中性",
+          personaCompleteness: 20,
+        },
+        permissions: profile.permissions,
+        stats: { planCount: 0, memoryCount: 0, favoriteCount: 0, unreadNotifications: 0, personaCompleteness: 20 },
+      });
+    });
+
+    // PATCH /api/profile/me
+    app.patch("/api/profile/me", { preHandler: [app.authGuard] }, async (request, reply) => {
+      const userId = uid(request);
+      const body = z.object({ displayName: z.string().max(50).optional(), city: z.string().max(50).optional(), startPoint: z.string().max(200).optional() }).parse(request.body);
+      if (body.city || body.startPoint) {
+        mem.upsertProfile(userId, { city: body.city, startPoint: body.startPoint });
+      }
+      const profile = mem.getFullProfile(userId);
+      sendOk(reply, { city: profile?.city ?? "北京", startPoint: profile?.startPoint ?? "家附近", budgetMin: profile?.budgetMin ?? 200, budgetMax: profile?.budgetMax ?? 300, personaCompleteness: 20 });
+    });
+
+    // GET /api/profile/me/persona
+    app.get("/api/profile/me/persona", { preHandler: [app.authGuard] }, async (request, reply) => {
+      const userId = uid(request);
+      const profile = mem.getFullProfile(userId);
+      if (!profile) return sendError(reply, 404, "PROFILE_NOT_FOUND", "用户画像不存在");
+      sendOk(reply, { city: profile.city, startPoint: profile.startPoint, budgetMin: profile.budgetMin, budgetMax: profile.budgetMax, personaCompleteness: 20 });
+    });
+
+    // PATCH /api/profile/me/persona
+    app.patch("/api/profile/me/persona", { preHandler: [app.authGuard] }, async (request, reply) => {
+      const userId = uid(request);
+      const body = z.record(z.string(), z.unknown()).parse(request.body);
+      mem.upsertProfile(userId, body as any);
+      const profile = mem.getFullProfile(userId);
+      sendOk(reply, { city: profile?.city, startPoint: profile?.startPoint, budgetMin: profile?.budgetMin, budgetMax: profile?.budgetMax, personaCompleteness: 20 });
+    });
+
+    // GET /api/profile/me/permissions
+    app.get("/api/profile/me/permissions", { preHandler: [app.authGuard] }, async (request, reply) => {
+      const userId = uid(request);
+      sendOk(reply, mem.getPermissions(userId));
+    });
+
+    // PATCH /api/profile/me/permissions
+    app.patch("/api/profile/me/permissions", { preHandler: [app.authGuard] }, async (request, reply) => {
+      const userId = uid(request);
+      const body = z.record(z.string(), z.boolean()).parse(request.body);
+      sendOk(reply, mem.upsertPermissions(userId, body));
+    });
+
+    // 其他路由返回空数据或 501
+    const emptyArrayRoutes = ["/api/profile/me/companions", "/api/notifications", "/api/auth/sessions"];
+    for (const route of emptyArrayRoutes) {
+      app.get(route, { preHandler: [app.authGuard] }, async (_request, reply) => sendOk(reply, { items: [], total: 0, sessions: [] }));
+    }
+
+    app.get("/api/profile/me/insights", { preHandler: [app.authGuard] }, async (_request, reply) => sendOk(reply, { insights: [] }));
+    app.get("/api/profile/me/history", { preHandler: [app.authGuard] }, async (_request, reply) => sendOk(reply, { items: [], total: 0 }));
+    app.get("/api/notifications/preferences", { preHandler: [app.authGuard] }, async (_request, reply) => sendOk(reply, {}));
+    app.patch("/api/notifications/preferences", { preHandler: [app.authGuard] }, async (_request, reply) => sendOk(reply, {}));
+
+    return;
+  }
+
+  // Auth is handled per-route via app.authGuard and uid() helper
+  // 添加认证 hook 到所有 profile/notifications/account 路由
+  const authPrefixes = ["/api/profile/", "/api/notifications", "/api/auth/sessions", "/api/account", "/api/plans/"];
+  app.addHook("onRequest", async (request, reply) => {
+    const path = request.url.split("?")[0];
+    if (authPrefixes.some((p) => path.startsWith(p))) {
+      await app.authGuard(request, reply);
+    }
   });
 
   // ──────────────────────────────────────────────────────────────────

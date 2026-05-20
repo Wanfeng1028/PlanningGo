@@ -1,12 +1,14 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { RevealGroup } from "../components/RevealGroup";
-import type { ModalKey, NavKey } from "../types";
+import type { ModalKey, NavKey, SessionUser } from "../types";
 import styles from "./Pages.module.scss";
 
 interface HomePageProps {
   onNavigate: (key: NavKey) => void;
   onOpenModal: (key: ModalKey) => void;
+  user: SessionUser | null;
+  onAuthRequiredNavigate: (key: NavKey) => void;
 }
 
 const routeStops = ["浙大紫金港", "地铁/打车", "断桥", "白堤散步", "湖滨休息"];
@@ -103,7 +105,7 @@ const whyChooseCards = [
 
 const AUTO_SLIDE_INTERVAL = 3600;
 
-export function HomePage({ onNavigate, onOpenModal }: HomePageProps) {
+export function HomePage({ onNavigate, onOpenModal, user, onAuthRequiredNavigate }: HomePageProps) {
   const [activeSection, setActiveSection] = useState(0);
 
   useEffect(() => {
@@ -144,7 +146,7 @@ export function HomePage({ onNavigate, onOpenModal }: HomePageProps) {
             给出可解释、可预订、可分享的本地生活周末方案。
           </p>
           <div className={styles.actions}>
-            <button className={styles.darkCta} type="button" onClick={() => onNavigate("features")}>开始试用</button>
+            <button className={styles.darkCta} type="button" onClick={() => onAuthRequiredNavigate("features")}>开始试用</button>
             <button className={styles.yellowCta} type="button" onClick={() => onOpenModal("guest")}>游客体验</button>
           </div>
           <div className={styles.stats}>
@@ -211,8 +213,8 @@ export function HomePage({ onNavigate, onOpenModal }: HomePageProps) {
           </motion.div>
         </motion.div>
         <div className={styles.landingBottomActions}>
-          <button className={styles.softCta} type="button" onClick={() => onNavigate("features")}>了解功能</button>
-          <button className={styles.yellowCta} type="button" onClick={() => onNavigate("features")}>进入规划</button>
+          <button className={styles.softCta} type="button" onClick={() => onNavigate("cases")}>了解功能</button>
+          <button className={styles.yellowCta} type="button" onClick={() => onAuthRequiredNavigate("features")}>进入规划</button>
           <button className={styles.darkCta} type="button" onClick={() => onOpenModal("contact")}>联系我们</button>
         </div>
       </section>
@@ -364,7 +366,7 @@ export function HomePage({ onNavigate, onOpenModal }: HomePageProps) {
               <button
                 className={`${styles.yellowCta} ${styles.routeSummaryAction}`}
                 type="button"
-                onClick={() => onNavigate("features")}
+                onClick={() => onAuthRequiredNavigate("features")}
               >
                 查看详情
               </button>

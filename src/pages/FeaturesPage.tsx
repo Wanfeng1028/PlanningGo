@@ -65,7 +65,8 @@ type VoiceState =
   | "no-speech"
   | "not-allowed"
   | "not-supported"
-  | "error";
+  | "error"
+  | "processing";
 
 const MODEL_MODES = ["Flash", "Pro"] as const;
 type ModelMode = typeof MODEL_MODES[number];
@@ -572,8 +573,11 @@ function Composer({
       setIsRecording(false);
       recognitionRef.current = null;
       if (hasResult) {
-        setVoiceState("idle");
-        requestAnimationFrame(() => textareaRef.current?.focus());
+        setVoiceState("processing");
+        setTimeout(() => {
+          setVoiceState("idle");
+          requestAnimationFrame(() => textareaRef.current?.focus());
+        }, 600);
       }
     };
 
@@ -615,18 +619,20 @@ function Composer({
     return "📎";
   };
 
-  const voiceModalContent = useMemo(() => {
+  const voicePanelData = useMemo(() => {
     switch (voiceState) {
       case "listening":
-        return { icon: "🎙", title: "正在听你说…", desc: "请对着麦克风说话", showRetry: false };
+        return { title: "正在听你说…", desc: "说出时间、预算、同行人和想去的方向", showStop: true, showRetry: false, showClose: false };
       case "no-speech":
-        return { icon: "🔇", title: "没有听到内容", desc: "可以再试一次，或者直接打字", showRetry: true };
+        return { title: "没有听到内容", desc: "可以再试一次，或者直接打字输入", showStop: false, showRetry: true, showClose: true };
       case "not-allowed":
-        return { icon: "🚫", title: "麦克风权限被拒绝", desc: "请在浏览器地址栏允许麦克风权限后重试", showRetry: true };
+        return { title: "麦克风权限未开启", desc: "请在浏览器地址栏允许麦克风权限后重试", showStop: false, showRetry: false, showClose: true };
       case "not-supported":
-        return { icon: "⚠", title: "浏览器不支持语音", desc: "当前浏览器不支持语音输入，可以直接打字", showRetry: false };
+        return { title: "当前浏览器不支持语音输入", desc: "可以直接用文字描述你的周末需求", showStop: false, showRetry: false, showClose: true };
+      case "processing":
+        return { title: "正在整理语音…", desc: "我会把识别内容填入输入框", showStop: false, showRetry: false, showClose: false };
       case "error":
-        return { icon: "⚠", title: "语音服务暂时不可用", desc: "可以稍后重试，或者直接打字描述", showRetry: true };
+        return { title: "语音服务暂时不可用", desc: "可以稍后重试，或者直接打字描述", showStop: false, showRetry: true, showClose: true };
       default:
         return null;
     }
@@ -768,47 +774,72 @@ function Composer({
         </div>
       )}
 
-      {/* Voice Status Modal */}
-      <FeatureModal
-        open={voiceState !== "idle"}
-        onClose={() => setVoiceState("idle")}
-        width="sm"
-      >
-        {voiceModalContent && (
-          <div className={styles.voiceModalContent}>
-            <div className={styles.voiceModalIcon}>
-              {isRecording ? (
-                <div className={styles.voiceWave}>
-                  <span /><span /><span /><span /><span />
-                </div>
-              ) : (
-                <span>{voiceModalContent.icon}</span>
-              )}
-            </div>
-            <h3 className={styles.voiceModalTitle}>{voiceModalContent.title}</h3>
-            <p className={styles.voiceModalDesc}>{voiceModalContent.desc}</p>
-            {voiceModalContent.showRetry && (
+      {/* Voice Panel — floating above composer */}
+      {voicePanelData && (
+        <div className={styles.voicePanel}>
+          <button
+            className={styles.voiceCloseBtn}
+            type="button"
+            aria-label="关闭"
+            onClick={() => {
+              if (isRecording && recognitionRef.current) recognitionRef.current.stop();
+              setVoiceState("idle");
+            }}
+          >
+            ×
+          </button>
+
+          <div className={styles.voiceOrb}>
+            {voiceState === "listening" || voiceState === "processing" ? (
+              <><span /><span /><span /></>
+            ) : voiceState === "no-speech" ? (
+              <span className={styles.voiceOrbIcon}>🔇</span>
+            ) : voiceState === "not-allowed" ? (
+              <span className={styles.voiceOrbIcon}>🚫</span>
+            ) : (
+              <span className={styles.voiceOrbIcon}>⚠</span>
+            )}
+          </div>
+
+          <div className={styles.voiceTitle}>{voicePanelData.title}</div>
+          <div className={styles.voiceHint}>{voicePanelData.desc}</div>
+
+          <div className={styles.voiceActions}>
+            {voicePanelData.showStop && (
               <button
-                className={styles.voiceModalRetry}
+                className={styles.voiceStopBtn}
+                type="button"
+                onClick={() => {
+                  if (recognitionRef.current) recognitionRef.current.stop();
+                }}
+              >
+                停止
+              </button>
+            )}
+            {voicePanelData.showRetry && (
+              <button
+                className={styles.voiceRetryBtn}
+                type="button"
                 onClick={() => {
                   setVoiceState("idle");
                   requestAnimationFrame(() => toggleRecording());
                 }}
               >
-                重新尝试
+                再试一次
               </button>
             )}
-            {!voiceModalContent.showRetry && !isRecording && (
+            {voicePanelData.showClose && (
               <button
-                className={styles.voiceModalRetry}
+                className={styles.voiceCloseTextBtn}
+                type="button"
                 onClick={() => setVoiceState("idle")}
               >
-                知道了
+                {voiceState === "no-speech" ? "关闭" : "知道了"}
               </button>
             )}
           </div>
-        )}
-      </FeatureModal>
+        </div>
+      )}
 
       {/* Companion Selection Modal */}
       <FeatureModal

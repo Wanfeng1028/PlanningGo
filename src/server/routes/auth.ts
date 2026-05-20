@@ -1,5 +1,6 @@
 /**
  * Auth 路由 — 注册 / 登录 / Guest / Refresh / Logout
+ * 支持 PostgreSQL 和内存 fallback 两种模式
  */
 
 import type { FastifyInstance } from "fastify";
@@ -8,6 +9,7 @@ import { UserRepository } from "../repositories/userRepository.js";
 import { ProfileRepository } from "../repositories/profileRepository.js";
 import { TokenService } from "../services/tokenService.js";
 import { AuthService } from "../services/authService.js";
+import * as mem from "../services/memoryStore.js";
 import { sendOk, sendCreated, sendNoContent, sendError } from "../common/response.js";
 
 const registerSchema = z.object({
@@ -50,63 +52,118 @@ function getClientMeta(request: { headers: Record<string, string | string[] | un
 }
 
 export async function registerAuthRoutes(app: FastifyInstance) {
-  const userRepo = new UserRepository(app.db);
-  const profileRepo = new ProfileRepository(app.db);
-  const tokenService = new TokenService(userRepo);
-  const authService = new AuthService(userRepo, profileRepo, tokenService);
+  // 判断是否使用内存模式
+  const useMemory = !app.db;
 
-  // ── POST /api/auth/register ──
+  if (!useMemory) {
+    // ── PostgreSQL 模式 ──
+    const db = app.db!;
+    const userRepo = new UserRepository(db);
+    const profileRepo = new ProfileRepository(db);
+    const tokenService = new TokenService(userRepo);
+    const authService = new AuthService(userRepo, profileRepo, tokenService);
+
+    app.post("/api/auth/register", async (request, reply) => {
+      const body = registerSchema.parse(request.body);
+      const result = await authService.register(body.email, body.password, body.displayName, getClientMeta(request));
+      return sendCreated(reply, result);
+    });
+
+    app.post("/api/auth/login", async (request, reply) => {
+      const body = loginSchema.parse(request.body);
+      const result = await authService.login(body.email, body.password, getClientMeta(request));
+      return sendOk(reply, result);
+    });
+
+    app.post("/api/auth/guest", async (request, reply) => {
+      const profile = guestProfileSchema.parse(request.body) ?? undefined;
+      const result = await authService.guestLogin(getClientMeta(request), profile);
+      return sendCreated(reply, result);
+    });
+
+    app.post("/api/auth/demo", async (request, reply) => {
+      const result = await authService.demoLogin(getClientMeta(request));
+      return sendOk(reply, result);
+    });
+
+    app.post("/api/auth/refresh", async (request, reply) => {
+      const body = refreshTokenSchema.parse(request.body);
+      const result = await tokenService.refreshTokens(body.refreshToken, getClientMeta(request));
+      if (!result) return sendError(reply, 401, "TOKEN_EXPIRED", "Refresh token 无效或已过期");
+      return sendOk(reply, result);
+    });
+
+    app.post("/api/auth/logout", { preHandler: [app.optionalAuthGuard] }, async (request, reply) => {
+      const body = refreshTokenSchema.parse(request.body);
+      await tokenService.revokeRefreshToken(body.refreshToken);
+      return sendNoContent(reply);
+    });
+
+    app.post("/api/auth/logout-all", { preHandler: [app.authGuard] }, async (request, reply) => {
+      await tokenService.revokeAllTokens(request.userId!);
+      return sendNoContent(reply);
+    });
+
+    app.post("/api/auth/change-password", { preHandler: [app.authGuard] }, async (request, reply) => {
+      const body = changePasswordSchema.parse(request.body);
+      await authService.changePassword(request.userId!, body.oldPassword, body.newPassword);
+      return sendNoContent(reply);
+    });
+
+    return;
+  }
+
+  // ── 内存 fallback 模式 ──
+  app.log.info("📝 Auth routes using in-memory store (no PostgreSQL)");
+
   app.post("/api/auth/register", async (request, reply) => {
     const body = registerSchema.parse(request.body);
-    const result = await authService.register(body.email, body.password, body.displayName, getClientMeta(request));
-    return sendCreated(reply, result);
+    try {
+      const result = await mem.register(body.email, body.password, body.displayName, getClientMeta(request));
+      return sendCreated(reply, result);
+    } catch (err: any) {
+      return sendError(reply, 409, "EMAIL_EXISTS", err.message);
+    }
   });
 
-  // ── POST /api/auth/login ──
   app.post("/api/auth/login", async (request, reply) => {
     const body = loginSchema.parse(request.body);
-    const result = await authService.login(body.email, body.password, getClientMeta(request));
-    return sendOk(reply, result);
+    try {
+      const result = await mem.login(body.email, body.password, getClientMeta(request));
+      return sendOk(reply, result);
+    } catch (err: any) {
+      return sendError(reply, 401, "INVALID_CREDENTIALS", err.message);
+    }
   });
 
-  // ── POST /api/auth/guest ──
   app.post("/api/auth/guest", async (request, reply) => {
     const profile = guestProfileSchema.parse(request.body) ?? undefined;
-    const result = await authService.guestLogin(getClientMeta(request), profile);
+    const result = await mem.guestLogin(getClientMeta(request), profile);
     return sendCreated(reply, result);
   });
 
-  // ── POST /api/auth/demo ──（兼容旧 API）
   app.post("/api/auth/demo", async (request, reply) => {
-    const result = await authService.demoLogin(getClientMeta(request));
+    const result = await mem.demoLogin(getClientMeta(request));
     return sendOk(reply, result);
   });
 
-  // ── POST /api/auth/refresh ──
   app.post("/api/auth/refresh", async (request, reply) => {
     const body = refreshTokenSchema.parse(request.body);
-    const result = await tokenService.refreshTokens(body.refreshToken, getClientMeta(request));
+    const result = mem.refreshTokens(body.refreshToken, getClientMeta(request));
     if (!result) return sendError(reply, 401, "TOKEN_EXPIRED", "Refresh token 无效或已过期");
     return sendOk(reply, result);
   });
 
-  // ── POST /api/auth/logout ──
   app.post("/api/auth/logout", { preHandler: [app.optionalAuthGuard] }, async (request, reply) => {
-    const body = refreshTokenSchema.parse(request.body);
-    await tokenService.revokeRefreshToken(body.refreshToken);
     return sendNoContent(reply);
   });
 
-  // ── POST /api/auth/logout-all ──
   app.post("/api/auth/logout-all", { preHandler: [app.authGuard] }, async (request, reply) => {
-    await tokenService.revokeAllTokens(request.userId!);
+    mem.revokeAllRefreshTokens(request.userId!);
     return sendNoContent(reply);
   });
 
-  // ── POST /api/auth/change-password ──
   app.post("/api/auth/change-password", { preHandler: [app.authGuard] }, async (request, reply) => {
-    const body = changePasswordSchema.parse(request.body);
-    await authService.changePassword(request.userId!, body.oldPassword, body.newPassword);
-    return sendNoContent(reply);
+    return sendError(reply, 501, "NOT_IMPLEMENTED", "内存模式不支持修改密码，请连接 PostgreSQL");
   });
 }

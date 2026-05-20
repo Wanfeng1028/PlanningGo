@@ -34,6 +34,7 @@ export function App() {
     }
   });
   const [authRedirectTo, setAuthRedirectTo] = useState<NavKey | null>(null);
+  const [pendingAfterAuth, setPendingAfterAuth] = useState<NavKey | null>(null);
 
   const openModal = (key: ModalKey) => {
     if (isAuthModal(key) && active === "profile") {
@@ -42,20 +43,39 @@ export function App() {
       setAuthRedirectTo(null);
     }
 
+    // 手动打开弹窗时清除待定跳转，避免 NavBar 登录误触发首页按钮的 pending
+    if (isAuthModal(key)) {
+      setPendingAfterAuth(null);
+    }
+
     setModal(key);
+  };
+
+  /** 需要登录才能进入的页面：未登录时开弹窗，已登录时直接跳转 */
+  const handleAuthRequiredNavigate = (key: NavKey) => {
+    if (!user) {
+      setPendingAfterAuth(key);
+      setAuthRedirectTo(null);
+      setModal("login");
+    } else {
+      setActive(key);
+    }
   };
 
   const closeModal = () => {
     setModal(null);
     setAuthRedirectTo(null);
+    setPendingAfterAuth(null);
   };
 
   const handleAuthSuccess = (nextUser: SessionUser, token?: string) => {
     setUser(nextUser);
     localStorage.setItem("pg_user", JSON.stringify(nextUser));
     if (token) setAuthToken(token);
-    setActive(authRedirectTo ?? "features");
+    const redirect = pendingAfterAuth ?? authRedirectTo ?? "features";
+    setActive(redirect);
     setAuthRedirectTo(null);
+    setPendingAfterAuth(null);
   };
 
   const handleRequestLocation = useCallback(async () => {
@@ -100,7 +120,14 @@ export function App() {
   const page = (() => {
     switch (active) {
       case "home":
-        return <HomePage onNavigate={setActive} onOpenModal={openModal} />;
+        return (
+          <HomePage
+            onNavigate={setActive}
+            onOpenModal={openModal}
+            user={user}
+            onAuthRequiredNavigate={handleAuthRequiredNavigate}
+          />
+        );
 
       case "features":
         return (

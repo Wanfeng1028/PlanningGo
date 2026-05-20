@@ -1,5 +1,5 @@
 import { buildApp } from "./app";
-import { env } from "./config/env";
+import { env, corsOrigins } from "./config/env";
 
 async function main() {
   const app = await buildApp();
@@ -16,7 +16,11 @@ async function main() {
 
   try {
     await app.listen({ port: env.PORT, host: env.HOST });
-    console.log(`🚀 Server ready at http://${env.HOST}:${env.PORT}`);
+    console.log(`\n🚀 PlanningGo API Server`);
+    console.log(`   地址: http://127.0.0.1:${env.PORT}`);
+    console.log(`   规划模式: ${env.PLANNING_MODE}`);
+    console.log(`   CORS: ${corsOrigins.join(", ")}`);
+    console.log(`   环境: ${env.NODE_ENV}\n`);
   } catch (error) {
     app.log.error(error);
     process.exit(1);

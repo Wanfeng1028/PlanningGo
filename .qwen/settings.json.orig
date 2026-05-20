@@ -19,7 +19,15 @@
       "Bash(rmdir *)",
       "Bash(wc *)",
       "Bash(echo)",
-      "Bash(echo.)"
+      "Bash(echo.)",
+      "Bash(echo *)",
+      "Bash(dir *)",
+      "Bash(netstat *)",
+      "Bash(set *)",
+      "Bash(sc *)",
+      "Bash(tasklist *)",
+      "Bash(f *)",
+      "Bash('curl -s -x post http://127.0.0.1:3001/api/auth/login -h \"content-type: application/json\" -d \"{\\\"email\\\":\\\"xiaoming@example.com\\\",\\\"password\\\":\\\"weekend123\\\"}\"')"
     ]
   },
   "$version": 4

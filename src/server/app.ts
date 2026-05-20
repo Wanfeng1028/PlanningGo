@@ -65,7 +65,7 @@ export async function buildApp() {
     }
 
     // 未知异常
-    app.log.error({ error, traceId });
+    app.log.error({ error: error instanceof Error ? error.message : String(error), traceId });
     return sendError(reply, 500, "INTERNAL_SERVER_ERROR", "服务暂时不可用");
   });
 
@@ -73,8 +73,8 @@ export async function buildApp() {
   app.get("/api/health", async () => ({ status: "ok", timestamp: new Date().toISOString() }));
   app.get("/api/ready", async (request, reply) => {
     try {
-      await app.db.$queryRaw`SELECT 1`;
-      return { status: "ready", db: "ok", redis: app.redis.status };
+      if (app.db) await app.db.$queryRaw`SELECT 1`;
+      return { status: "ready", db: app.db ? "ok" : "memory", redis: app.redis?.status ?? "memory" };
     } catch {
       return reply.status(503).send({ status: "not_ready", db: "error" });
     }

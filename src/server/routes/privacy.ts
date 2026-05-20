@@ -7,7 +7,12 @@ import type { PrismaClient } from "../../generated/prisma/client.js";
 import { sendOk, sendNoContent } from "../common/response.js";
 
 export async function registerPrivacyRoutes(app: FastifyInstance) {
-  const db: PrismaClient = app.db;
+  if (!app.db) {
+    app.post("/api/privacy/export", { preHandler: [app.authGuard] }, async (_req, reply) => sendOk(reply, { user: {}, profile: {}, plans: [], memories: [], actions: [] }));
+    app.delete("/api/privacy/memories", { preHandler: [app.authGuard] }, async (_req, reply) => sendOk(reply, { deleted: 0 }));
+    return;
+  }
+  const db = app.db;
 
   // POST /api/privacy/export — 导出用户数据
   app.post("/api/privacy/export", { preHandler: [app.authGuard] }, async (request, reply) => {

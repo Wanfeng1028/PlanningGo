@@ -14,6 +14,12 @@ function uid(req: FastifyRequest): string {
 }
 
 export async function registerMemoryRoutes(app: FastifyInstance) {
+  if (!app.db) {
+    // 内存模式：返回空数据
+    app.get("/api/memories", { preHandler: [app.authGuard] }, async (_req, reply) => sendOk(reply, []));
+    app.post("/api/memories", { preHandler: [app.authGuard] }, async (_req, reply) => sendError(reply, 501, "NOT_IMPLEMENTED", "内存模式不支持记忆功能"));
+    return;
+  }
   const db = app.db;
 
   // GET /api/memories — 返回数组（前端直接用）
