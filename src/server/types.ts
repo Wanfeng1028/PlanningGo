@@ -5,6 +5,7 @@ export interface PlanningRequest {
   companions?: "family" | "friends" | "couple" | "solo";
   budget?: number;
   departAt?: string;
+  modelMode?: "flash" | "pro";
 }
 
 export interface ToolLog {

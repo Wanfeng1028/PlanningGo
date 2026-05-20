@@ -54,7 +54,7 @@ function buildFamilyPlan(input: PlannerInput): ActivityPlan {
         transport: "taxi",
         reasoning: "控制亲子出行强度，优先打车降低孩子步行负担。",
         bookingNeeded: false,
-        actionId: null,
+        actionId: null as any,
       },
       {
         id: createId("step"),
@@ -68,7 +68,7 @@ function buildFamilyPlan(input: PlannerInput): ActivityPlan {
         transport: "none",
         reasoning: "亲子友好、节奏低负担，适合 5 岁孩子。",
         bookingNeeded: activity?.bookingRequired ?? false,
-        actionId: null,
+        actionId: null as any,
       },
       {
         id: createId("step"),
@@ -82,7 +82,7 @@ function buildFamilyPlan(input: PlannerInput): ActivityPlan {
         transport: "walk",
         reasoning: "亲子路线预留缓冲，避免赶场。",
         bookingNeeded: false,
-        actionId: null,
+        actionId: null as any,
       },
       {
         id: createId("step"),
@@ -96,7 +96,7 @@ function buildFamilyPlan(input: PlannerInput): ActivityPlan {
         transport: "none",
         reasoning: "安排较早晚餐，减少孩子疲劳；餐厅可备注低油和儿童椅。",
         bookingNeeded: true,
-        actionId: null,
+        actionId: null as any,
       },
       {
         id: createId("step"),
@@ -110,7 +110,7 @@ function buildFamilyPlan(input: PlannerInput): ActivityPlan {
         transport: "taxi",
         reasoning: "晚餐后直接返程，保证总时长在 4-6 小时内。",
         bookingNeeded: false,
-        actionId: null,
+        actionId: null as any,
       },
     ],
     backupPlan: "如果下雨或孩子疲劳，直接切换到湖滨室内亲子展 + 同商圈晚餐。",
@@ -150,7 +150,7 @@ function buildFriendsPlan(input: PlannerInput): ActivityPlan {
         transport: "mixed",
         reasoning: "默认同城集合，优先同商圈减少转场。",
         bookingNeeded: false,
-        actionId: null,
+        actionId: null as any,
       },
       {
         id: createId("step"),
@@ -164,7 +164,7 @@ function buildFriendsPlan(input: PlannerInput): ActivityPlan {
         transport: "none",
         reasoning: "适合朋友聊天拍照，节奏轻松，话题性强。",
         bookingNeeded: activity?.bookingRequired ?? false,
-        actionId: null,
+        actionId: null as any,
       },
       {
         id: createId("step"),
@@ -178,7 +178,7 @@ function buildFriendsPlan(input: PlannerInput): ActivityPlan {
         transport: "walk",
         reasoning: "作为 4 人室内备选，可锁连座但不自动支付。",
         bookingNeeded: true,
-        actionId: null,
+        actionId: null as any,
       },
       {
         id: createId("step"),
@@ -192,7 +192,7 @@ function buildFriendsPlan(input: PlannerInput): ActivityPlan {
         transport: "walk",
         reasoning: "晚餐放在同商圈，方便 4 人桌预约和后续返程。",
         bookingNeeded: true,
-        actionId: null,
+        actionId: null as any,
       },
     ],
     backupPlan: "如果电影没有 4 连座，改为同商圈展览/桌游，晚餐时间不变。",
@@ -231,7 +231,7 @@ function buildIndoorBackupPlan(input: PlannerInput): ActivityPlan {
         transport: "taxi",
         reasoning: "雨天优先减少户外暴露和步行距离。",
         bookingNeeded: false,
-        actionId: null,
+        actionId: null as any,
       },
       {
         id: createId("step"),
@@ -245,7 +245,7 @@ function buildIndoorBackupPlan(input: PlannerInput): ActivityPlan {
         transport: "none",
         reasoning: "室内场所对雨天和亲子/朋友聚会都更稳妥。",
         bookingNeeded: indoor?.bookingRequired ?? true,
-        actionId: null,
+        actionId: null as any,
       },
       {
         id: createId("step"),
@@ -259,7 +259,7 @@ function buildIndoorBackupPlan(input: PlannerInput): ActivityPlan {
         transport: "walk",
         reasoning: "同商圈晚餐减少转场，降低天气和交通风险。",
         bookingNeeded: true,
-        actionId: null,
+        actionId: null as any,
       },
     ],
     backupPlan: "若室内活动无票，则保留餐厅并切换到商场休息/咖啡。",

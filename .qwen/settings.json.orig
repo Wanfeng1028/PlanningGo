@@ -16,7 +16,10 @@
       "Bash(type *)",
       "Bash(powershell *)",
       "Bash(git checkout *)",
-      "Bash(rmdir *)"
+      "Bash(rmdir *)",
+      "Bash(wc *)",
+      "Bash(echo)",
+      "Bash(echo.)"
     ]
   },
   "$version": 4

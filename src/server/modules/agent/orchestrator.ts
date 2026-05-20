@@ -14,13 +14,21 @@ import type { PlanningResponse } from "../planning/schemas";
  * 主规划 Pipeline：intent -> context -> candidates -> rank -> plan -> validate -> actions
  *
  * 根据 PLANNING_MODE 环境变量决定使用 mock/llm/hybrid 模式。
+ * modelMode "flash" | "pro" 影响 LLM 模型选择。
  */
-export async function runPlanningPipeline(input: PlanningRequest): Promise<
-  PlanningResponse & { summary: string; selectedPlanId: string }
-> {
+export async function runPlanningPipeline(
+  input: PlanningRequest & { modelMode?: "flash" | "pro" },
+): Promise<PlanningResponse & { summary: string; selectedPlanId: string }> {
   const traceId = createTraceId();
   const planId = createId("plan");
   const mode = env.PLANNING_MODE;
+  const modelMode = input.modelMode ?? "flash";
+
+  // 根据 modelMode 选择模型
+  const llmModel =
+    modelMode === "pro"
+      ? (env.LLM_PRO_MODEL ?? env.LLM_MODEL)
+      : (env.LLM_FLASH_MODEL ?? env.LLM_MODEL);
 
   // 1. 抽取意图
   const intent = await extractIntent(input);
@@ -69,5 +77,8 @@ export async function runPlanningPipeline(input: PlanningRequest): Promise<
     // 兼容旧前端
     summary: options[0]?.summary ?? "已生成可执行方案",
     selectedPlanId: options[0]?.id ?? "",
-  };
+    // modelMode 回显，方便前端确认生效
+    modelMode,
+    llmModel,
+  } as PlanningResponse & { summary: string; selectedPlanId: string; modelMode: string; llmModel: string };
 }

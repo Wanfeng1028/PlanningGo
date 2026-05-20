@@ -108,6 +108,7 @@ export function App() {
             user={user}
             onOpenModal={openModal}
             onRequestLocation={handleRequestLocation}
+            onNavigate={setActive}
           />
         );
 
@@ -138,11 +139,13 @@ export function App() {
     }
   })();
 
+  const isFeatureWorkspace = active === "features";
+
   return (
     <div
-      className={`${styles.shell} ${active === "features" ? styles.shellFull : ""}`}
+      className={`${styles.shell} ${isFeatureWorkspace ? styles.shellFull : ""}`}
     >
-      {active !== "features" && (
+      {!isFeatureWorkspace && (
         <div className={pageStyles.floatingBubbles} aria-hidden="true">
           {Array.from({ length: 36 }).map((_, index) => (
             <span key={index} />
@@ -150,34 +153,36 @@ export function App() {
         </div>
       )}
 
-      <NavBar
-        active={active}
-        onNavigate={setActive}
-        onOpenModal={openModal}
-        user={user}
-        onRequestLocation={handleRequestLocation}
-        onLogout={() => {
-          setUser(null);
-          setAuthToken(null);
-          localStorage.removeItem("pg_user");
-          setAuthRedirectTo(null);
-        }}
-      />
+      {!isFeatureWorkspace && (
+        <NavBar
+          active={active}
+          onNavigate={setActive}
+          onOpenModal={openModal}
+          user={user}
+          onRequestLocation={handleRequestLocation}
+          onLogout={() => {
+            setUser(null);
+            setAuthToken(null);
+            localStorage.removeItem("pg_user");
+            setAuthRedirectTo(null);
+          }}
+        />
+      )}
 
       <main
-        className={`${active === "features" ? styles.contentFull : styles.content} ${active === "features" ? styles.pageFull : styles.page}`}
+        className={isFeatureWorkspace ? styles.workspaceMain : styles.pageMain}
       >
         <PageTransition pageKey={active}>{page}</PageTransition>
       </main>
 
-      <footer
-        className={`${styles.footer} ${active === "features" ? styles.footerHidden : ""}`}
-      >
-        <span>周末有谱 · 本地生活规划 Agent</span>
-        <span></span>
-      </footer>
+      {!isFeatureWorkspace && (
+        <footer className={styles.footer}>
+          <span>周末有谱 · 本地生活规划 Agent</span>
+          <span></span>
+        </footer>
+      )}
 
-      <BottomTabs active={active} onNavigate={setActive} />
+      {!isFeatureWorkspace && <BottomTabs active={active} onNavigate={setActive} />}
 
       {isAuthModal(modal) ? (
         <AuthModal

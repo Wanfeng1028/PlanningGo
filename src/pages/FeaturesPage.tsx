@@ -1,16 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { v4 as uuid } from "uuid";
+import { ArrowLeft } from "lucide-react";
 import {
   requestPlanning,
   quoteAction as apiQuoteAction,
   confirmAction as apiConfirmAction,
   cancelAction as apiCancelAction,
   checkHealth,
-  getApiBase,
   type PlanningOption,
   type PlanningExecutableAction,
 } from "../lib/api";
-import type { ModalKey, SessionUser } from "../types";
+import {
+  FeatureModal,
+  FeaturePopover,
+  PopoverItem,
+  ConfirmActions,
+} from "../components/FeatureModal";
+import type { ModalKey, NavKey, SessionUser } from "../types";
 import styles from "./FeaturesPage.module.scss";
 
 /* ═══════════════════════════════════════════════
@@ -21,6 +27,7 @@ interface FeaturesPageProps {
   user?: SessionUser | null;
   onOpenModal?: (key: ModalKey) => void;
   onRequestLocation?: () => void;
+  onNavigate?: (key: NavKey) => void;
 }
 
 type ChatPhase =
@@ -52,8 +59,21 @@ type AttachmentItem = {
   previewUrl?: string;
 };
 
+type VoiceState =
+  | "idle"
+  | "listening"
+  | "no-speech"
+  | "not-allowed"
+  | "not-supported"
+  | "error";
+
 const MODEL_MODES = ["Flash", "Pro"] as const;
 type ModelMode = typeof MODEL_MODES[number];
+
+/** 将前端 ModelMode 转为后端期望的小写格式 */
+function toApiModelMode(mode: ModelMode): "flash" | "pro" {
+  return mode.toLowerCase() as "flash" | "pro";
+}
 
 /* ── Sidebar mock data ── */
 const SIDEBAR_NAV = [
@@ -97,10 +117,32 @@ function InlineToast({
 function AmbientBackground() {
   return (
     <div className={styles.featureAmbient} aria-hidden="true">
+      <div className={styles.ambientGrid} />
       <div className={`${styles.ambientOrb} ${styles.ambientOrb1}`} />
       <div className={`${styles.ambientOrb} ${styles.ambientOrb2}`} />
-      <div className={`${styles.ambientCard} ${styles.ambientCard1}`} />
-      <div className={`${styles.ambientCard} ${styles.ambientCard2}`} />
+      <div className={`${styles.ambientCard} ${styles.ambientCard1}`}>
+        <div className={`${styles.ambientCardContent} ${styles.ambientCardContent1}`}>
+          <span className={styles.ambientLabel}>今日路线</span>
+          <span className={styles.ambientTitle}>朝阳公园 → 三里屯</span>
+          <span className={styles.ambientMeta}><span>📍</span> 2.3km · 步行28min</span>
+        </div>
+      </div>
+      <div className={`${styles.ambientCard} ${styles.ambientCard2}`}>
+        <div className={`${styles.ambientCardContent} ${styles.ambientCardContent2}`}>
+          <span className={styles.ambientIcon}>🌧️</span>
+          <div className={styles.ambientText}>
+            <span className={styles.ambientLabel}>备选方案</span>
+            <span className={styles.ambientTitle}>雨天室内路线</span>
+          </div>
+        </div>
+      </div>
+      <div className={styles.ambientRoute}>
+        <svg viewBox="0 0 200 150">
+          <path d="M 10 10 C 50 10, 40 80, 100 75 S 160 130, 190 120" />
+        </svg>
+        <div className={styles.ambientRouteDot} />
+        <div className={styles.ambientRouteDot} />
+      </div>
       <div className={`${styles.ambientLine} ${styles.ambientLine1}`} />
       <div className={`${styles.ambientLine} ${styles.ambientLine2}`} />
       <div className={`${styles.ambientLine} ${styles.ambientLine3}`} />
@@ -119,9 +161,12 @@ function Sidebar({
   onNewChat,
   onNavItemClick,
   onRecentClick,
-  onSettingsClick,
   searchQuery,
   onSearchChange,
+  modelMode,
+  onModelModeChange,
+  onToast,
+  onReturnHome,
 }: {
   user?: SessionUser | null;
   open: boolean;
@@ -129,12 +174,16 @@ function Sidebar({
   onNewChat: () => void;
   onNavItemClick: (id: string) => void;
   onRecentClick: (title: string) => void;
-  onSettingsClick: () => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
+  modelMode: ModelMode;
+  onModelModeChange: (mode: ModelMode) => void;
+  onToast: (msg: string) => void;
+  onReturnHome?: () => void;
 }) {
   const [showSearch, setShowSearch] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const handleNavClick = (id: string) => {
     if (id === "search") {
@@ -155,8 +204,16 @@ function Sidebar({
       <aside className={`${styles.featureSidebar} ${open ? styles.featureSidebarOpen : ""}`}>
         {/* Header */}
         <div className={styles.sidebarHeader}>
-          <div className={styles.sidebarLogo}>谱</div>
-          <span className={styles.sidebarBrand}>周末有谱</span>
+          <div className={styles.sidebarLogoRow}>
+            <div className={styles.sidebarLogo}>谱</div>
+            <span className={styles.sidebarBrand}>周末有谱</span>
+          </div>
+          {onReturnHome && (
+            <button className={styles.returnHomeBtn} onClick={onReturnHome}>
+              <ArrowLeft size={14} />
+              返回官网
+            </button>
+          )}
         </div>
 
         <button className={styles.sidebarNewBtn} onClick={onNewChat}>
@@ -213,20 +270,78 @@ function Sidebar({
               {user?.mode === "registered" ? "已注册" : "体验模式"}
             </div>
           </div>
-          <div style={{ position: "relative" }}>
-            <button className={styles.sidebarSettingsBtn} title="设置" onClick={() => setShowSettings(!showSettings)}>
-              ⚙
-            </button>
-            {showSettings && (
-              <div className={styles.sidebarSettingsDropdown}>
-                <button onClick={() => { onSettingsClick(); setShowSettings(false); }}>模型偏好</button>
-                <button onClick={() => { onSettingsClick(); setShowSettings(false); }}>位置偏好</button>
-                <button onClick={() => { onSettingsClick(); setShowSettings(false); }}>清空本地记录</button>
-              </div>
-            )}
-          </div>
+          <button className={styles.sidebarSettingsBtn} title="设置" onClick={() => setShowSettings(true)}>
+            ⚙
+          </button>
         </div>
       </aside>
+
+      {/* Settings Modal */}
+      <FeatureModal
+        open={showSettings}
+        onClose={() => { setShowSettings(false); setShowClearConfirm(false); }}
+        title="设置"
+        subtitle="管理你的规划偏好"
+      >
+        <div className={styles.settingsList}>
+          <button className={styles.settingsItem} onClick={() => {
+            const next = modelMode === "Flash" ? "Pro" : "Flash";
+            onModelModeChange(next);
+            onToast(`已切换为 ${next} 模式`);
+          }}>
+            <span className={styles.settingsItemIcon}>🤖</span>
+            <span className={styles.settingsItemContent}>
+              <span className={styles.settingsItemLabel}>模型偏好</span>
+              <span className={styles.settingsItemDesc}>
+                当前：{modelMode === "Flash" ? "Flash · 快速规划" : "Pro · 深度推理"}
+              </span>
+            </span>
+            <span className={styles.settingsItemValue}>{modelMode}</span>
+          </button>
+
+          <button className={styles.settingsItem}>
+            <span className={styles.settingsItemIcon}>📍</span>
+            <span className={styles.settingsItemContent}>
+              <span className={styles.settingsItemLabel}>位置偏好</span>
+              <span className={styles.settingsItemDesc}>用于推荐附近目的地</span>
+            </span>
+            <span className={styles.settingsItemValue}>{user?.city || "上海"}</span>
+          </button>
+
+          <button className={styles.settingsItem} onClick={() => setShowClearConfirm(true)}>
+            <span className={styles.settingsItemIcon}>🗑️</span>
+            <span className={styles.settingsItemContent}>
+              <span className={styles.settingsItemLabel}>清空本地记录</span>
+              <span className={styles.settingsItemDesc}>删除草稿和收藏数据</span>
+            </span>
+          </button>
+        </div>
+      </FeatureModal>
+
+      {/* Clear Confirm Modal */}
+      <FeatureModal
+        open={showClearConfirm}
+        onClose={() => setShowClearConfirm(false)}
+        title="清空本地记录"
+        width="sm"
+        danger
+      >
+        <p className={styles.confirmText}>
+          确定清空本地规划记录吗？清空后草稿和收藏数据将无法恢复。
+        </p>
+        <ConfirmActions
+          confirmLabel="清空记录"
+          danger
+          onCancel={() => setShowClearConfirm(false)}
+          onConfirm={() => {
+            localStorage.removeItem("pg_drafts");
+            localStorage.removeItem("pg_favorites");
+            onToast("本地记录已清空");
+            setShowClearConfirm(false);
+            setShowSettings(false);
+          }}
+        />
+      </FeatureModal>
     </>
   );
 }
@@ -279,7 +394,12 @@ function Composer({
   const valueRef = useRef(value);
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [isRecording, setIsRecording] = useState(false);
+  const [voiceState, setVoiceState] = useState<VoiceState>("idle");
+
+  // Popover states
+  const [plusOpen, setPlusOpen] = useState(false);
   const [modeOpen, setModeOpen] = useState(false);
+  const [companionOpen, setCompanionOpen] = useState(false);
 
   useEffect(() => {
     valueRef.current = value;
@@ -337,6 +457,52 @@ function Composer({
     });
   }, []);
 
+  /* ── Plus menu actions ── */
+  const PLUS_ITEMS = [
+    { icon: "📍", label: "添加地点", desc: "输入出发地或目的地", action: "location" as const },
+    { icon: "🖼", label: "添加图片", desc: "图片识别稍后开放", action: "image" as const },
+    { icon: "⚙", label: "添加偏好", desc: "少排队、室内优先等", action: "preference" as const },
+    { icon: "👥", label: "添加同行人", desc: "家人、朋友、情侣、独自", action: "companion" as const },
+    { icon: "💰", label: "添加预算", desc: "人均消费范围", action: "budget" as const },
+  ];
+
+  const handlePlusAction = useCallback((action: string) => {
+    setPlusOpen(false);
+    switch (action) {
+      case "location":
+        onChange(value ? `${value}\n出发地：` : "出发地：");
+        requestAnimationFrame(() => textareaRef.current?.focus());
+        break;
+      case "image":
+        handleFilePick();
+        break;
+      case "preference":
+        onChange(value ? `${value}\n偏好：少排队、少走路、室内优先` : "偏好：少排队、少走路、室内优先");
+        requestAnimationFrame(() => textareaRef.current?.focus());
+        break;
+      case "companion":
+        setCompanionOpen(true);
+        break;
+      case "budget":
+        onChange(value ? `${value}\n预算：人均 200` : "预算：人均 200");
+        requestAnimationFrame(() => textareaRef.current?.focus());
+        break;
+    }
+  }, [value, onChange, textareaRef, handleFilePick]);
+
+  const COMPANION_OPTIONS = [
+    { value: "家人", icon: "👨‍👩‍👧‍👦", label: "家庭出行" },
+    { value: "朋友", icon: "👥", label: "朋友聚会" },
+    { value: "情侣", icon: "💑", label: "情侣约会" },
+    { value: "独自", icon: "🚶", label: "独自出行" },
+  ];
+
+  const handleCompanionSelect = useCallback((companion: string) => {
+    setCompanionOpen(false);
+    onChange(value ? `${value}\n同行人：${companion}` : `同行人：${companion}`);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }, [value, onChange, textareaRef]);
+
   /* ── Voice recording ── */
   const SpeechRecognitionCtor = useMemo(() => {
     const w = window as any;
@@ -350,7 +516,7 @@ function Composer({
     }
 
     if (!SpeechRecognitionCtor) {
-      onToast?.("当前浏览器不支持语音输入，可以直接打字。");
+      setVoiceState("not-supported");
       return;
     }
 
@@ -384,24 +550,21 @@ function Composer({
 
       switch (event.error) {
         case "not-allowed":
-          onToast?.("浏览器没有麦克风权限，请在地址栏允许后重试。");
+          setVoiceState("not-allowed");
           break;
         case "no-speech":
-          if (!hasResult) {
-            onToast?.("没有听到内容，可以再试一次。");
-          }
+          if (!hasResult) setVoiceState("no-speech");
           break;
         case "audio-capture":
-          onToast?.("没有检测到麦克风设备。");
+          setVoiceState("error");
           break;
         case "network":
-          onToast?.("语音服务暂时不可用，可以先打字。");
+          setVoiceState("error");
           break;
         case "aborted":
-          // User stopped, no error message needed
           break;
         default:
-          onToast?.(`语音识别出错：${event.error}`);
+          setVoiceState("error");
       }
     };
 
@@ -409,6 +572,7 @@ function Composer({
       setIsRecording(false);
       recognitionRef.current = null;
       if (hasResult) {
+        setVoiceState("idle");
         requestAnimationFrame(() => textareaRef.current?.focus());
       }
     };
@@ -416,27 +580,15 @@ function Composer({
     recognitionRef.current = recognition;
     recognition.start();
     setIsRecording(true);
-    onToast?.("正在听...");
-  }, [isRecording, SpeechRecognitionCtor, onChange, onToast, textareaRef]);
+    setVoiceState("listening");
+  }, [isRecording, SpeechRecognitionCtor, onChange, textareaRef]);
 
-  /* ── Mode dropdown ── */
-  const handleModeClick = useCallback(() => {
-    setModeOpen((v) => !v);
-  }, []);
-
+  /* ── Mode select ── */
   const handleModeSelect = useCallback((mode: ModelMode) => {
     onModelModeChange(mode);
     setModeOpen(false);
     onToast?.(`已切换为 ${mode} 模式`);
   }, [onModelModeChange, onToast]);
-
-  // Close mode dropdown on outside click
-  useEffect(() => {
-    if (!modeOpen) return;
-    const close = () => setModeOpen(false);
-    document.addEventListener("click", close, { once: true });
-    return () => document.removeEventListener("click", close);
-  }, [modeOpen]);
 
   /* ── Submit ── */
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -458,20 +610,27 @@ function Composer({
   const fileIcon = (file: File) => {
     if (file.type.startsWith("image/")) return null;
     if (file.type.includes("pdf")) return "📄";
-    if (
-      file.type.includes("word") ||
-      file.name.endsWith(".doc") ||
-      file.name.endsWith(".docx")
-    )
-      return "📝";
-    if (
-      file.type.includes("sheet") ||
-      file.name.endsWith(".xls") ||
-      file.name.endsWith(".xlsx")
-    )
-      return "📊";
+    if (file.type.includes("word") || file.name.endsWith(".doc") || file.name.endsWith(".docx")) return "📝";
+    if (file.type.includes("sheet") || file.name.endsWith(".xls") || file.name.endsWith(".xlsx")) return "📊";
     return "📎";
   };
+
+  const voiceModalContent = useMemo(() => {
+    switch (voiceState) {
+      case "listening":
+        return { icon: "🎙", title: "正在听你说…", desc: "请对着麦克风说话", showRetry: false };
+      case "no-speech":
+        return { icon: "🔇", title: "没有听到内容", desc: "可以再试一次，或者直接打字", showRetry: true };
+      case "not-allowed":
+        return { icon: "🚫", title: "麦克风权限被拒绝", desc: "请在浏览器地址栏允许麦克风权限后重试", showRetry: true };
+      case "not-supported":
+        return { icon: "⚠", title: "浏览器不支持语音", desc: "当前浏览器不支持语音输入，可以直接打字", showRetry: false };
+      case "error":
+        return { icon: "⚠", title: "语音服务暂时不可用", desc: "可以稍后重试，或者直接打字描述", showRetry: true };
+      default:
+        return null;
+    }
+  }, [voiceState]);
 
   return (
     <div
@@ -511,15 +670,29 @@ function Composer({
       )}
 
       <div className={styles.composerInputRow}>
-        <button
-          className={styles.composerIconButton}
-          type="button"
-          aria-label="添加附件"
-          onClick={handleFilePick}
-          disabled={disabled}
-        >
-          +
-        </button>
+        {/* Plus button with popover menu */}
+        <div className={styles.composerPopoverWrap}>
+          <button
+            className={styles.composerIconButton}
+            type="button"
+            aria-label="添加内容"
+            onClick={() => setPlusOpen((v) => !v)}
+            disabled={disabled}
+          >
+            +
+          </button>
+          <FeaturePopover open={plusOpen} onClose={() => setPlusOpen(false)}>
+            {PLUS_ITEMS.map((item) => (
+              <PopoverItem
+                key={item.action}
+                icon={item.icon}
+                label={item.label}
+                desc={item.desc}
+                onClick={() => handlePlusAction(item.action)}
+              />
+            ))}
+          </FeaturePopover>
+        </div>
 
         <textarea
           ref={textareaRef}
@@ -531,30 +704,29 @@ function Composer({
           rows={1}
         />
 
-        <div style={{ position: "relative" }}>
+        {/* Model mode selector with popover */}
+        <div className={styles.composerPopoverWrap}>
           <button
             className={styles.composerModeButton}
             type="button"
-            onClick={handleModeClick}
+            onClick={() => setModeOpen((v) => !v)}
           >
             {modelMode}
           </button>
-          {modeOpen && (
-            <div className={styles.composerModeDropdown}>
-              {MODEL_MODES.map((mode) => (
-                <button
-                  key={mode}
-                  className={`${styles.composerModeItem} ${mode === modelMode ? styles.composerModeItemActive : ""}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleModeSelect(mode);
-                  }}
-                >
-                  {mode}
-                </button>
-              ))}
-            </div>
-          )}
+          <FeaturePopover open={modeOpen} onClose={() => setModeOpen(false)}>
+            <PopoverItem
+              label="Flash"
+              desc="快速规划，适合普通周末路线"
+              check={modelMode === "Flash"}
+              onClick={() => handleModeSelect("Flash")}
+            />
+            <PopoverItem
+              label="Pro"
+              desc="复杂约束，多人偏好、天气、排队综合推理"
+              check={modelMode === "Pro"}
+              onClick={() => handleModeSelect("Pro")}
+            />
+          </FeaturePopover>
         </div>
 
         <button
@@ -595,6 +767,70 @@ function Composer({
           <span className={styles.composerMetaItem}>预约和付款前会先确认</span>
         </div>
       )}
+
+      {/* Voice Status Modal */}
+      <FeatureModal
+        open={voiceState !== "idle"}
+        onClose={() => setVoiceState("idle")}
+        width="sm"
+      >
+        {voiceModalContent && (
+          <div className={styles.voiceModalContent}>
+            <div className={styles.voiceModalIcon}>
+              {isRecording ? (
+                <div className={styles.voiceWave}>
+                  <span /><span /><span /><span /><span />
+                </div>
+              ) : (
+                <span>{voiceModalContent.icon}</span>
+              )}
+            </div>
+            <h3 className={styles.voiceModalTitle}>{voiceModalContent.title}</h3>
+            <p className={styles.voiceModalDesc}>{voiceModalContent.desc}</p>
+            {voiceModalContent.showRetry && (
+              <button
+                className={styles.voiceModalRetry}
+                onClick={() => {
+                  setVoiceState("idle");
+                  requestAnimationFrame(() => toggleRecording());
+                }}
+              >
+                重新尝试
+              </button>
+            )}
+            {!voiceModalContent.showRetry && !isRecording && (
+              <button
+                className={styles.voiceModalRetry}
+                onClick={() => setVoiceState("idle")}
+              >
+                知道了
+              </button>
+            )}
+          </div>
+        )}
+      </FeatureModal>
+
+      {/* Companion Selection Modal */}
+      <FeatureModal
+        open={companionOpen}
+        onClose={() => setCompanionOpen(false)}
+        title="选择同行人"
+        subtitle="帮助 AI 更好地规划适合的路线"
+        width="sm"
+      >
+        <div className={styles.companionGrid}>
+          {COMPANION_OPTIONS.map((co) => (
+            <button
+              key={co.value}
+              className={styles.companionOption}
+              onClick={() => handleCompanionSelect(co.value)}
+            >
+              <span className={styles.companionIcon}>{co.icon}</span>
+              <span className={styles.companionLabel}>{co.label}</span>
+            </button>
+          ))}
+        </div>
+      </FeatureModal>
     </div>
   );
 }
@@ -679,44 +915,85 @@ function ErrorCardView({
   onNew: () => void;
 }) {
   const [showHint, setShowHint] = useState(false);
+  const isNetworkError =
+    message.includes("无法连接") ||
+    message.includes("Failed to fetch") ||
+    message.includes("NetworkError");
 
   return (
-    <div className={styles.errorCard}>
-      <div className={styles.errorCardTitle}>⚠ 规划服务连接失败</div>
-      <div className={styles.errorCardMessage}>{message}</div>
+    <>
+      <div className={styles.errorCard}>
+        <div className={styles.errorCardTitle}>
+          {isNetworkError ? "⚠ 规划服务暂时不可用" : "⚠ 出了点问题"}
+        </div>
+        <div className={styles.errorCardMessage}>{message}</div>
 
-      <div className={styles.errorCardHint}>
-        {`# .env.local
-VITE_API_BASE=${getApiBase()}
-
-# 启动后端
-npm run dev:api
-
-# 启动前端
-npm run dev`}
+        <div className={styles.errorCardActions}>
+          <button
+            className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
+            onClick={onRetry}
+          >
+            重试
+          </button>
+          {isNetworkError && (
+            <button
+              className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
+              onClick={() => setShowHint(true)}
+            >
+              查看启动说明
+            </button>
+          )}
+          <button
+            className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
+            onClick={onNew}
+          >
+            新一轮
+          </button>
+        </div>
       </div>
 
-      <div className={styles.errorCardActions}>
-        <button
-          className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
-          onClick={onRetry}
-        >
-          重试
-        </button>
-        <button
-          className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
-          onClick={() => setShowHint((v) => !v)}
-        >
-          {showHint ? "收起说明" : "查看启动说明"}
-        </button>
-        <button
-          className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
-          onClick={onNew}
-        >
-          新一轮
-        </button>
-      </div>
-    </div>
+      {/* Startup Instructions Modal */}
+      <FeatureModal
+        open={showHint}
+        onClose={() => setShowHint(false)}
+        title="本地服务启动说明"
+        subtitle="确保前后端服务正常运行"
+        width="sm"
+      >
+        <div className={styles.startupSteps}>
+          <div className={styles.startupStep}>
+            <span className={styles.startupStepNum}>1</span>
+            <div className={styles.startupStepContent}>
+              <strong>启动后端服务</strong>
+              <code>npm run dev:api</code>
+            </div>
+          </div>
+          <div className={styles.startupStep}>
+            <span className={styles.startupStepNum}>2</span>
+            <div className={styles.startupStepContent}>
+              <strong>启动前端服务</strong>
+              <code>npm run dev</code>
+            </div>
+          </div>
+          <div className={styles.startupStep}>
+            <span className={styles.startupStepNum}>3</span>
+            <div className={styles.startupStepContent}>
+              <strong>环境配置</strong>
+              <span>在 .env.local 中设置</span>
+              <code>VITE_API_BASE=http://127.0.0.1:3001</code>
+            </div>
+          </div>
+        </div>
+        <div className={styles.startupActions}>
+          <button
+            className={styles.startupBtn}
+            onClick={() => setShowHint(false)}
+          >
+            知道了
+          </button>
+        </div>
+      </FeatureModal>
+    </>
   );
 }
 
@@ -740,7 +1017,7 @@ const HERO_PHRASES = [
   "把纠结变成安排",
 ] as const;
 
-export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
+export default function FeaturesPage({ user, onOpenModal, onNavigate }: FeaturesPageProps) {
   const [mode, setMode] = useState<"idle" | "chat">("idle");
   const [inputValue, setInputValue] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -750,6 +1027,8 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
   const [toast, setToast] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [modelMode, setModelMode] = useState<ModelMode>("Flash");
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [showReturnConfirm, setShowReturnConfirm] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [drafts, setDrafts] = useState<string[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -904,15 +1183,23 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
           prompt,
           city,
           companions: "family",
+          modelMode: toApiModelMode(modelMode),
         });
 
+        // 确保 options 数组存在且不为空
         if (result.options && result.options.length > 0) {
+          // 为每个 option 生成唯一 ID（如果后端没有提供）
+          const optionsWithIds = result.options.map((opt, idx) => ({
+            ...opt,
+            id: opt.id || `plan_${idx}`,
+          }));
+
           updateLastAssistant({
             status: "success",
             content: result.summary || "为你找到以下方案：",
             chips: undefined,
-            plans: result.options,
-            actions: result.executableActions,
+            plans: optionsWithIds,
+            actions: result.executableActions || [],
           });
           setPhase("result");
         } else {
@@ -936,7 +1223,7 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
         setIsBusy(false);
       }
     },
-    [isBusy, city, addMessage, updateLastAssistant],
+    [isBusy, city, modelMode, addMessage, updateLastAssistant],
   );
 
   /* ── Event handlers ── */
@@ -966,6 +1253,7 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
 
   const handleSelectPlan = useCallback(
     (planId: string) => {
+      setSelectedPlanId(planId);
       setPhase("selected");
       const actionMsg: ChatMessage = {
         id: uuid(),
@@ -990,9 +1278,25 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
     setMessages([]);
     setPhase("idle");
     setInputValue("");
+    setSelectedPlanId(null);
     setSidebarOpen(false);
     requestAnimationFrame(() => textareaRef.current?.focus());
   }, []);
+
+  /* ── Return to home ── */
+  const handleReturnHome = useCallback(() => {
+    // If there's content or messages, show confirmation
+    if (inputValue.trim() || messages.length > 0) {
+      setShowReturnConfirm(true);
+    } else {
+      onNavigate?.("home");
+    }
+  }, [inputValue, messages, onNavigate]);
+
+  const handleConfirmReturnHome = useCallback(() => {
+    setShowReturnConfirm(false);
+    onNavigate?.("home");
+  }, [onNavigate]);
 
   /* ── Sidebar handlers ── */
   const handleNavItemClick = useCallback((id: string) => {
@@ -1056,10 +1360,6 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
     requestAnimationFrame(() => textareaRef.current?.focus());
   }, []);
 
-  const handleSettingsClick = useCallback(() => {
-    setToast("设置功能开发中");
-  }, []);
-
   /* ── Render: message content ── */
   const renderMessageContent = useCallback(
     (msg: ChatMessage) => {
@@ -1119,7 +1419,7 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
                       <PlanCardView
                         key={plan.id}
                         plan={plan}
-                        selected={phase === "selected" || phase === "done"}
+                        selected={selectedPlanId === plan.id}
                         onSelect={handleSelectPlan}
                       />
                     ))}
@@ -1142,6 +1442,14 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
                             预估：{action.priceEstimate}
                           </div>
                         )}
+                        <div className={styles.actionCardActions}>
+                          <button
+                            className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
+                            onClick={() => setToast(`${action.title}将在后续版本中推出`)}
+                          >
+                            {action.status === "waiting_confirm" ? "确认" : "查看"}
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1160,7 +1468,7 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
                       <button
                         key={label}
                         className={styles.nextActionChip}
-                        onClick={() => setToast(`${label}功能开发中`)}
+                        onClick={() => setToast(`${label}将在后续版本中推出`)}
                       >
                         {label}
                       </button>
@@ -1198,9 +1506,12 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
         onNewChat={handleNewChat}
         onNavItemClick={handleNavItemClick}
         onRecentClick={handleRecentClick}
-        onSettingsClick={handleSettingsClick}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        modelMode={modelMode}
+        onModelModeChange={setModelMode}
+        onToast={(msg) => setToast(msg)}
+        onReturnHome={handleReturnHome}
       />
 
       {/* Main area */}
@@ -1255,7 +1566,7 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
                   className={styles.healthDot}
                   style={{ background: healthOk ? "#22c55e" : "#ef4444" }}
                 />
-                {healthOk ? "规划服务已连接" : `未连接后端 · ${getApiBase()}`}
+                {healthOk ? "规划服务已连接" : "服务未连接，请检查后端是否启动"}
               </div>
             )}
           </div>
@@ -1293,6 +1604,24 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
           </div>
         )}
       </main>
+
+      {/* 返回官网确认弹窗 */}
+      <FeatureModal
+        open={showReturnConfirm}
+        onClose={() => setShowReturnConfirm(false)}
+        title="离开规划工作区？"
+        width="sm"
+      >
+        <p className={styles.confirmText}>
+          当前规划内容将保留在本地存储中，下次进入可以继续查看。
+        </p>
+        <ConfirmActions
+          cancelLabel="继续规划"
+          confirmLabel="返回官网"
+          onConfirm={handleConfirmReturnHome}
+          onCancel={() => setShowReturnConfirm(false)}
+        />
+      </FeatureModal>
     </section>
   );
 }

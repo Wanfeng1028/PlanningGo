@@ -540,6 +540,7 @@ export const planningRequestSchema = z.object({
   companions: z.enum(["family", "friends", "couple", "solo"]).optional(),
   budget: z.number().positive().optional(),
   departAt: z.string().optional(),
+  modelMode: z.enum(["flash", "pro"]).optional(),
 });
 
 /**

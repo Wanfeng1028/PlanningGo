@@ -26,6 +26,8 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_BASE_URL: z.string().url().default("https://api.openai.com/v1"),
   LLM_MODEL: z.string().default("gpt-4o"),
+  LLM_FLASH_MODEL: z.string().optional(),
+  LLM_PRO_MODEL: z.string().optional(),
   LLM_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
 
   // ── 外部工具 ──

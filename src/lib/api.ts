@@ -295,6 +295,7 @@ export async function requestPlanning(input: {
   startPoint?: string;
   companions?: "family" | "friends" | "couple" | "solo";
   budget?: number;
+  modelMode?: "flash" | "pro";
 }): Promise<PlanningResult> {
   return apiJson<PlanningResult>("/api/agent/plan", {
     method: "POST",
