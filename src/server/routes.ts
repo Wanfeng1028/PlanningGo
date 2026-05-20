@@ -24,6 +24,16 @@ import {
 } from "./services/store";
 
 export async function registerRoutes(app: FastifyInstance) {
+  // ── 根路由：API 信息 ──
+  app.get("/", async () => ({
+    name: "PlanningGo API",
+    version: "0.1.0",
+    description: "「周末有谱」智能出行规划 API",
+    docs: "/api/docs",
+    health: "/api/health",
+    environment: process.env.NODE_ENV ?? "development",
+  }));
+
   // ── 注册模块化路由 ──
   await import("./routes/auth.js").then((m) => m.registerAuthRoutes(app));
   await import("./routes/profile.js").then((m) => m.registerProfileRoutes(app));
