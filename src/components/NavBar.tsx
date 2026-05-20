@@ -18,6 +18,11 @@ export function NavBar({ active, onNavigate, onOpenModal, user, onLogout, onRequ
   const [open, setOpen] = useState(false);
 
   const handleNavigate = (key: NavKey) => {
+    if (key === "developers") {
+      onOpenModal("developerComingSoon");
+      setOpen(false);
+      return;
+    }
     onNavigate(key);
     setOpen(false);
   };

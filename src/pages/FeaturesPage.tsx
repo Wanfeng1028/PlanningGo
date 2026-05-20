@@ -6,16 +6,25 @@ import {
   quoteAction as apiQuoteAction,
   confirmAction as apiConfirmAction,
   cancelAction as apiCancelAction,
+  confirmExecAction,
   checkHealth,
+  addMemory,
+  selectPlan,
+  listConversations,
+  getConversation,
+  togglePlanFavorite,
+  trackEvent as apiTrackEvent,
+  reportClientError,
   type PlanningOption,
   type PlanningExecutableAction,
+  type ConversationItem,
 } from "../lib/api";
 import {
-  FeatureModal,
   FeaturePopover,
   PopoverItem,
   ConfirmActions,
 } from "../components/FeatureModal";
+import { WorkspaceModal } from "../components/WorkspaceModal";
 import type { ModalKey, NavKey, SessionUser } from "../types";
 import styles from "./FeaturesPage.module.scss";
 
@@ -64,6 +73,15 @@ interface ChatMessage {
   actionQuotedPreview?: string;
 }
 
+interface ChatSession {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  city: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 type AttachmentItem = {
   id: string;
   file: File;
@@ -96,7 +114,8 @@ const SIDEBAR_NAV = [
   { icon: "⭐", label: "收藏方案", id: "favorites" },
 ];
 
-const SIDEBAR_RECENT = [
+/** 输入框下方的建议提示词 */
+const SUGGESTION_PROMPTS = [
   "武康路晚餐规划",
   "亲子半日游",
   "雨天室内备选",
@@ -105,6 +124,45 @@ const SIDEBAR_RECENT = [
   "西湖一日慢游",
   "带爸妈吃饭",
 ];
+
+/** 城市-区 数据（常用城市） */
+const CITY_DISTRICTS: Record<string, string[]> = {
+  "上海市": ["黄浦区","徐汇区","长宁区","静安区","普陀区","虹口区","杨浦区","浦东新区","闵行区","宝山区","嘉定区","松江区","青浦区","奉贤区","金山区","崇明区"],
+  "北京市": ["东城区","西城区","朝阳区","丰台区","石景山区","海淀区","门头沟区","房山区","通州区","顺义区","昌平区","大兴区"],
+  "杭州市": ["上城区","拱墅区","西湖区","滨江区","萧山区","余杭区","临平区","富阳区","临安区"],
+  "南京市": ["玄武区","秦淮区","建邺区","鼓楼区","栖霞区","雨花台区","江宁区","浦口区","六合区"],
+  "成都市": ["锦江区","青羊区","金牛区","武侯区","成华区","龙泉驿区","青白江区","新都区","温江区","双流区"],
+  "广州市": ["越秀区","海珠区","荔湾区","天河区","白云区","黄埔区","番禺区","花都区","南沙区"],
+  "深圳市": ["罗湖区","福田区","南山区","宝安区","龙岗区","龙华区","坪山区","光明区"],
+  "武汉市": ["江岸区","江汉区","硚口区","汉阳区","武昌区","青山区","洪山区","东西湖区","蔡甸区","江夏区"],
+  "西安市": ["新城区","碑林区","莲湖区","灞桥区","未央区","雁塔区","阎良区","临潼区","长安区"],
+  "重庆市": ["渝中区","大渡口区","江北区","沙坪坝区","九龙坡区","南岸区","北碚区","渝北区","巴南区"],
+  "苏州市": ["姑苏区","虎丘区","吴中区","相城区","吴江区","工业园区"],
+  "天津市": ["和平区","河东区","河西区","南开区","河北区","红桥区","东丽区","西青区","津南区","北辰区","滨海新区"],
+  "长沙市": ["芙蓉区","天心区","岳麓区","开福区","雨花区","望城区"],
+  "郑州市": ["中原区","二七区","管城回族区","金水区","上街区","惠济区"],
+  "青岛市": ["市南区","市北区","黄岛区","崂山区","李沧区","城阳区"],
+  "厦门市": ["思明区","海沧区","湖里区","集美区","同安区","翔安区"],
+  "昆明市": ["五华区","盘龙区","官渡区","西山区","东川区","呈贡区"],
+  "合肥市": ["瑶海区","庐阳区","蜀山区","包河区"],
+  "福州市": ["鼓楼区","台江区","仓山区","马尾区","晋安区","长乐区"],
+  "无锡市": ["锡山区","惠山区","滨湖区","梁溪区","新吴区","江阴市","宜兴市"],
+};
+const CITY_LIST = Object.keys(CITY_DISTRICTS);
+
+/** 格式化相对时间 */
+function formatRelativeTime(isoStr: string): string {
+  const now = Date.now();
+  const then = new Date(isoStr).getTime();
+  const diffMin = Math.floor((now - then) / 60000);
+  if (diffMin < 1) return "刚刚";
+  if (diffMin < 60) return `${diffMin}分钟前`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}小时前`;
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay < 7) return `${diffDay}天前`;
+  return new Date(isoStr).toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
+}
 
 /* ═══════════════════════════════════════════════
    Sub-components
@@ -173,13 +231,15 @@ function Sidebar({
   onClose,
   onNewChat,
   onNavItemClick,
-  onRecentClick,
+  chatSessions,
+  onSessionClick,
   searchQuery,
   onSearchChange,
   modelMode,
   onModelModeChange,
   onToast,
   onReturnHome,
+  onNavigate,
 }: {
   user?: SessionUser | null;
   city: string;
@@ -187,13 +247,15 @@ function Sidebar({
   onClose: () => void;
   onNewChat: () => void;
   onNavItemClick: (id: string) => void;
-  onRecentClick: (title: string) => void;
+  chatSessions: ChatSession[];
+  onSessionClick: (sessionId: string) => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
   modelMode: ModelMode;
   onModelModeChange: (mode: ModelMode) => void;
   onToast: (msg: string) => void;
   onReturnHome?: () => void;
+  onNavigate?: (key: NavKey) => void;
 }) {
   const [showSearch, setShowSearch] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -208,9 +270,9 @@ function Sidebar({
     onClose();
   };
 
-  const filteredRecent = searchQuery
-    ? SIDEBAR_RECENT.filter((t) => t.toLowerCase().includes(searchQuery.toLowerCase()))
-    : SIDEBAR_RECENT;
+  const filteredSessions = searchQuery
+    ? chatSessions.filter((s) => s.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    : chatSessions;
 
   return (
     <>
@@ -258,18 +320,21 @@ function Sidebar({
           </div>
         )}
 
-        {/* Recent */}
+        {/* Recent sessions */}
         <div className={styles.sidebarNavLabel}>最近规划</div>
         <div className={styles.sidebarRecent}>
-          {filteredRecent.length > 0 ? (
-            filteredRecent.map((title) => (
-              <button key={title} className={styles.sidebarRecentItem} onClick={() => onRecentClick(title)}>
+          {filteredSessions.length > 0 ? (
+            filteredSessions.map((session) => (
+              <button key={session.id} className={styles.sidebarRecentItem} onClick={() => onSessionClick(session.id)}>
                 <span className={styles.recentDot} />
-                {title}
+                <span className={styles.recentItemContent}>
+                  <span className={styles.recentItemTitle}>{session.title}</span>
+                  <span className={styles.recentItemTime}>{formatRelativeTime(session.updatedAt)}</span>
+                </span>
               </button>
             ))
           ) : (
-            <div className={styles.sidebarEmpty}>没有找到匹配记录</div>
+            <div className={styles.sidebarEmpty}>{searchQuery ? "没有找到匹配记录" : "还没有对话记录"}</div>
           )}
         </div>
 
@@ -291,7 +356,7 @@ function Sidebar({
       </aside>
 
       {/* Settings Modal */}
-      <FeatureModal
+      <WorkspaceModal
         open={showSettings}
         onClose={() => { setShowSettings(false); setShowClearConfirm(false); }}
         title="设置"
@@ -313,7 +378,7 @@ function Sidebar({
             <span className={styles.settingsItemValue}>{modelMode}</span>
           </button>
 
-          <button className={styles.settingsItem}>
+          <button className={styles.settingsItem} onClick={() => { onNavigate?.("profile"); onClose(); }}>
             <span className={styles.settingsItemIcon}>📍</span>
             <span className={styles.settingsItemContent}>
               <span className={styles.settingsItemLabel}>位置偏好</span>
@@ -330,10 +395,10 @@ function Sidebar({
             </span>
           </button>
         </div>
-      </FeatureModal>
+      </WorkspaceModal>
 
       {/* Clear Confirm Modal */}
-      <FeatureModal
+      <WorkspaceModal
         open={showClearConfirm}
         onClose={() => setShowClearConfirm(false)}
         title="清空本地记录"
@@ -355,7 +420,7 @@ function Sidebar({
             setShowSettings(false);
           }}
         />
-      </FeatureModal>
+      </WorkspaceModal>
     </>
   );
 }
@@ -372,6 +437,7 @@ interface ComposerProps {
   showMeta?: boolean;
   user?: SessionUser | null;
   city?: string;
+  onCityChange?: (city: string) => void;
   onOpenModal?: (key: ModalKey) => void;
   onToast?: (msg: string) => void;
   modelMode: ModelMode;
@@ -398,6 +464,7 @@ function Composer({
   showMeta,
   user,
   city,
+  onCityChange,
   onOpenModal,
   onToast,
   modelMode,
@@ -414,6 +481,9 @@ function Composer({
   const [plusOpen, setPlusOpen] = useState(false);
   const [modeOpen, setModeOpen] = useState(false);
   const [companionOpen, setCompanionOpen] = useState(false);
+  const [cityOpen, setCityOpen] = useState(false);
+  const [cityStep, setCityStep] = useState<"city" | "district">("city");
+  const [selectedCityName, setSelectedCityName] = useState<string>("");
 
   useEffect(() => {
     valueRef.current = value;
@@ -770,7 +840,13 @@ function Composer({
 
       {showMeta && (
         <div className={styles.composerMetaRow}>
-          <span className={styles.composerMetaItem}>📍 {city}</span>
+          <button
+            className={styles.composerMetaCity}
+            onClick={() => { setCityOpen(true); setCityStep("city"); setSelectedCityName(""); }}
+            title="选择城市和地区"
+          >
+            📍 {city}
+          </button>
           {user ? (
             <span className={styles.composerMetaItem}>
               👤 {user.name || "已登录"}
@@ -784,24 +860,82 @@ function Composer({
             </button>
           )}
           <span className={styles.composerMetaItem}></span>
+
+          {/* City Selector Modal */}
+          <WorkspaceModal
+            open={cityOpen}
+            onClose={() => setCityOpen(false)}
+            title={cityStep === "city" ? "选择城市" : `选择区域 — ${selectedCityName}`}
+            subtitle="用于规划路线、天气和附近地点"
+            width="sm"
+          >
+            {cityStep === "city" ? (
+              <div className={styles.cityGrid}>
+                {CITY_LIST.map((c) => (
+                  <button
+                    key={c}
+                    className={styles.cityGridItem}
+                    onClick={() => {
+                      setSelectedCityName(c);
+                      const districts = CITY_DISTRICTS[c];
+                      if (districts && districts.length > 0) {
+                        setCityStep("district");
+                      } else {
+                        onCityChange?.(c);
+                        setCityOpen(false);
+                      }
+                    }}
+                  >
+                    {c.replace("市", "")}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className={styles.cityGrid}>
+                <button
+                  className={`${styles.cityGridItem} ${styles.cityGridItemBack}`}
+                  onClick={() => setCityStep("city")}
+                >
+                  ← 返回选择城市
+                </button>
+                <button
+                  className={styles.cityGridItem}
+                  onClick={() => {
+                    onCityChange?.(selectedCityName);
+                    setCityOpen(false);
+                  }}
+                >
+                  {selectedCityName.replace("市", "")}（全市）
+                </button>
+                {CITY_DISTRICTS[selectedCityName]?.map((d) => (
+                  <button
+                    key={d}
+                    className={styles.cityGridItem}
+                    onClick={() => {
+                      onCityChange?.(`${selectedCityName.replace("市", "")} ${d}`);
+                      setCityOpen(false);
+                    }}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            )}
+          </WorkspaceModal>
         </div>
       )}
 
-      {/* Voice Panel — floating above composer */}
-      {voicePanelData && (
-        <div className={styles.voicePanel}>
-          <button
-            className={styles.voiceCloseBtn}
-            type="button"
-            aria-label="关闭"
-            onClick={() => {
-              if (isRecording && recognitionRef.current) recognitionRef.current.stop();
-              setVoiceState("idle");
-            }}
-          >
-            ×
-          </button>
-
+      {/* Voice Modal */}
+      <WorkspaceModal
+        open={!!voicePanelData}
+        onClose={() => {
+          if (isRecording && recognitionRef.current) recognitionRef.current.stop();
+          setVoiceState("idle");
+        }}
+        title={voicePanelData?.title ?? "语音输入"}
+        width="sm"
+      >
+        <div className={styles.voiceBody}>
           <div className={styles.voiceOrb}>
             {voiceState === "listening" || voiceState === "processing" ? (
               <><span /><span /><span /></>
@@ -814,48 +948,51 @@ function Composer({
             )}
           </div>
 
-          <div className={styles.voiceTitle}>{voicePanelData.title}</div>
-          <div className={styles.voiceHint}>{voicePanelData.desc}</div>
+          {voicePanelData && (
+            <>
+              <div className={styles.voiceDesc}>{voicePanelData.desc}</div>
 
-          <div className={styles.voiceActions}>
-            {voicePanelData.showStop && (
-              <button
-                className={styles.voiceStopBtn}
-                type="button"
-                onClick={() => {
-                  if (recognitionRef.current) recognitionRef.current.stop();
-                }}
-              >
-                停止
-              </button>
-            )}
-            {voicePanelData.showRetry && (
-              <button
-                className={styles.voiceRetryBtn}
-                type="button"
-                onClick={() => {
-                  setVoiceState("idle");
-                  requestAnimationFrame(() => toggleRecording());
-                }}
-              >
-                再试一次
-              </button>
-            )}
-            {voicePanelData.showClose && (
-              <button
-                className={styles.voiceCloseTextBtn}
-                type="button"
-                onClick={() => setVoiceState("idle")}
-              >
-                {voiceState === "no-speech" ? "关闭" : "知道了"}
-              </button>
-            )}
-          </div>
+              <div className={styles.voiceActions}>
+                {voicePanelData.showStop && (
+                  <button
+                    className={styles.voiceStopBtn}
+                    type="button"
+                    onClick={() => {
+                      if (recognitionRef.current) recognitionRef.current.stop();
+                    }}
+                  >
+                    停止
+                  </button>
+                )}
+                {voicePanelData.showRetry && (
+                  <button
+                    className={styles.voiceRetryBtn}
+                    type="button"
+                    onClick={() => {
+                      setVoiceState("idle");
+                      requestAnimationFrame(() => toggleRecording());
+                    }}
+                  >
+                    再试一次
+                  </button>
+                )}
+                {voicePanelData.showClose && (
+                  <button
+                    className={styles.voiceCloseTextBtn}
+                    type="button"
+                    onClick={() => setVoiceState("idle")}
+                  >
+                    {voiceState === "no-speech" ? "关闭" : "知道了"}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </div>
-      )}
+      </WorkspaceModal>
 
       {/* Companion Selection Modal */}
-      <FeatureModal
+      <WorkspaceModal
         open={companionOpen}
         onClose={() => setCompanionOpen(false)}
         title="选择同行人"
@@ -874,7 +1011,7 @@ function Composer({
             </button>
           ))}
         </div>
-      </FeatureModal>
+      </WorkspaceModal>
     </div>
   );
 }
@@ -884,10 +1021,16 @@ function PlanCardView({
   plan,
   selected,
   onSelect,
+  planActions,
+  onExecuteAction,
+  busyActionId,
 }: {
   plan: PlanningOption;
   selected: boolean;
   onSelect: (id: string) => void;
+  planActions?: PlanningExecutableAction[];
+  onExecuteAction?: (action: PlanningExecutableAction) => void;
+  busyActionId?: string | null;
 }) {
   return (
     <div className={styles.planCard}>
@@ -944,6 +1087,40 @@ function PlanCardView({
           {selected ? "✓ 已选择" : "选这套"}
         </button>
       </div>
+
+      {/* Compact action chips */}
+      {planActions && planActions.length > 0 && (
+        <div className={styles.actionDock}>
+          {planActions.map((action) => (
+            <button
+              key={action.id}
+              className={styles.actionChipBtn}
+              disabled={action.status !== "waiting_confirm" || busyActionId === action.id}
+              onClick={() => onExecuteAction?.(action)}
+            >
+              <span className={styles.actionChipIcon}>{
+                action.type === "book_hotel" ? "🏨" :
+                action.type === "book_restaurant" ? "🍽️" :
+                action.type === "book_transport" ? "🚆" :
+                action.type === "buy_ticket" ? "🎫" :
+                action.type === "reserve_activity" ? "🎯" :
+                action.type === "add_to_calendar" ? "📅" :
+                action.type === "set_reminder" ? "⏰" : "✅"
+              }</span>
+              <span className={styles.actionChipBody}>
+                <span className={styles.actionChipTitle}>{action.title}</span>
+                {action.description && <span className={styles.actionChipDesc}>{action.description}</span>}
+              </span>
+              {action.priceEstimate && (
+                <span className={styles.actionChipPrice}>{action.priceEstimate}</span>
+              )}
+              {busyActionId === action.id && (
+                <span className={styles.actionChipStatus} style={{ color: "#E6A817" }}>…</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -997,7 +1174,7 @@ function ErrorCardView({
       </div>
 
       {/* Startup Instructions Modal */}
-      <FeatureModal
+      <WorkspaceModal
         open={showHint}
         onClose={() => setShowHint(false)}
         title="本地服务启动说明"
@@ -1036,7 +1213,7 @@ function ErrorCardView({
             知道了
           </button>
         </div>
-      </FeatureModal>
+      </WorkspaceModal>
     </>
   );
 }
@@ -1044,13 +1221,6 @@ function ErrorCardView({
 /* ═══════════════════════════════════════════════
    Main Component
    ═══════════════════════════════════════════════ */
-
-const EXAMPLE_PROMPTS = [
-  "明天带娃半天，预算 300",
-  "朋友来上海，找小众路线",
-  "下雨天室内好去处",
-  "纪念日约会西餐路线",
-];
 
 const HERO_PHRASES = [
   "周末去哪儿",
@@ -1076,6 +1246,12 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
   const [searchQuery, setSearchQuery] = useState("");
   const [drafts, setDrafts] = useState<string[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const conversationIdRef = useRef<string | null>(null);
+  const [backendSessions, setBackendSessions] = useState<ConversationItem[]>([]);
+  const [busyActionId, setBusyActionId] = useState<string | null>(null);
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [typedText, setTypedText] = useState("");
   const [isTyping, setIsTyping] = useState(true);
@@ -1083,9 +1259,12 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const composerDockRef = useRef<HTMLDivElement>(null);
   const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const city = location?.city || user?.city || "选择城市";
+  const [selectedCity, setSelectedCity] = useState<string | null>(null);
+  const city = selectedCity || location?.city || user?.city || "选择城市";
 
   /* ── Typewriter effect for hero title ── */
   useEffect(() => {
@@ -1138,6 +1317,20 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
         setFavorites(JSON.parse(savedFavorites));
       } catch {}
     }
+    // Load sessions from localStorage as fallback
+    const savedSessions = localStorage.getItem("pg_chat_sessions");
+    if (savedSessions) {
+      try {
+        setChatSessions(JSON.parse(savedSessions));
+      } catch {}
+    }
+
+    // Load conversations from backend
+    listConversations({ limit: 30 })
+      .then((convs) => {
+        if (convs.length > 0) setBackendSessions(convs);
+      })
+      .catch(() => {});
   }, []);
 
   // Save modelMode to localStorage when changed
@@ -1145,10 +1338,30 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
     localStorage.setItem("pg_model_mode", modelMode);
   }, [modelMode]);
 
-  /* ── Scroll to bottom helper ── */
+  // Save chat sessions to localStorage when changed
+  useEffect(() => {
+    if (chatSessions.length > 0) {
+      localStorage.setItem("pg_chat_sessions", JSON.stringify(chatSessions));
+    }
+  }, [chatSessions]);
+
+  // Auto-sync messages → current session
+  useEffect(() => {
+    if (!currentSessionId || messages.length === 0) return;
+    setChatSessions((prev) =>
+      prev.map((s) =>
+        s.id === currentSessionId
+          ? { ...s, messages, updatedAt: new Date().toISOString() }
+          : s,
+      ),
+    );
+  }, [messages, currentSessionId]);
+
+  /* ── Scroll to bottom helper (use scrollTop to avoid ancestor scroll) ── */
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      const el = messagesContainerRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
     });
   }, []);
 
@@ -1158,6 +1371,11 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
       .then((r) => setHealthOk(r.ok))
       .catch(() => setHealthOk(false));
   }, []);
+
+  /* ── Sync conversationId ref ── */
+  useEffect(() => {
+    conversationIdRef.current = conversationId;
+  }, [conversationId]);
 
   /* ── Auto-scroll when messages change ── */
   useEffect(() => {
@@ -1198,6 +1416,21 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
       setIsBusy(true);
       setPhase("understanding");
 
+      // Create new session if needed
+      if (!currentSessionId) {
+        const sid = uuid();
+        const newSession: ChatSession = {
+          id: sid,
+          title: prompt.length > 20 ? prompt.slice(0, 20) + "…" : prompt,
+          messages: [],
+          city,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        setCurrentSessionId(sid);
+        setChatSessions((prev) => [newSession, ...prev]);
+      }
+
       // 1) Add user message
       const userMsg: ChatMessage = {
         id: uuid(),
@@ -1220,6 +1453,9 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
       };
       addMessage(thinkingMsg);
 
+      // Track event
+      apiTrackEvent({ eventName: "send_planning_prompt", payload: { prompt, city, modelMode }, page: "features" }).catch(() => {});
+
       // 3) Call API
       try {
         setPhase("planning");
@@ -1228,7 +1464,19 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
           city,
           companions: "family",
           modelMode: toApiModelMode(modelMode),
+          conversationId: conversationIdRef.current ?? undefined,
         });
+
+        // Store conversationId from backend
+        if (result.conversationId) {
+          setConversationId(result.conversationId);
+          conversationIdRef.current = result.conversationId;
+        }
+
+        // Refresh backend sessions list
+        listConversations({ limit: 30 }).then(setBackendSessions).catch(() => {});
+
+        apiTrackEvent({ eventName: "planning_success", payload: { conversationId: result.conversationId, planId: result.planId }, page: "features" }).catch(() => {});
 
         // 确保 options 数组存在且不为空
         if (result.options && result.options.length > 0) {
@@ -1263,6 +1511,8 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
           chips: undefined,
         });
         setPhase("error");
+        apiTrackEvent({ eventName: "planning_failed", payload: { error: errorMsg }, page: "features" }).catch(() => {});
+        reportClientError({ message: errorMsg, route: "/api/agent/plan" }).catch(() => {});
       } finally {
         setIsBusy(false);
       }
@@ -1299,17 +1549,10 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
     (planId: string) => {
       setSelectedPlanId(planId);
       setPhase("selected");
-      const actionMsg: ChatMessage = {
-        id: uuid(),
-        role: "assistant",
-        content: "这套方案可以继续处理以下事项，你想先做哪一步？",
-        status: "success",
-        createdAt: new Date().toISOString(),
-      };
-      addMessage(actionMsg);
-      scrollToBottom();
+      // Plan card auto-expands with action chips — no extra message needed
+      apiTrackEvent({ eventName: "select_plan", payload: { planId, conversationId }, page: "features" }).catch(() => {});
     },
-    [addMessage, scrollToBottom],
+    [conversationId],
   );
 
   const handleRetryLast = useCallback(() => {
@@ -1323,9 +1566,56 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
     setPhase("idle");
     setInputValue("");
     setSelectedPlanId(null);
+    setCurrentSessionId(null);
+    setConversationId(null);
+    conversationIdRef.current = null;
     setSidebarOpen(false);
     requestAnimationFrame(() => textareaRef.current?.focus());
   }, []);
+
+  const handleSessionClick = useCallback(async (sessionId: string) => {
+    // Try to load from backend first
+    try {
+      const detail = await getConversation(sessionId);
+      if (detail && detail.messages.length > 0) {
+        const loadedMessages: ChatMessage[] = detail.messages.map((m) => ({
+          id: m.id,
+          role: m.role as "user" | "assistant",
+          content: m.content,
+          createdAt: m.createdAt,
+        }));
+        setCurrentSessionId(sessionId);
+        setConversationId(sessionId);
+        conversationIdRef.current = sessionId;
+        setMessages(loadedMessages);
+        setMode("chat");
+        setPhase("result");
+        setSelectedPlanId(null);
+        setSidebarOpen(false);
+        setInputValue("");
+        return;
+      }
+    } catch {
+      // fall through to localStorage
+    }
+
+    // Fallback: localStorage sessions
+    const session = chatSessions.find((s) => s.id === sessionId);
+    if (!session) return;
+    setCurrentSessionId(sessionId);
+    setMessages(session.messages);
+    setMode("chat");
+    const lastAssistant = [...session.messages].reverse().find((m) => m.role === "assistant");
+    if (lastAssistant && "status" in lastAssistant && lastAssistant.status === "success") {
+      setPhase("result");
+    } else {
+      setPhase("idle");
+    }
+    setSelectedPlanId(null);
+    setSidebarOpen(false);
+    setInputValue("");
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }, [chatSessions]);
 
   /* ── Return to home ── */
   const handleReturnHome = useCallback(() => {
@@ -1376,33 +1666,140 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
         break;
       case "favorites":
         if (favorites.length === 0) {
-          addMessage({
-            id: uuid(),
-            role: "assistant",
-            content: "还没有收藏方案，生成方案后可以收藏。",
-            status: "success",
-            createdAt: new Date().toISOString(),
-          });
-          setMode("chat");
+          setToast("还没有收藏方案，生成方案后可以收藏 ⭐");
         } else {
-          addMessage({
-            id: uuid(),
-            role: "assistant",
-            content: `已收藏 ${favorites.length} 个方案：\n${favorites.map((f, i) => `${i + 1}. ${f}`).join("\n")}`,
-            status: "success",
-            createdAt: new Date().toISOString(),
-          });
-          setMode("chat");
+          onNavigate?.("profile");
         }
         break;
     }
-  }, [handleNewChat, drafts, favorites, addMessage]);
+  }, [handleNewChat, drafts, favorites, setToast, onNavigate]);
 
-  const handleRecentClick = useCallback((title: string) => {
-    setInputValue(title);
-    setSidebarOpen(false);
-    requestAnimationFrame(() => textareaRef.current?.focus());
-  }, []);
+  /* ── Action handlers ── */
+  const handleExecuteAction = useCallback(
+    async (action: PlanningExecutableAction) => {
+      apiTrackEvent({ eventName: "confirm_action", payload: { actionId: action.id, type: action.type, title: action.title }, page: "features" }).catch(() => {});
+
+      // Backend actions that need API call
+      const backendTypes = ["book_hotel", "book_restaurant", "book_transport", "buy_ticket", "reserve_activity"];
+      if (backendTypes.includes(action.type)) {
+        setBusyActionId(action.id);
+        try {
+          const result = await confirmExecAction(action.id);
+          setToast(result.message || `${action.title}：操作成功`);
+          // Update action status in messages
+          setMessages((prev) =>
+            prev.map((msg) => {
+              if (!msg.actions) return msg;
+              return {
+                ...msg,
+                actions: msg.actions.map((a) =>
+                  a.id === action.id ? { ...a, status: result.status || "done" } : a
+                ),
+              };
+            })
+          );
+        } catch (err) {
+          setToast(`操作失败：${err instanceof Error ? err.message : "未知错误"}`);
+        } finally {
+          setBusyActionId(null);
+        }
+        return;
+      }
+
+      // Local actions
+      switch (action.type) {
+        case "navigation": {
+          const dest = action.description || city;
+          window.open(`https://uri.amap.com/search?keyword=${encodeURIComponent(dest)}&city=${encodeURIComponent(city)}`, "_blank");
+          setToast("已打开导航");
+          break;
+        }
+        case "calendar_event":
+        case "add_to_calendar": {
+          const now = new Date();
+          const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (6 - now.getDay() || 7), 14, 0);
+          const end = new Date(start.getTime() + 3 * 3600_000);
+          const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+          const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(action.title)}&dates=${fmt(start)}/${fmt(end)}&details=${encodeURIComponent(action.description)}`;
+          window.open(url, "_blank");
+          setToast("已打开日历");
+          break;
+        }
+        case "share_message": {
+          const shareData = { title: action.title, text: action.description };
+          if (navigator.share) {
+            navigator.share(shareData).catch(() => {});
+          } else {
+            navigator.clipboard.writeText(`${action.title}\n${action.description}`).then(() => setToast("已复制到剪贴板"));
+          }
+          break;
+        }
+        case "set_reminder":
+        case "restaurant_reservation":
+        case "ticket_lock":
+          setToast(`${action.title}：${action.description}`);
+          break;
+        case "memory_save":
+          addMemory({ category: "preference", title: action.title, detail: action.description, weight: 0.5 })
+            .then(() => setToast("已保存到记忆"))
+            .catch(() => setToast("保存失败"));
+          break;
+        default:
+          setToast(action.title);
+      }
+    },
+    [city, setToast, addMemory],
+  );
+
+  const handleNextAction = useCallback(
+    (label: string) => {
+      switch (label) {
+        case "保存方案":
+          if (selectedPlanId) {
+            selectPlan(selectedPlanId)
+              .then(() => setToast("方案已保存"))
+              .catch(() => setToast("保存失败"));
+          } else {
+            setToast("请先选择一个方案");
+          }
+          break;
+        case "生成日历": {
+          const plan = messages.flatMap((m) => (m.role === "assistant" && "plans" in m ? m.plans ?? [] : [])).find((p) => p.id === selectedPlanId);
+          const title = plan?.title ?? "周末出行计划";
+          const now = new Date();
+          const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (6 - now.getDay() || 7), 14, 0);
+          const end = new Date(start.getTime() + 3 * 3600_000);
+          const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+          window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${fmt(start)}/${fmt(end)}`, "_blank");
+          setToast("已打开日历");
+          break;
+        }
+        case "分享给同行人": {
+          const plan = messages.flatMap((m) => (m.role === "assistant" && "plans" in m ? m.plans ?? [] : [])).find((p) => p.id === selectedPlanId);
+          const text = plan ? `${plan.title}\n${plan.summary ?? ""}` : "来看看这个周末计划！";
+          if (navigator.share) {
+            navigator.share({ title: "周末有谱", text }).catch(() => {});
+          } else {
+            navigator.clipboard.writeText(text).then(() => setToast("已复制到剪贴板"));
+          }
+          break;
+        }
+        case "查看预约建议":
+          setToast("预约建议已展示在上方执行操作卡片中");
+          break;
+        case "打开导航": {
+          const plan = messages.flatMap((m) => (m.role === "assistant" && "plans" in m ? m.plans ?? [] : [])).find((p) => p.id === selectedPlanId);
+          const dest = plan?.title ?? city;
+          window.open(`https://uri.amap.com/search?keyword=${encodeURIComponent(dest)}&city=${encodeURIComponent(city)}`, "_blank");
+          setToast("已打开导航");
+          break;
+        }
+        default:
+          setToast(label);
+      }
+    },
+    [selectedPlanId, messages, city, setToast],
+  );
 
   /* ── Render: message content ── */
   const renderMessageContent = useCallback(
@@ -1456,67 +1853,26 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
                   <div className={styles.resultSummary}>{msg.content}</div>
                 )}
 
-                {/* Plan cards */}
+                {/* Plan cards with embedded action chips */}
                 {msg.plans && msg.plans.length > 0 && (
                   <div className={styles.planCards}>
-                    {msg.plans.map((plan) => (
-                      <PlanCardView
-                        key={plan.id}
-                        plan={plan}
-                        selected={selectedPlanId === plan.id}
-                        onSelect={handleSelectPlan}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {/* Executable actions */}
-                {msg.actions && msg.actions.length > 0 && (
-                  <div className={styles.actionCards}>
-                    {msg.actions.map((action) => (
-                      <div key={action.id} className={styles.actionCard}>
-                        <div className={styles.actionCardTitle}>
-                          {action.title}
-                        </div>
-                        <div className={styles.actionCardDesc}>
-                          {action.description}
-                        </div>
-                        {action.priceEstimate && (
-                          <div className={styles.actionCardPrice}>
-                            预估：{action.priceEstimate}
-                          </div>
-                        )}
-                        <div className={styles.actionCardActions}>
-                          <button
-                            className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
-                            onClick={() => setToast(`${action.title}将在后续版本中推出`)}
-                          >
-                            {action.status === "waiting_confirm" ? "确认" : "查看"}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Next action chips */}
-                {phase === "selected" && (
-                  <div className={styles.nextActionChips}>
-                    {[
-                      "保存方案",
-                      "生成日历",
-                      "分享给同行人",
-                      "查看预约建议",
-                      "打开导航",
-                    ].map((label) => (
-                      <button
-                        key={label}
-                        className={styles.nextActionChip}
-                        onClick={() => setToast(`${label}将在后续版本中推出`)}
-                      >
-                        {label}
-                      </button>
-                    ))}
+                    {msg.plans.map((plan) => {
+                      // Group actions by planId for this plan
+                      const planActions = (msg.actions || []).filter(
+                        (a) => a.planId === plan.id
+                      );
+                      return (
+                        <PlanCardView
+                          key={plan.id}
+                          plan={plan}
+                          selected={selectedPlanId === plan.id}
+                          onSelect={handleSelectPlan}
+                          planActions={planActions}
+                          onExecuteAction={handleExecuteAction}
+                          busyActionId={busyActionId}
+                        />
+                      );
+                    })}
                   </div>
                 )}
               </>
@@ -1525,7 +1881,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
         </div>
       );
     },
-    [phase, handleRetryLast, handleNewChat, handleSelectPlan, setToast],
+    [selectedPlanId, handleRetryLast, handleNewChat, handleSelectPlan, setToast, handleExecuteAction, busyActionId],
   );
 
   /* ═══════════════════════════════════════════════
@@ -1550,13 +1906,15 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
         onClose={() => setSidebarOpen(false)}
         onNewChat={handleNewChat}
         onNavItemClick={handleNavItemClick}
-        onRecentClick={handleRecentClick}
+        chatSessions={chatSessions}
+        onSessionClick={handleSessionClick}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         modelMode={modelMode}
         onModelModeChange={setModelMode}
         onToast={(msg) => setToast(msg)}
         onReturnHome={handleReturnHome}
+        onNavigate={onNavigate}
       />
 
       {/* Main area */}
@@ -1596,6 +1954,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
               showMeta
               user={user}
               city={city}
+              onCityChange={setSelectedCity}
               onOpenModal={onOpenModal}
               onToast={setToast}
               modelMode={modelMode}
@@ -1607,7 +1966,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
             )}
 
             <div className={styles.featureChips}>
-              {EXAMPLE_PROMPTS.map((p) => (
+              {SUGGESTION_PROMPTS.map((p) => (
                 <button
                   key={p}
                   className={styles.featureChip}
@@ -1631,7 +1990,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
         ) : (
           /* ── Chat: messages + docked composer ── */
           <div className={styles.featureChat}>
-            <div className={styles.featureMessages}>
+            <div className={styles.featureMessages} ref={messagesContainerRef}>
               <div className={styles.featureMessagesInner}>
                 {messages.map((msg) => (
                   <div key={msg.id}>{renderMessageContent(msg)}</div>
@@ -1640,7 +1999,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
               </div>
             </div>
 
-            <div className={styles.featureComposerDock}>
+            <div className={styles.featureComposerDock} ref={composerDockRef}>
               <Composer
                 compact
                 textareaRef={textareaRef}
@@ -1650,6 +2009,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
                 disabled={isBusy}
                 user={user}
                 city={city}
+                onCityChange={setSelectedCity}
                 onOpenModal={onOpenModal}
                 onToast={setToast}
                 modelMode={modelMode}
@@ -1664,7 +2024,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
       </main>
 
       {/* 返回官网确认弹窗 */}
-      <FeatureModal
+      <WorkspaceModal
         open={showReturnConfirm}
         onClose={() => setShowReturnConfirm(false)}
         title="离开规划工作区？"
@@ -1679,7 +2039,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
           onConfirm={handleConfirmReturnHome}
           onCancel={() => setShowReturnConfirm(false)}
         />
-      </FeatureModal>
+      </WorkspaceModal>
     </section>
   );
 }

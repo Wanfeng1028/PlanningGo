@@ -3,6 +3,8 @@
    One-screen fixed layout: sidebar + main (idle / chat)
    ═══════════════════════════════════════════════════════════ */
 
+@use "sass:color";
+
 $brand: #ffcc33;
 $text: #1a1a2e;
 $text-secondary: #6b7280;
@@ -20,6 +22,12 @@ $green: #22c55e;
   display: flex;
   background: linear-gradient(180deg, #faf8f4 0%, #f3efe7 100%);
   animation: featureShellEnter 520ms cubic-bezier(.2,.8,.2,1) both;
+
+  /* Override global :focus-visible — use soft glow instead of hard outline */
+  :focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(255, 199, 44, 0.18);
+  }
 }
 
 /* ─────────────────────────────────────────────
@@ -85,7 +93,7 @@ $green: #22c55e;
   cursor: pointer;
   transition: background 0.15s;
 
-  &:hover { background: darken($brand, 8%); }
+  &:hover { background: color.adjust($brand, $lightness: -8%); }
 }
 
 .featureBannerDismissBtn {
@@ -125,7 +133,7 @@ $green: #22c55e;
   width: 30px;
   height: 30px;
   border-radius: 10px;
-  background: linear-gradient(135deg, $brand, darken($brand, 12%));
+  background: linear-gradient(135deg, $brand, color.adjust($brand, $lightness: -12%));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -271,7 +279,7 @@ $green: #22c55e;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 12px;
+  padding: 8px 12px;
   border-radius: 8px;
   font-size: 13px;
   font-weight: 400;
@@ -297,6 +305,28 @@ $green: #22c55e;
     background: rgba($text, 0.15);
     flex-shrink: 0;
   }
+}
+
+.recentItemContent {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recentItemTitle {
+  font-size: 13px;
+  font-weight: 500;
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recentItemTime {
+  font-size: 11px;
+  color: rgba($text, 0.35);
 }
 
 /* ── sidebar: footer ── */
@@ -394,9 +424,10 @@ $green: #22c55e;
   flex: 1;
   min-width: 0;
   min-height: 0;
-  height: 100%;
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── ambient decorations (absolute, no layout) ── */
@@ -625,7 +656,7 @@ $green: #22c55e;
 .featureHome {
   position: relative;
   z-index: 5;
-  height: 100%;
+  flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -643,7 +674,7 @@ $green: #22c55e;
   line-height: 1.15;
   text-align: center;
   margin-bottom: 10px;
-  background: linear-gradient(135deg, $text, lighten($text, 18%));
+  background: linear-gradient(135deg, $text, color.adjust($text, $lightness: 18%));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -731,7 +762,7 @@ $green: #22c55e;
   position: relative;
   z-index: 5;
   width: 100%;
-  height: 100%;
+  flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -744,9 +775,12 @@ $green: #22c55e;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 24px 16px clamp(150px, 22vh, 210px);
-  display: flex;
-  flex-direction: column;
+  overscroll-behavior: contain;
+  padding-top: clamp(32px, 6vh, 72px);
+  padding-left: 16px;
+  padding-right: 16px;
+  padding-bottom: clamp(160px, 22vh, 280px);
+  scroll-padding-bottom: clamp(160px, 22vh, 280px);
   scrollbar-width: thin;
   scrollbar-color: rgba($text, 0.12) transparent;
 
@@ -763,29 +797,25 @@ $green: #22c55e;
 }
 
 .featureMessagesInner {
-  width: min(820px, 100%);
+  width: min(960px, 100%);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-/* ── composer dock (absolute bottom) ── */
+/* ── composer dock (absolute floating) ── */
 .featureComposerDock {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: clamp(48px, 7vh, 82px);
-  z-index: 20;
-  padding: 12px 16px 16px;
+  left: 50%;
+  bottom: clamp(36px, 6vh, 72px);
+  transform: translateX(-50%);
+  z-index: 30;
+  width: min(760px, calc(100% - 48px));
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  background: linear-gradient(0deg, #f5f1ea 50%, rgba(#f5f1ea, 0));
-  pointer-events: none;
-
-  > * {
-    pointer-events: auto;
-  }
 }
 
 /* ─────────────────────────────────────────────
@@ -904,8 +934,7 @@ $green: #22c55e;
   }
 
   &:focus-visible {
-    outline: 2px solid rgba(255, 199, 44, 0.55);
-    outline-offset: 3px;
+    box-shadow: 0 0 0 3px rgba(255, 199, 44, 0.25);
   }
 }
 
@@ -914,7 +943,7 @@ $green: #22c55e;
   padding: 0 18px;
   border-radius: 999px;
   border: none;
-  background: linear-gradient(135deg, $brand, darken($brand, 8%));
+  background: linear-gradient(135deg, $brand, color.adjust($brand, $lightness: -8%));
   color: $text;
   font-size: 13px;
   font-weight: 700;
@@ -1012,11 +1041,81 @@ $green: #22c55e;
   }
 }
 
+.composerMetaCity {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  color: rgba($text, 0.4);
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: background 0.15s, color 0.15s;
+
+  &:hover {
+    background: rgba($brand, 0.1);
+    color: rgba($text, 0.7);
+  }
+}
+
+/* ── city selector grid ── */
+.cityGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.cityGridItem {
+  height: 44px;
+  border-radius: 14px;
+  border: 1px solid rgba($text, 0.08);
+  background: rgba(255, 255, 255, 0.76);
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba($text, 0.82);
+  cursor: pointer;
+  text-align: center;
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease, border-color 180ms ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(28, 25, 18, 0.08);
+    background: rgba($brand, 0.1);
+    border-color: rgba($brand, 0.25);
+    color: $text;
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+.cityGridItemBack {
+  grid-column: 1 / -1;
+  height: 36px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba($text, 0.5);
+  border: none;
+  background: transparent;
+  padding: 6px 4px;
+
+  &:hover {
+    color: $text;
+    background: transparent;
+  }
+}
+
 /* ── composer toast ── */
 .composerToast {
   font-size: 12px;
   color: $text-secondary;
   padding: 0 10px 4px;
+  white-space: nowrap;
   animation: featureFadeIn 0.2s ease-out;
 }
 
@@ -1134,17 +1233,19 @@ $green: #22c55e;
 .messageUser {
   display: flex;
   justify-content: flex-end;
+  padding: 0;
 }
 
 .messageUserBubble {
   max-width: 70%;
-  padding: 12px 18px;
-  border-radius: 22px 22px 4px 22px;
-  background: rgba($brand, 0.12);
-  border: 1px solid rgba($brand, 0.2);
-  backdrop-filter: blur(12px);
+  padding: 14px 20px;
+  border-radius: 18px 18px 4px 18px;
+  background: linear-gradient(135deg, #FFF3E0 0%, #FFE9B8 100%);
+  border: 1px solid rgba(#E6A817, 0.2);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
   color: $text;
   font-size: 14.5px;
+  font-weight: 400;
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
@@ -1154,16 +1255,20 @@ $green: #22c55e;
 .messageAssistant {
   display: flex;
   justify-content: flex-start;
+  padding: 0;
 }
 
 .messageAssistantBubble {
-  max-width: 86%;
-  padding: 14px 20px;
-  border-radius: 24px 24px 24px 4px;
+  max-width: 100%;
+  padding: 16px 20px;
+  border-radius: 4px 18px 18px 18px;
   background: rgba(255, 255, 255, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  box-shadow: 0 4px 20px rgba($text, 0.04);
+  border: 1px solid rgba($brand, 0.08);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    0 0 0 1px rgba($brand, 0.04);
   backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   color: $text;
   font-size: 14.5px;
   line-height: 1.65;
@@ -1242,13 +1347,28 @@ $green: #22c55e;
 }
 
 .planCard {
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 6px 24px rgba($text, 0.05);
-  backdrop-filter: blur(16px);
-  padding: 18px 20px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(247,241,231,0.9) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 8px 32px rgba($text, 0.06), 0 2px 8px rgba($text, 0.03);
+  backdrop-filter: blur(20px);
+  padding: 22px 24px;
   cursor: default;
+  transition: border-color 0.25s, box-shadow 0.25s, transform 0.2s;
+
+  &:hover {
+    box-shadow: 0 12px 40px rgba($text, 0.08), 0 4px 12px rgba($text, 0.04);
+    transform: translateY(-2px);
+  }
+}
+
+.planCardSelected {
+  border-color: rgba($brand, 0.4);
+  background: linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(255,245,220,0.95) 100%);
+  box-shadow:
+    0 8px 32px rgba($text, 0.06),
+    0 0 0 3px rgba($brand, 0.15),
+    inset 0 1px 0 rgba($brand, 0.1);
 }
 
 .planCardTitle {
@@ -1268,15 +1388,34 @@ $green: #22c55e;
 .planCardTimeline {
   padding-left: 16px;
   margin-bottom: 10px;
+  list-style: none;
 
   li {
     font-size: 13px;
-    color: rgba($text, 0.7);
-    line-height: 1.6;
+    color: rgba($text, 0.75);
+    line-height: 1.7;
     padding-left: 6px;
+    position: relative;
 
-    &::marker {
-      color: $brand;
+    &::before {
+      content: "";
+      position: absolute;
+      left: -12px;
+      top: 8px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: $brand;
+    }
+
+    & + li::after {
+      content: "";
+      position: absolute;
+      left: -9.5px;
+      top: 14px;
+      width: 1px;
+      height: calc(100% - 6px);
+      background: rgba($brand, 0.2);
     }
   }
 }
@@ -1289,29 +1428,30 @@ $green: #22c55e;
 }
 
 .planMetaTag {
-  padding: 3px 10px;
+  padding: 4px 12px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .planMetaTagBudget {
-  background: rgba($brand, 0.12);
-  color: darken($brand, 25%);
+  background: linear-gradient(135deg, rgba($brand, 0.15) 0%, rgba($brand, 0.08) 100%);
+  color: color.adjust($brand, $lightness: -25%);
 }
 
 .planMetaTagRoute {
-  background: rgba($text, 0.05);
+  background: rgba($text, 0.04);
   color: $text-secondary;
 }
 
 .planMetaTagRisk {
-  background: rgba(#ef4444, 0.08);
+  background: linear-gradient(135deg, rgba(#ef4444, 0.1) 0%, rgba(#ef4444, 0.05) 100%);
   color: #dc2626;
 }
 
 .planMetaTagDefault {
-  background: rgba($text, 0.04);
+  background: linear-gradient(135deg, rgba($text, 0.06) 0%, rgba($text, 0.03) 100%);
   color: $text-secondary;
 }
 
@@ -1323,7 +1463,7 @@ $green: #22c55e;
 
 /* ── action buttons (shared) ── */
 .actionBtn {
-  padding: 8px 18px;
+  padding: 10px 22px;
   border-radius: 999px;
   font-size: 13px;
   font-weight: 600;
@@ -1331,7 +1471,8 @@ $green: #22c55e;
   border: none;
   transition:
     filter 0.15s,
-    transform 0.1s;
+    transform 0.1s,
+    box-shadow 0.2s;
 
   &:active {
     transform: scale(0.97);
@@ -1339,10 +1480,13 @@ $green: #22c55e;
 }
 
 .actionBtnPrimary {
-  background: $brand;
+  background: linear-gradient(135deg, $brand 0%, color.adjust($brand, $lightness: -8%) 100%);
   color: $text;
+  box-shadow: 0 2px 8px rgba($brand, 0.25);
+
   &:hover {
     filter: brightness(0.95);
+    box-shadow: 0 4px 12px rgba($brand, 0.35);
   }
 }
 
@@ -1381,70 +1525,85 @@ $green: #22c55e;
   }
 }
 
-/* ── action cards ── */
-.actionCards {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 4px;
-}
-
-.actionCard {
-  padding: 16px 18px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow: 0 4px 16px rgba($text, 0.04);
-  backdrop-filter: blur(12px);
-}
-
-.actionCardTitle {
-  font-size: 14px;
-  font-weight: 600;
-  color: $text;
-  margin-bottom: 4px;
-}
-
-.actionCardDesc {
-  font-size: 13px;
-  color: $text-secondary;
-  line-height: 1.5;
-  margin-bottom: 8px;
-}
-
-.actionCardPrice {
-  font-size: 12px;
-  font-weight: 700;
-  color: $text;
-  margin-bottom: 10px;
-}
-
-.actionCardStatus {
-  font-size: 12px;
-  font-weight: 700;
-  margin-bottom: 8px;
-
-  &.actionCardStatusQuoted {
-    color: $brand;
-  }
-  &.actionCardStatusExecuting {
-    color: #3b82f6;
-  }
-  &.actionCardStatusSuccess {
-    color: $green;
-  }
-  &.actionCardStatusFailed {
-    color: #ef4444;
-  }
-  &.actionCardStatusCancelled {
-    color: $text-secondary;
-  }
-}
-
-.actionCardActions {
+/* ── action dock (compact chips inside plan card) ── */
+.actionDock {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba($text, 0.06);
+}
+
+.actionChipBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba($brand, 0.15);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: all 0.15s;
+  max-width: 100%;
+
+  &:hover:not(:disabled) {
+    border-color: rgba($brand, 0.35);
+    background: rgba($brand, 0.06);
+    box-shadow: 0 2px 8px rgba($brand, 0.08);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.actionChipIcon {
+  font-size: 18px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.actionChipBody {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  text-align: left;
+}
+
+.actionChipTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: $text;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.actionChipDesc {
+  font-size: 11px;
+  color: $text-secondary;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.actionChipPrice {
+  font-size: 11px;
+  color: $brand;
+  font-weight: 600;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.actionChipStatus {
+  font-size: 11px;
+  font-weight: 500;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* ── error card ── */
@@ -1488,32 +1647,6 @@ $green: #22c55e;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-/* ── next action chips ── */
-.nextActionChips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.nextActionChip {
-  padding: 7px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba($text, 0.08);
-  background: rgba(255, 255, 255, 0.6);
-  font-size: 12px;
-  font-weight: 500;
-  color: $text-secondary;
-  cursor: pointer;
-  transition: all 0.15s;
-
-  &:hover {
-    border-color: rgba($brand, 0.3);
-    color: $text;
-    background: rgba($brand, 0.06);
-  }
 }
 
 /* ─────────────────────────────────────────────
@@ -1623,69 +1756,19 @@ $green: #22c55e;
   position: relative;
 }
 
-/* ── Voice Panel — floating above composer ── */
-.voicePanel {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 16px);
-  transform: translateX(-50%);
-  width: min(360px, calc(100vw - 32px));
-  padding: 22px 24px 20px;
-  border-radius: 28px;
-  background:
-    radial-gradient(circle at 30% 10%, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.78)),
-    rgba(255, 250, 238, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.86);
-  box-shadow:
-    0 24px 70px rgba(25, 20, 10, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(22px) saturate(150%);
-  -webkit-backdrop-filter: blur(22px) saturate(150%);
-  z-index: 90;
+/* ── Voice Modal Body ── */
+.voiceBody {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  animation: voicePanelIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-@keyframes voicePanelIn {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(8px) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0) scale(1);
-  }
-}
-
-.voiceCloseBtn {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: none;
-  background: rgba($text, 0.05);
-  color: $text-secondary;
-  font-size: 16px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.12s;
-
-  &:hover {
-    background: rgba($text, 0.1);
-  }
+  padding: 8px 0;
 }
 
 .voiceOrb {
-  width: 64px;
-  height: 64px;
-  margin: 0 auto 14px;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 18px;
   border-radius: 999px;
   background: rgba($brand, 0.18);
   display: flex;
@@ -1729,19 +1812,11 @@ $green: #22c55e;
   }
 }
 
-.voiceTitle {
-  font-size: 16px;
-  font-weight: 700;
-  color: $text;
-  margin-bottom: 4px;
-}
-
-.voiceHint {
-  font-size: 12px;
+.voiceDesc {
+  font-size: 14px;
   color: $text-secondary;
   line-height: 1.5;
-  margin-bottom: 16px;
-  max-width: 280px;
+  margin-bottom: 20px;
 }
 
 .voiceActions {

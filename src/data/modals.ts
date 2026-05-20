@@ -109,4 +109,13 @@ export const modalContent: Record<ModalContent["key"], ModalContent> = {
     secondary: "查看日志",
     bullets: ["凭证只会展示一次，请妥善保存", "支持回调测试与结果校验", "也能查看最近一次失败原因"],
   },
+  developerComingSoon: {
+    key: "developerComingSoon",
+    eyebrow: "开发者中心",
+    title: "开发者模式",
+    body: "开发者模式稍后开放，敬请期待。我们正在精心打磨 API 管理、Webhook 和调试工具等能力，上线后会第一时间通知你。",
+    primary: "知道了",
+    secondary: "返回首页",
+    bullets: ["API Key 与 Webhook 管理", "请求日志与沙箱调试", "开放平台接入与文档"],
+  },
 };

@@ -78,6 +78,68 @@
   letter-spacing: 0.04em;
 }
 
+/* ─── Carousel ─── */
+.carouselDots {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.carouselDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  border: none;
+  background: var(--color-border);
+  cursor: pointer;
+  transition: background 180ms var(--ease-out), transform 180ms var(--ease-out);
+}
+
+.carouselDot:hover {
+  background: var(--color-text-secondary);
+}
+
+.carouselDotActive {
+  width: 24px;
+  background: var(--color-brand);
+}
+
+.carouselArrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 4;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 180ms var(--ease-out), color 180ms var(--ease-out), border-color 180ms var(--ease-out), box-shadow 180ms var(--ease-out);
+  box-shadow: var(--shadow-xs);
+}
+
+.carouselArrow:hover {
+  background: var(--color-surface-warm);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+.carouselArrowLeft {
+  left: -52px;
+}
+
+.carouselArrowRight {
+  right: -52px;
+}
+
 /* ─── Header ─── */
 .authHeader {
   position: relative;
@@ -715,6 +777,19 @@
 
   .authTitle {
     font-size: 24px;
+  }
+
+  .carouselArrow {
+    width: 36px;
+    height: 36px;
+  }
+
+  .carouselArrowLeft {
+    left: 8px;
+  }
+
+  .carouselArrowRight {
+    right: 8px;
   }
 
   .guestPills {

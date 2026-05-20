@@ -50,10 +50,110 @@ interface MemoryPermission {
   developerEnabled: boolean;
 }
 
+interface MemoryNotificationPrefs {
+  userId: string;
+  departureReminder: boolean;
+  reservationReminder: boolean;
+  shareFeedback: boolean;
+  weatherAlert: boolean;
+  planExpiry: boolean;
+  emailEnabled: boolean;
+  browserEnabled: boolean;
+  calendarEnabled: boolean;
+}
+
 const users = new Map<string, MemoryUser>();
 const tokens = new Map<string, MemoryRefreshToken>();
 const profiles = new Map<string, MemoryProfile>();
 const permissions = new Map<string, MemoryPermission>();
+const notifPrefs = new Map<string, MemoryNotificationPrefs>();
+
+// ── 新增：对话/消息/执行动作/事件/错误 日志 ──
+
+interface MemoryGuestSession {
+  guestId: string;
+  city: string;
+  createdAt: Date;
+  expiresAt: Date;
+}
+
+interface MemoryConversation {
+  id: string;
+  userId: string | null;
+  guestId: string | null;
+  title: string;
+  city: string;
+  modelMode: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface MemoryMessage {
+  id: string;
+  conversationId: string;
+  role: string;
+  content: string;
+  payloadJson: any | null;
+  createdAt: Date;
+}
+
+interface MemoryExecAction {
+  id: string;
+  planId: string;
+  type: string;
+  title: string;
+  description: string;
+  status: string;
+  priceEstimate: string | null;
+  metadata: any;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface MemoryPlan {
+  id: string;
+  userId: string;
+  conversationId: string | null;
+  status: string;
+  title: string;
+  summary: string;
+  favorite: boolean;
+  options: any[];
+  execActions: MemoryExecAction[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface MemoryUserEvent {
+  id: string;
+  userId: string | null;
+  guestId: string | null;
+  conversationId: string | null;
+  eventName: string;
+  eventPayloadJson: any;
+  page: string;
+  traceId: string;
+  createdAt: Date;
+}
+
+interface MemoryErrorLog {
+  id: string;
+  userId: string | null;
+  guestId: string | null;
+  traceId: string;
+  route: string;
+  message: string;
+  stack: string | null;
+  payloadJson: any | null;
+  createdAt: Date;
+}
+
+const guestSessions = new Map<string, MemoryGuestSession>();
+const conversations = new Map<string, MemoryConversation>();
+const messages = new Map<string, MemoryMessage[]>();
+const memPlans = new Map<string, MemoryPlan>();
+const userEvents: MemoryUserEvent[] = [];
+const errorLogs: MemoryErrorLog[] = [];
 
 // ── 预置演示账号 ──
 const DEMO_USER_ID = "demo_user_001";
@@ -221,6 +321,29 @@ export function upsertPermissions(userId: string, data: Partial<MemoryPermission
   return perm;
 }
 
+// ── 通知偏好操作 ──
+
+export function getNotificationPrefs(userId: string): MemoryNotificationPrefs {
+  return notifPrefs.get(userId) ?? {
+    userId,
+    departureReminder: true,
+    reservationReminder: true,
+    shareFeedback: true,
+    weatherAlert: true,
+    planExpiry: true,
+    emailEnabled: false,
+    browserEnabled: true,
+    calendarEnabled: false,
+  };
+}
+
+export function upsertNotificationPrefs(userId: string, data: Partial<MemoryNotificationPrefs>): MemoryNotificationPrefs {
+  const existing = getNotificationPrefs(userId);
+  const prefs: MemoryNotificationPrefs = { ...existing, ...data, userId };
+  notifPrefs.set(userId, prefs);
+  return prefs;
+}
+
 // ── 完整登录流程 ──
 
 export async function login(email: string, password: string, meta?: { userAgent?: string; ipAddress?: string }) {
@@ -343,4 +466,258 @@ export function getFullProfile(userId: string) {
       developer: perm.developerEnabled,
     },
   };
+}
+
+// ═══════════════════════════════════════════════════
+// Guest Sessions
+// ═══════════════════════════════════════════════════
+
+export function upsertGuestSession(guestId: string, city?: string): MemoryGuestSession {
+  const existing = guestSessions.get(guestId);
+  if (existing) {
+    if (city) existing.city = city;
+    return existing;
+  }
+  const gs: MemoryGuestSession = {
+    guestId,
+    city: city ?? "北京",
+    createdAt: new Date(),
+    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+  };
+  guestSessions.set(guestId, gs);
+  return gs;
+}
+
+export function getGuestSession(guestId: string): MemoryGuestSession | undefined {
+  return guestSessions.get(guestId);
+}
+
+// ═══════════════════════════════════════════════════
+// Conversations
+// ═══════════════════════════════════════════════════
+
+export function createConversation(data: {
+  userId?: string | null;
+  guestId?: string | null;
+  title?: string;
+  city?: string;
+  modelMode?: string;
+}): MemoryConversation {
+  const conv: MemoryConversation = {
+    id: randomUUID(),
+    userId: data.userId ?? null,
+    guestId: data.guestId ?? null,
+    title: data.title ?? "新规划",
+    city: data.city ?? "北京",
+    modelMode: data.modelMode ?? "flash",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  conversations.set(conv.id, conv);
+  messages.set(conv.id, []);
+  return conv;
+}
+
+export function getConversation(id: string): MemoryConversation | undefined {
+  return conversations.get(id);
+}
+
+export function listConversations(opts: {
+  userId?: string;
+  guestId?: string;
+  limit?: number;
+}): MemoryConversation[] {
+  const limit = opts.limit ?? 50;
+  return Array.from(conversations.values())
+    .filter((c) => {
+      if (opts.userId && c.userId === opts.userId) return true;
+      if (opts.guestId && c.guestId === opts.guestId) return true;
+      return false;
+    })
+    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+    .slice(0, limit);
+}
+
+export function updateConversationTitle(id: string, title: string): void {
+  const conv = conversations.get(id);
+  if (conv) {
+    conv.title = title;
+    conv.updatedAt = new Date();
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// Messages
+// ═══════════════════════════════════════════════════
+
+export function addMessage(data: {
+  conversationId: string;
+  role: string;
+  content: string;
+  payloadJson?: any;
+}): MemoryMessage {
+  const msg: MemoryMessage = {
+    id: randomUUID(),
+    conversationId: data.conversationId,
+    role: data.role,
+    content: data.content,
+    payloadJson: data.payloadJson ?? null,
+    createdAt: new Date(),
+  };
+  const list = messages.get(data.conversationId) ?? [];
+  list.push(msg);
+  messages.set(data.conversationId, list);
+  // Update conversation updatedAt
+  const conv = conversations.get(data.conversationId);
+  if (conv) conv.updatedAt = new Date();
+  return msg;
+}
+
+export function listMessages(conversationId: string): MemoryMessage[] {
+  return messages.get(conversationId) ?? [];
+}
+
+// ═══════════════════════════════════════════════════
+// Plans (memory mode)
+// ═══════════════════════════════════════════════════
+
+export function createPlan(data: {
+  userId: string;
+  conversationId?: string;
+  title: string;
+  summary?: string;
+  options?: any[];
+  execActions?: MemoryExecAction[];
+}): MemoryPlan {
+  const plan: MemoryPlan = {
+    id: randomUUID(),
+    userId: data.userId,
+    conversationId: data.conversationId ?? null,
+    status: "completed",
+    title: data.title,
+    summary: data.summary ?? "",
+    favorite: false,
+    options: data.options ?? [],
+    execActions: data.execActions ?? [],
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  memPlans.set(plan.id, plan);
+  return plan;
+}
+
+export function getPlan(id: string): MemoryPlan | undefined {
+  return memPlans.get(id);
+}
+
+export function listPlans(opts: {
+  userId?: string;
+  conversationId?: string;
+  favoritesOnly?: boolean;
+  limit?: number;
+}): MemoryPlan[] {
+  const limit = opts.limit ?? 50;
+  return Array.from(memPlans.values())
+    .filter((p) => {
+      if (opts.userId && p.userId !== opts.userId) return false;
+      if (opts.conversationId && p.conversationId !== opts.conversationId) return false;
+      if (opts.favoritesOnly && !p.favorite) return false;
+      return true;
+    })
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, limit);
+}
+
+export function togglePlanFavorite(id: string): boolean | null {
+  const plan = memPlans.get(id);
+  if (!plan) return null;
+  plan.favorite = !plan.favorite;
+  plan.updatedAt = new Date();
+  return plan.favorite;
+}
+
+// ═══════════════════════════════════════════════════
+// Execution Actions (memory mode)
+// ═══════════════════════════════════════════════════
+
+export function updateExecActionStatus(
+  id: string,
+  status: string,
+): MemoryExecAction | null {
+  for (const plan of memPlans.values()) {
+    const action = plan.execActions.find((a) => a.id === id);
+    if (action) {
+      action.status = status;
+      action.updatedAt = new Date();
+      return action;
+    }
+  }
+  return null;
+}
+
+export function getExecAction(id: string): MemoryExecAction | null {
+  for (const plan of memPlans.values()) {
+    const action = plan.execActions.find((a) => a.id === id);
+    if (action) return action;
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════════════
+// User Events
+// ═══════════════════════════════════════════════════
+
+export function trackEvent(data: {
+  userId?: string | null;
+  guestId?: string | null;
+  conversationId?: string | null;
+  eventName: string;
+  eventPayloadJson?: any;
+  page?: string;
+  traceId?: string;
+}): MemoryUserEvent {
+  const evt: MemoryUserEvent = {
+    id: randomUUID(),
+    userId: data.userId ?? null,
+    guestId: data.guestId ?? null,
+    conversationId: data.conversationId ?? null,
+    eventName: data.eventName,
+    eventPayloadJson: data.eventPayloadJson ?? {},
+    page: data.page ?? "",
+    traceId: data.traceId ?? "",
+    createdAt: new Date(),
+  };
+  userEvents.push(evt);
+  // Cap at 5000 entries
+  if (userEvents.length > 5000) userEvents.splice(0, userEvents.length - 5000);
+  return evt;
+}
+
+// ═══════════════════════════════════════════════════
+// Client Error Logs
+// ═══════════════════════════════════════════════════
+
+export function logClientError(data: {
+  userId?: string | null;
+  guestId?: string | null;
+  traceId?: string;
+  route?: string;
+  message: string;
+  stack?: string | null;
+  payloadJson?: any;
+}): MemoryErrorLog {
+  const log: MemoryErrorLog = {
+    id: randomUUID(),
+    userId: data.userId ?? null,
+    guestId: data.guestId ?? null,
+    traceId: data.traceId ?? "",
+    route: data.route ?? "",
+    message: data.message,
+    stack: data.stack ?? null,
+    payloadJson: data.payloadJson ?? null,
+    createdAt: new Date(),
+  };
+  errorLogs.push(log);
+  if (errorLogs.length > 2000) errorLogs.splice(0, errorLogs.length - 2000);
+  return log;
 }

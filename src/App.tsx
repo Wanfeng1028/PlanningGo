@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { AuthModal } from "./components/AuthModal";
 import { BottomTabs } from "./components/BottomTabs";
+import { ComingSoonModal } from "./components/ComingSoonModal";
 import { Modal } from "./components/Modal";
 import { NavBar } from "./components/NavBar";
 import { PageTransition } from "./components/PageTransition";
@@ -11,7 +12,6 @@ import { CasesPage } from "./pages/CasesPage";
 import DevelopersPage from "./pages/DevelopersPage";
 import FeaturesPage from "./pages/FeaturesPage";
 import { HomePage } from "./pages/HomePage";
-import { ProfileGatePage } from "./pages/ProfileGatePage";
 import { ProfilePage } from "./pages/ProfilePage";
 import styles from "./App.module.scss";
 import pageStyles from "./pages/Pages.module.scss";
@@ -53,7 +53,7 @@ export function App() {
   };
 
   const handleAuthRequiredNavigate = (key: NavKey) => {
-    if (!user) {
+    if (!user && key !== "home") {
       setPendingAfterAuth(key);
       setAuthRedirectTo(null);
       setModal("login");
@@ -207,7 +207,12 @@ export function App() {
         return <DevelopersPage onOpenModal={openModal} user={user} />;
 
       case "profile":
-        return user ? (
+        if (!user) {
+          // 未登录时弹出认证弹窗，不渲染 ProfileGatePage
+          handleAuthRequiredNavigate("profile");
+          return null;
+        }
+        return (
           <ProfilePage
             user={user}
             onOpenModal={openModal}
@@ -218,8 +223,6 @@ export function App() {
               setAuthRedirectTo(null);
             }}
           />
-        ) : (
-          <ProfileGatePage onNavigate={setActive} onOpenModal={openModal} />
         );
 
       default:
@@ -244,7 +247,7 @@ export function App() {
       {!isFeatureWorkspace && (
         <NavBar
           active={active}
-          onNavigate={setActive}
+          onNavigate={handleAuthRequiredNavigate}
           onOpenModal={openModal}
           user={user}
           onRequestLocation={handleRequestLocation}
@@ -273,7 +276,7 @@ export function App() {
       <main
         className={isFeatureWorkspace ? styles.workspaceMain : styles.pageMain}
       >
-        <PageTransition pageKey={active}>{page}</PageTransition>
+        {isFeatureWorkspace ? page : <PageTransition pageKey={active}>{page}</PageTransition>}
       </main>
 
       {!isFeatureWorkspace && (
@@ -283,7 +286,7 @@ export function App() {
         </footer>
       )}
 
-      {!isFeatureWorkspace && <BottomTabs active={active} onNavigate={setActive} />}
+      {!isFeatureWorkspace && <BottomTabs active={active} onNavigate={handleAuthRequiredNavigate} user={user} onOpenModal={openModal} />}
 
       {isAuthModal(modal) ? (
         <AuthModal
@@ -292,8 +295,27 @@ export function App() {
           onSuccess={handleAuthSuccess}
           onSwitchMode={setModal}
         />
+      ) : modal === "developerComingSoon" ? (
+        <ComingSoonModal onClose={closeModal} />
       ) : (
-        <Modal modal={modal} onClose={closeModal} />
+        <Modal
+          modal={modal}
+          onClose={closeModal}
+          onPrimary={
+            modal === "location"
+              ? () => { handleRequestLocation(); closeModal(); }
+              : modal === "privacy" || modal === "apiKey"
+              ? () => { setActive("profile"); closeModal(); }
+              : undefined
+          }
+          onSecondary={
+            modal === "location"
+              ? () => { setActive("profile"); closeModal(); }
+              : modal === "privacy"
+              ? () => { setActive("profile"); closeModal(); }
+              : undefined
+          }
+        />
       )}
     </div>
   );

@@ -38,7 +38,8 @@
       "Bash(docker compose up *)",
       "Bash(start *)",
       "Bash(docker stop *)",
-      "Bash(pg_isready *)"
+      "Bash(pg_isready *)",
+      "Bash(docker exec *)"
     ]
   },
   "$version": 4

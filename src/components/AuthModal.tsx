@@ -8,6 +8,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Navigation,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "./Button";
 import { enterAsGuest, login, register, reverseGeocode } from "../lib/api";
@@ -68,6 +70,19 @@ const BUDGET_PRESETS = [
   { min: 300, max: 500, label: "300–500" },
   { min: 500, max: 1000, label: "500+" },
 ];
+
+/** 注册仅支持国内外主流邮箱 */
+const ALLOWED_EMAIL_DOMAINS = new Set([
+  // 国内
+  "qq.com", "163.com", "126.com", "yeah.net", "sina.com", "sohu.com",
+  "foxmail.com", "aliyun.com", "139.com", "189.cn",
+  // 国际
+  "gmail.com", "googlemail.com",
+  "outlook.com", "hotmail.com", "live.com", "msn.com",
+  "icloud.com", "me.com", "mac.com",
+  "yahoo.com", "yahoo.co.jp", "yahoo.co.uk",
+  "proton.me", "protonmail.com",
+]);
 
 export function AuthModal({
   mode,
@@ -153,6 +168,13 @@ export function AuthModal({
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
       setError("请输入正确的邮箱地址。");
       return false;
+    }
+    if (mode === "register") {
+      const domain = form.email.split("@")[1]?.toLowerCase();
+      if (!domain || !ALLOWED_EMAIL_DOMAINS.has(domain)) {
+        setError("注册仅支持 QQ、163、Gmail、Outlook、iCloud 等主流邮箱。");
+        return false;
+      }
     }
     if (form.password.length < 6) {
       setError("密码至少需要 6 位。");
@@ -256,6 +278,11 @@ export function AuthModal({
     setError("");
     if (onSwitchMode) onSwitchMode(target);
   };
+
+  const MODE_ORDER: AuthMode[] = ["guest", "login", "register"];
+  const modeIndex = MODE_ORDER.indexOf(mode);
+  const goPrev = () => switchTo(MODE_ORDER[(modeIndex - 1 + 3) % 3]);
+  const goNext = () => switchTo(MODE_ORDER[(modeIndex + 1) % 3]);
 
   // ── 定位权限提示层 ──
   const renderLocationLayer = () => {
@@ -427,6 +454,10 @@ export function AuthModal({
           ))}
         </div>
       </div>
+
+      <p style={{ fontSize: 12, color: "#9CA3AF", lineHeight: 1.5, textAlign: "center", margin: "8px 0 4px" }}>
+        我们会记录你的偏好与对话数据，以便为你提供个性化推荐。数据仅用于产品优化，绝不泄露给第三方。
+      </p>
 
       <Button type="submit" disabled={loading}>
         {loading ? "进入中…" : "以游客身份开始体验"}
@@ -610,6 +641,37 @@ export function AuthModal({
           onClick={onClose}
         >
           <X size={18} />
+        </button>
+
+        {/* ── 轮播指示器 ── */}
+        <div className={styles.carouselDots}>
+          {MODE_ORDER.map((m, i) => (
+            <button
+              key={m}
+              type="button"
+              className={`${styles.carouselDot} ${i === modeIndex ? styles.carouselDotActive : ""}`}
+              onClick={() => switchTo(m)}
+              aria-label={m === "guest" ? "游客体验" : m === "login" ? "登录" : "注册"}
+            />
+          ))}
+        </div>
+
+        {/* ── 轮播箭头 ── */}
+        <button
+          type="button"
+          className={`${styles.carouselArrow} ${styles.carouselArrowLeft}`}
+          onClick={goPrev}
+          aria-label="上一步"
+        >
+          <ChevronLeft size={20} />
+        </button>
+        <button
+          type="button"
+          className={`${styles.carouselArrow} ${styles.carouselArrowRight}`}
+          onClick={goNext}
+          aria-label="下一步"
+        >
+          <ChevronRight size={20} />
         </button>
 
         <span className={styles.modePill}>

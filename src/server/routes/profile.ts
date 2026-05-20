@@ -225,8 +225,16 @@ export async function registerProfileRoutes(app: FastifyInstance) {
 
     app.get("/api/profile/me/insights", { preHandler: [app.authGuard] }, async (_request, reply) => sendOk(reply, { insights: [] }));
     app.get("/api/profile/me/history", { preHandler: [app.authGuard] }, async (_request, reply) => sendOk(reply, { items: [], total: 0 }));
-    app.get("/api/notifications/preferences", { preHandler: [app.authGuard] }, async (_request, reply) => sendOk(reply, {}));
-    app.patch("/api/notifications/preferences", { preHandler: [app.authGuard] }, async (_request, reply) => sendOk(reply, {}));
+
+    app.get("/api/notifications/preferences", { preHandler: [app.authGuard] }, async (request, reply) => {
+      const userId = uid(request);
+      sendOk(reply, mem.getNotificationPrefs(userId));
+    });
+    app.patch("/api/notifications/preferences", { preHandler: [app.authGuard] }, async (request, reply) => {
+      const userId = uid(request);
+      const body = z.record(z.string(), z.boolean()).parse(request.body);
+      sendOk(reply, mem.upsertNotificationPrefs(userId, body));
+    });
 
     return;
   }

@@ -50,6 +50,8 @@ export async function registerRoutes(app: FastifyInstance) {
   await import("./routes/mock.js").then((m) => m.registerMockRoutes(app));
   await import("./routes/location.js").then((m) => m.registerLocationRoutes(app));
   await import("./routes/meituan.js").then((m) => m.registerMeituanRoutes(app));
+  await import("./routes/conversations.js").then((m) => m.registerConversationRoutes(app));
+  await import("./routes/events.js").then((m) => m.registerEventRoutes(app));
 
   app.get("/api/docs", async () => ({
     name: "PlanningGo API",

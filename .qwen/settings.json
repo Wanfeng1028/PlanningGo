@@ -39,7 +39,8 @@
       "Bash(start *)",
       "Bash(docker stop *)",
       "Bash(pg_isready *)",
-      "Bash(docker exec *)"
+      "Bash(docker exec *)",
+      "Bash(redis-cli *)"
     ]
   },
   "$version": 4

@@ -32,6 +32,10 @@ const envSchema = z.object({
 
   // ── 外部工具 ──
   AMAP_WEB_SERVICE_KEY: z.string().optional(),
+  AMAP_BASE_URL: z.string().url().default("https://restapi.amap.com"),
+  AMAP_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
+  AMAP_MAX_CALLS_FLASH: z.coerce.number().int().positive().default(8),
+  AMAP_MAX_CALLS_PRO: z.coerce.number().int().positive().default(16),
   QWEATHER_API_KEY: z.string().optional(),
 
   // ── 美团 OAuth（可选）──
@@ -41,6 +45,50 @@ const envSchema = z.object({
   MEITUAN_AUTH_URL: z.string().optional(),
   MEITUAN_TOKEN_URL: z.string().optional(),
   MEITUAN_USERINFO_URL: z.string().optional(),
+
+  // ── 执行引擎 ──
+  AUTO_EXECUTION_ENABLED: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true"),
+  AUTO_EXECUTION_MAX_ACTIONS: z.coerce.number().int().positive().default(6),
+  AUTO_EXECUTION_ALLOW_PAYMENT: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true"),
+  ACTION_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(15),
+
+  // ── 移动端接续 ──
+  PUBLIC_APP_URL: z.string().url().default("http://localhost:5173"),
+  HANDOFF_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(300),
+  HANDOFF_QR_ENABLED: z
+    .string()
+    .default("true")
+    .transform((v) => v === "true"),
+
+  // ── 可观测性 ──
+  ENABLE_TOOL_LOGS: z
+    .string()
+    .default("true")
+    .transform((v) => v === "true"),
+  ENABLE_USER_EVENTS: z
+    .string()
+    .default("true")
+    .transform((v) => v === "true"),
+  ENABLE_CLIENT_ERRORS: z
+    .string()
+    .default("true")
+    .transform((v) => v === "true"),
+
+  // ── Qwen（可选）──
+  QWEN_API_KEY: z.string().optional(),
+  QWEN_BASE_URL: z.string().url().default("https://dashscope.aliyuncs.com/compatible-mode/v1"),
+  QWEN_FLASH_MODEL: z.string().optional(),
+  QWEN_PRO_MODEL: z.string().optional(),
+  QWEN_ENABLE_THINKING: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true"),
 });
 
 export const env = envSchema.parse(process.env);

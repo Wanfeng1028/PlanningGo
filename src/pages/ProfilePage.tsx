@@ -48,7 +48,8 @@ import {
   getNotificationPreferences,
   updateNotificationPreferences,
   getPermissions,
-  updatePermission,
+  updatePermissions,
+  updatePersona,
   getSessions,
   revokeSession,
   getDeveloperDashboard,
@@ -256,7 +257,23 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
         setNotifications(Array.isArray(val) ? val : val?.items ?? val?.notifications ?? []);
       }
       if (prefData.status === "fulfilled") setNotifPrefs(prefData.value as NotificationPreferences);
-      if (permData.status === "fulfilled") setPermissions(permData.value as PermissionSettings);
+      if (permData.status === "fulfilled") {
+        setPermissions(permData.value as PermissionSettings);
+      } else {
+        // API 失败时从 localStorage 恢复
+        try {
+          const local = JSON.parse(localStorage.getItem("pg_permissions") || "{}");
+          if (Object.keys(local).length > 0) {
+            setPermissions({
+              locationEnabled: local.locationEnabled ?? false,
+              memoryEnabled: local.memoryEnabled ?? false,
+              calendarEnabled: local.calendarEnabled ?? false,
+              shareEnabled: local.shareEnabled ?? false,
+              developerEnabled: local.developerEnabled ?? false,
+            });
+          }
+        } catch {}
+      }
       if (sessData.status === "fulfilled") {
         const val = sessData.value as any;
         setSessions(Array.isArray(val) ? val : val?.sessions ?? []);
@@ -304,11 +321,27 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
 
   const handleSavePersona = async () => {
     try {
-      await updateAccount({
-        displayName: personaForm.displayName,
-        city: personaForm.city,
-        startPoint: personaForm.startPoint,
-      });
+      await Promise.all([
+        updateAccount({
+          displayName: personaForm.displayName,
+          city: personaForm.city,
+          startPoint: personaForm.startPoint,
+        }),
+        updatePersona({
+          city: personaForm.city,
+          startPoint: personaForm.startPoint,
+          transportMode: personaForm.transportMode,
+          distanceLimitKm: personaForm.distanceLimitKm,
+          pace: personaForm.pace,
+          riskPreference: personaForm.riskPreference,
+          budgetMin: personaForm.budgetMin,
+          budgetMax: personaForm.budgetMax,
+          dietPreference: personaForm.dietPreference,
+          avoidFoods: personaForm.avoidFoods,
+          activityTags: personaForm.activityTags,
+          avoidActivityTags: personaForm.avoidActivityTags,
+        }),
+      ]);
       flash("已保存");
       fetchBundle();
     } catch {
@@ -425,12 +458,26 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
 
   const handleTogglePerm = async (key: keyof PermissionSettings) => {
     if (!permissions) return;
-    const next = !permissions[key];
+    const prev = permissions[key];
+    const next = !prev;
+    // 乐观更新：先翻转 UI
+    setPermissions({ ...permissions, [key]: next });
     try {
-      await updatePermission(key, next);
-      setPermissions({ ...permissions, [key]: next });
+      await updatePermissions({ [key]: next });
+      flash("设置已保存");
     } catch {
-      // silent
+      // API 失败时回滚并保存到 localStorage
+      setPermissions((p) => (p ? { ...p, [key]: prev } : p));
+      try {
+        const local = JSON.parse(localStorage.getItem("pg_permissions") || "{}");
+        local[key] = next;
+        localStorage.setItem("pg_permissions", JSON.stringify(local));
+        // 恢复乐观更新
+        setPermissions((p) => (p ? { ...p, [key]: next } : p));
+        flash("已保存到本地");
+      } catch {
+        flash("设置失败，请重试");
+      }
     }
   };
 
@@ -804,6 +851,8 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
         <p className={styles.tabDesc}>AI 会根据你的记忆和偏好，给出个性化建议</p>
       </div>
 
+      {saveMsg && <span className={styles.saveSuccess}>{saveMsg}</span>}
+
       {insights.length > 0 && (
         <div className={styles.insightsGrid}>
           {insights.map((ins) => (
@@ -918,6 +967,8 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
         <h2 className={styles.tabTitle}>同行人</h2>
         <p className={styles.tabDesc}>管理家人、朋友的偏好，规划会自动适配</p>
       </div>
+
+      {saveMsg && <span className={styles.saveSuccess}>{saveMsg}</span>}
 
       {isGuest ? (
         <div className={styles.glassCard}>
@@ -1049,6 +1100,8 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
         <p className={styles.tabDesc}>查看历史规划，给好评帮助 AI 更懂你</p>
       </div>
 
+      {saveMsg && <span className={styles.saveSuccess}>{saveMsg}</span>}
+
       <div className={styles.historyList}>
         {history.length === 0 ? (
           <div className={styles.glassCard}>
@@ -1096,6 +1149,8 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
         <h2 className={styles.tabTitle}>通知中心</h2>
         <p className={styles.tabDesc}>管理通知和提醒偏好</p>
       </div>
+
+      {saveMsg && <span className={styles.saveSuccess}>{saveMsg}</span>}
 
       <div className={styles.glassCard}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
@@ -1161,12 +1216,14 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
                 <Toggle
                   active={notifPrefs[key]}
                   onToggle={async () => {
-                    const next = { ...notifPrefs, [key]: !notifPrefs[key] };
+                    const prev = notifPrefs[key];
+                    const next = { ...notifPrefs, [key]: !prev };
+                    setNotifPrefs(next);
                     try {
                       await updateNotificationPreferences(next);
-                      setNotifPrefs(next);
                     } catch {
-                      // silent
+                      setNotifPrefs((p) => (p ? { ...p, [key]: prev } : p));
+                      flash("设置失败，请重试");
                     }
                   }}
                 />
@@ -1184,6 +1241,8 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
         <h2 className={styles.tabTitle}>隐私与安全</h2>
         <p className={styles.tabDesc}>管理权限、会话和数据</p>
       </div>
+
+      {saveMsg && <span className={styles.saveSuccess}>{saveMsg}</span>}
 
       {permissions && (
         <div className={styles.glassCard}>
@@ -1267,111 +1326,12 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
         <p className={styles.tabDesc}>API Key、Webhook 和工具日志</p>
       </div>
 
-      {devMetrics.length > 0 && (
-        <div className={styles.devStatsGrid}>
-          {devMetrics.map((m) => (
-            <div key={m.label} className={styles.devStatCard}>
-              <div className={styles.devStatValue}>{m.value}</div>
-              <div className={styles.devStatLabel}>{m.label}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
       <div className={styles.glassCard}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <h3 className={styles.glassCardTitle} style={{ margin: 0 }}>API Keys</h3>
-          <Button size="small" onClick={handleCreateApiKey}>
-            <Plus size={14} /> 创建
-          </Button>
+        <div className={styles.registerCta}>
+          <Code2 size={48} />
+          <p className={styles.registerCtaTitle}>开发者模式</p>
+          <p className={styles.registerCtaDesc}>稍后开放，敬请期待</p>
         </div>
-
-        {newKeyReveal && (
-          <div className={styles.newKeyReveal}>
-            <strong>请保存你的新 Key（仅显示一次）：</strong>
-            <code>{newKeyReveal}</code>
-            <Button size="small" variant="ghost" onClick={() => handleCopyKey(newKeyReveal)}>
-              <Copy size={12} /> 复制
-            </Button>
-            <Button size="small" variant="ghost" onClick={() => setNewKeyReveal(null)}>
-              关闭
-            </Button>
-          </div>
-        )}
-
-        <div className={styles.apiKeyList}>
-          {apiKeys.map((k) => (
-            <div key={k.id} className={styles.apiKeyItem}>
-              <div className={styles.apiKeyInfo}>
-                <span className={styles.apiKeyName}>{k.name}</span>
-                <span className={styles.apiKeyPrefix}>{k.prefix}••••••••</span>
-              </div>
-              <span className={`${styles.apiKeyStatus} ${k.status === "revoked" ? styles.apiKeyStatusRevoked : ""}`}>
-                {k.status === "active" ? "活跃" : "已撤销"}
-              </span>
-              {k.status === "active" && (
-                <button type="button" className={styles.memoryActionBtn} onClick={() => handleRevokeApiKey(k.id)}>
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-          ))}
-          {apiKeys.length === 0 && <p style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>暂无 API Key</p>}
-        </div>
-      </div>
-
-      <div className={styles.glassCard}>
-        <h3 className={styles.glassCardTitle}>Webhooks</h3>
-        <div className={styles.webhookList}>
-          {webhooks.map((w) => (
-            <div key={w.id} className={styles.webhookItem}>
-              <div className={styles.webhookInfo}>
-                <div className={styles.webhookUrl}>{w.url}</div>
-                <div className={styles.webhookEvent}>{w.events.join(", ")}</div>
-              </div>
-              <span className={`${styles.webhookStatus} ${!w.enabled ? styles.webhookStatusFail : ""}`}>
-                {w.enabled ? "活跃" : "禁用"}
-              </span>
-              <div className={styles.webhookActions}>
-                <button type="button" className={styles.memoryActionBtn} onClick={() => replayWebhook(w.id)}>
-                  <RotateCw size={14} />
-                </button>
-                <button type="button" className={styles.memoryActionBtn} onClick={() => handleDeleteWebhook(w.id)}>
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </div>
-          ))}
-          {webhooks.length === 0 && <p style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>暂无 Webhook</p>}
-        </div>
-      </div>
-
-      <div className={styles.glassCard}>
-        <h3 className={styles.glassCardTitle}>工具日志</h3>
-        {toolLogs.length > 0 ? (
-          <table className={styles.toolLogTable}>
-            <thead>
-              <tr>
-                <th>工具</th>
-                <th>状态</th>
-                <th>延迟</th>
-                <th>时间</th>
-              </tr>
-            </thead>
-            <tbody>
-              {toolLogs.map((log) => (
-                <tr key={log.id}>
-                  <td>{log.toolName}</td>
-                  <td className={log.status === "ok" ? styles.logStatusOk : styles.logStatusErr}>{log.status}</td>
-                  <td>{log.latencyMs}ms</td>
-                  <td>{timeAgo(log.createdAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>暂无日志</p>
-        )}
       </div>
     </RevealGroup>
   );

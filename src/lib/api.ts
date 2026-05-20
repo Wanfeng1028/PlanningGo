@@ -88,8 +88,8 @@ export async function checkHealth(): Promise<HealthCheckResult> {
     if (!response.ok) {
       return { ok: false, error: `服务返回 ${response.status}` };
     }
-    const body = (await response.json()) as { ok?: boolean; service?: string };
-    return { ok: body.ok === true, service: body.service };
+    const body = (await response.json()) as { ok?: boolean; status?: string; service?: string };
+    return { ok: body.ok === true || body.status === "ok", service: body.service };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return { ok: false, error: msg };
@@ -217,7 +217,7 @@ export async function enterAsGuest(profile: GuestProfileInput): Promise<AuthResp
 export async function changePassword(input: { currentPassword: string; newPassword: string }) {
   return apiJson("/api/auth/change-password", {
     method: "POST",
-    body: JSON.stringify(input),
+    body: JSON.stringify({ oldPassword: input.currentPassword, newPassword: input.newPassword }),
   });
 }
 
@@ -282,6 +282,7 @@ export interface PlanningExecutableAction {
 export interface PlanningResult {
   traceId: string;
   planId: string;
+  conversationId?: string;
   summary: string;
   selectedPlanId: string;
   options: PlanningOption[];
@@ -296,6 +297,8 @@ export async function requestPlanning(input: {
   companions?: "family" | "friends" | "couple" | "solo";
   budget?: number;
   modelMode?: "flash" | "pro";
+  conversationId?: string;
+  guestId?: string;
 }): Promise<PlanningResult> {
   return apiJson<PlanningResult>("/api/agent/plan", {
     method: "POST",
@@ -366,13 +369,6 @@ export async function createReservation(input: { type: string; title: string; st
 
 export async function advanceExecution() {
   return apiJson<{ traceId: string; steps: unknown[] }>("/api/execution/advance", { method: "POST" });
-}
-
-export async function updatePermission(key: string, allowed: boolean) {
-  return apiJson<Record<string, boolean>>("/api/profile/demo/permissions", {
-    method: "PATCH",
-    body: JSON.stringify({ key, allowed }),
-  });
 }
 
 export async function createShareRoom(input: { planId: string; title: string; members: Array<{ name: string; vote?: string; comment?: string }> }) {
@@ -731,4 +727,144 @@ export interface ReverseGeocodeResult {
 
 export async function reverseGeocode(lat: number, lng: number): Promise<ReverseGeocodeResult> {
   return apiJson<ReverseGeocodeResult>(`/api/location/reverse-geocode?lat=${lat}&lng=${lng}`);
+}
+
+// ═══════════════════════════════════════════════════
+// Conversations API
+// ═══════════════════════════════════════════════════
+
+export interface ConversationItem {
+  id: string;
+  userId: string | null;
+  guestId: string | null;
+  title: string;
+  city: string;
+  modelMode: string;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { messages: number; plans: number };
+}
+
+export interface MessageItem {
+  id: string;
+  conversationId: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  payloadJson?: any;
+  createdAt: string;
+}
+
+export interface ConversationDetail extends ConversationItem {
+  messages: MessageItem[];
+  plans: any[];
+}
+
+export async function createConversation(input?: {
+  title?: string;
+  city?: string;
+  modelMode?: string;
+  guestId?: string;
+}): Promise<ConversationItem> {
+  return apiJson<ConversationItem>("/api/conversations", {
+    method: "POST",
+    body: JSON.stringify(input ?? {}),
+  });
+}
+
+export async function listConversations(opts?: {
+  guestId?: string;
+  limit?: number;
+}): Promise<ConversationItem[]> {
+  const params = new URLSearchParams();
+  if (opts?.guestId) params.set("guestId", opts.guestId);
+  if (opts?.limit) params.set("limit", String(opts.limit));
+  const qs = params.toString();
+  return apiJson<ConversationItem[]>(`/api/conversations${qs ? "?" + qs : ""}`);
+}
+
+export async function getConversation(id: string): Promise<ConversationDetail> {
+  return apiJson<ConversationDetail>(`/api/conversations/${id}`);
+}
+
+export async function addConversationMessage(
+  conversationId: string,
+  role: "user" | "assistant" | "system",
+  content: string,
+  payloadJson?: any,
+): Promise<MessageItem> {
+  return apiJson<MessageItem>(`/api/conversations/${conversationId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ role, content, payloadJson }),
+  });
+}
+
+export async function listConversationMessages(conversationId: string): Promise<MessageItem[]> {
+  return apiJson<MessageItem[]>(`/api/conversations/${conversationId}/messages`);
+}
+
+// ═══════════════════════════════════════════════════
+// Plans Favorites API
+// ═══════════════════════════════════════════════════
+
+export async function togglePlanFavorite(planId: string): Promise<{ id: string; favorite: boolean }> {
+  return apiJson(`/api/plans/${planId}/favorite`, { method: "POST" });
+}
+
+export async function listFavoritePlans(): Promise<any[]> {
+  return apiJson<any[]>("/api/plans/favorites");
+}
+
+// ═══════════════════════════════════════════════════
+// Execution Actions API (confirm/cancel)
+// ═══════════════════════════════════════════════════
+
+export async function confirmExecAction(actionId: string): Promise<any> {
+  return apiJson(`/api/actions/${actionId}/confirm`, { method: "POST" });
+}
+
+export async function cancelExecAction(actionId: string): Promise<any> {
+  return apiJson(`/api/actions/${actionId}/cancel`, { method: "POST" });
+}
+
+// ═══════════════════════════════════════════════════
+// Events & Error Logging API
+// ═══════════════════════════════════════════════════
+
+export async function trackEvent(input: {
+  eventName: string;
+  payload?: any;
+  page?: string;
+  guestId?: string;
+  conversationId?: string;
+}): Promise<{ id: string }> {
+  return apiJson("/api/events", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function trackEventBatch(events: Array<{
+  eventName: string;
+  payload?: any;
+  page?: string;
+  guestId?: string;
+  conversationId?: string;
+}>): Promise<{ ids: string[]; count: number }> {
+  return apiJson("/api/events/batch", {
+    method: "POST",
+    body: JSON.stringify({ events }),
+  });
+}
+
+export async function reportClientError(input: {
+  message: string;
+  stack?: string;
+  route?: string;
+  guestId?: string;
+  payload?: any;
+}): Promise<{ id: string }> {
+  return apiJson("/api/client-errors", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }

@@ -7,9 +7,11 @@ import styles from "./Modal.module.scss";
 interface ModalProps {
   modal: ModalKey | null;
   onClose: () => void;
+  onPrimary?: () => void;
+  onSecondary?: () => void;
 }
 
-export function Modal({ modal, onClose }: ModalProps) {
+export function Modal({ modal, onClose, onPrimary, onSecondary }: ModalProps) {
   if (!modal) {
     return null;
   }
@@ -45,8 +47,8 @@ export function Modal({ modal, onClose }: ModalProps) {
             ))}
           </ul>
           <div className={styles.actions}>
-            <Button onClick={onClose}>{content.primary}</Button>
-            <Button variant="ghost" onClick={onClose}>
+            <Button onClick={onPrimary ?? onClose}>{content.primary}</Button>
+            <Button variant="ghost" onClick={onSecondary ?? onClose}>
               {content.secondary}
             </Button>
           </div>
