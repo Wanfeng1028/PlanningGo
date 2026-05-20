@@ -214,7 +214,7 @@ export async function registerAgentRoutes(app: FastifyInstance) {
               conversationId,
               role: "assistant",
               content: result.summary ?? "已完成规划",
-              payloadJson: assistantPayload,
+              payloadJson: assistantPayload as any,
             },
           });
         } catch {

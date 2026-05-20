@@ -55,6 +55,20 @@ export const modalContent: Record<ModalContent["key"], ModalContent> = {
     secondary: "手动输入",
     bullets: ["当前默认出发点：徐家汇", "推荐活动区域：衡山路与周边街区", "手机端会以底部弹层方式呈现"],
   },
+  locationError: {
+    key: "locationError",
+    eyebrow: "定位失败",
+    title: "无法获取你的位置",
+    body: "定位功能暂时不可用，可能是以下原因导致。你可以选择手动设置城市，或者稍后重试定位。",
+    primary: "重新定位",
+    secondary: "手动设置城市",
+    bullets: [
+      "浏览器未授予定位权限，请在地址栏允许位置访问",
+      "设备 GPS 功能未开启或信号较弱",
+      "网络连接不稳定，无法完成定位请求",
+      "浏览器不支持定位功能（建议使用 Chrome、Edge 或 Safari）",
+    ],
+  },
   reservation: {
     key: "reservation",
     eyebrow: "预约确认",

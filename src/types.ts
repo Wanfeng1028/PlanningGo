@@ -9,6 +9,7 @@ export type ModalKey =
   | "contact"
   | "identity"
   | "location"
+  | "locationError"
   | "reservation"
   | "ticket"
   | "payment"

@@ -25,6 +25,8 @@ import {
   ConfirmActions,
 } from "../components/FeatureModal";
 import { WorkspaceModal } from "../components/WorkspaceModal";
+import { GlassToast, useGlassToast } from "../components/GlassToast";
+import { Button } from "../components/Button";
 import type { ModalKey, NavKey, SessionUser } from "../types";
 import styles from "./FeaturesPage.module.scss";
 
@@ -168,21 +170,6 @@ function formatRelativeTime(isoStr: string): string {
    Sub-components
    ═══════════════════════════════════════════════ */
 
-/* ── Inline Toast ── */
-function InlineToast({
-  message,
-  onDone,
-}: {
-  message: string;
-  onDone: () => void;
-}) {
-  useEffect(() => {
-    const t = setTimeout(onDone, 2800);
-    return () => clearTimeout(t);
-  }, [onDone]);
-  return <div className={styles.composerToast}>{message}</div>;
-}
-
 /* ── Ambient Background ── */
 function AmbientBackground() {
   return (
@@ -237,7 +224,6 @@ function Sidebar({
   onSearchChange,
   modelMode,
   onModelModeChange,
-  onToast,
   onReturnHome,
   onNavigate,
 }: {
@@ -253,7 +239,6 @@ function Sidebar({
   onSearchChange: (q: string) => void;
   modelMode: ModelMode;
   onModelModeChange: (mode: ModelMode) => void;
-  onToast: (msg: string) => void;
   onReturnHome?: () => void;
   onNavigate?: (key: NavKey) => void;
 }) {
@@ -366,7 +351,6 @@ function Sidebar({
           <button className={styles.settingsItem} onClick={() => {
             const next = modelMode === "Flash" ? "Pro" : "Flash";
             onModelModeChange(next);
-            onToast(`已切换为 ${next} 模式`);
           }}>
             <span className={styles.settingsItemIcon}>🤖</span>
             <span className={styles.settingsItemContent}>
@@ -415,7 +399,6 @@ function Sidebar({
           onConfirm={() => {
             localStorage.removeItem("pg_drafts");
             localStorage.removeItem("pg_favorites");
-            onToast("本地记录已清空");
             setShowClearConfirm(false);
             setShowSettings(false);
           }}
@@ -439,9 +422,9 @@ interface ComposerProps {
   city?: string;
   onCityChange?: (city: string) => void;
   onOpenModal?: (key: ModalKey) => void;
-  onToast?: (msg: string) => void;
   modelMode: ModelMode;
   onModelModeChange: (mode: ModelMode) => void;
+  onToast?: (text: string, type?: "success" | "error" | "info") => void;
 }
 
 /* ── Speech Recognition typings ── */
@@ -466,9 +449,9 @@ function Composer({
   city,
   onCityChange,
   onOpenModal,
-  onToast,
   modelMode,
   onModelModeChange,
+  onToast,
 }: ComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -522,7 +505,6 @@ function Composer({
       setAttachments((prev) => {
         const next = [...prev, ...newItems];
         if (next.length > 9) {
-          onToast?.("最多附加 9 个文件");
           return next.slice(0, 9);
         }
         return next;
@@ -530,7 +512,7 @@ function Composer({
 
       e.target.value = "";
     },
-    [onToast],
+    [],
   );
 
   const handleRemoveAttachment = useCallback((id: string) => {
@@ -674,7 +656,7 @@ function Composer({
   const handleModeSelect = useCallback((mode: ModelMode) => {
     onModelModeChange(mode);
     setModeOpen(false);
-    onToast?.(`已切换为 ${mode} 模式`);
+    onToast?.(`已切换到 ${mode} 模式`, "info");
   }, [onModelModeChange, onToast]);
 
   /* ── Submit ── */
@@ -1238,11 +1220,12 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
   const [phase, setPhase] = useState<ChatPhase>("idle");
   const [isBusy, setIsBusy] = useState(false);
   const [healthOk, setHealthOk] = useState<boolean | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [modelMode, setModelMode] = useState<ModelMode>("Flash");
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
-  const [showReturnConfirm, setShowReturnConfirm] = useState(false);
+  const [showDraftNotice, setShowDraftNotice] = useState(false);
+  const [showModeNotice, setShowModeNotice] = useState(false);
+  const [modeNoticeMessage, setModeNoticeMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [drafts, setDrafts] = useState<string[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -1265,6 +1248,8 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
 
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const city = selectedCity || location?.city || user?.city || "选择城市";
+
+  const { toast: glassToast, show: showToast, dismiss: dismissToast } = useGlassToast();
 
   /* ── Typewriter effect for hero title ── */
   useEffect(() => {
@@ -1619,16 +1604,49 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
 
   /* ── Return to home ── */
   const handleReturnHome = useCallback(() => {
-    // If there's content or messages, show confirmation
+    // Auto-save current conversation before navigating home
     if (inputValue.trim() || messages.length > 0) {
-      setShowReturnConfirm(true);
-    } else {
-      onNavigate?.("home");
+      // If there's unsaved input, add it as a user message
+      if (inputValue.trim()) {
+        const userMsg: ChatMessage = {
+          id: uuid(),
+          role: "user",
+          content: inputValue.trim(),
+          createdAt: new Date().toISOString(),
+        };
+        addMessage(userMsg);
+        setInputValue("");
+      }
+
+      // Ensure current session is updated with latest messages
+      if (currentSessionId) {
+        setChatSessions((prev) =>
+          prev.map((s) =>
+            s.id === currentSessionId
+              ? { ...s, messages, updatedAt: new Date().toISOString() }
+              : s
+          )
+        );
+      } else if (messages.length > 0) {
+        // Create a new session if one doesn't exist
+        const sid = uuid();
+        const newSession: ChatSession = {
+          id: sid,
+          title: messages[0].content.length > 20 ? messages[0].content.slice(0, 20) + "…" : messages[0].content,
+          messages,
+          city,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        setCurrentSessionId(sid);
+        setChatSessions((prev) => [newSession, ...prev]);
+      }
     }
-  }, [inputValue, messages, onNavigate]);
+    // Navigate home immediately
+    onNavigate?.("home");
+  }, [inputValue, messages, currentSessionId, city, onNavigate]);
 
   const handleConfirmReturnHome = useCallback(() => {
-    setShowReturnConfirm(false);
     onNavigate?.("home");
   }, [onNavigate]);
 
@@ -1641,18 +1659,10 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
       case "inspiration":
         setInputValue("推荐几个适合周末半日游的地点，少排队，交通方便。");
         requestAnimationFrame(() => textareaRef.current?.focus());
-        setToast("已填入地点灵感");
         break;
       case "drafts":
         if (drafts.length === 0) {
-          addMessage({
-            id: uuid(),
-            role: "assistant",
-            content: "还没有日程草稿。你可以把想去的地方、时间和预算发给我，我会整理成可执行路线。",
-            status: "success",
-            createdAt: new Date().toISOString(),
-          });
-          setMode("chat");
+          setShowDraftNotice(true);
         } else {
           addMessage({
             id: uuid(),
@@ -1666,13 +1676,13 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
         break;
       case "favorites":
         if (favorites.length === 0) {
-          setToast("还没有收藏方案，生成方案后可以收藏 ⭐");
+          showToast("还没有收藏方案", "info");
         } else {
           onNavigate?.("profile");
         }
         break;
     }
-  }, [handleNewChat, drafts, favorites, setToast, onNavigate]);
+  }, [handleNewChat, drafts, favorites, onNavigate, showToast]);
 
   /* ── Action handlers ── */
   const handleExecuteAction = useCallback(
@@ -1685,7 +1695,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
         setBusyActionId(action.id);
         try {
           const result = await confirmExecAction(action.id);
-          setToast(result.message || `${action.title}：操作成功`);
+          showToast(`${action.title} 已完成`, "success");
           // Update action status in messages
           setMessages((prev) =>
             prev.map((msg) => {
@@ -1699,7 +1709,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
             })
           );
         } catch (err) {
-          setToast(`操作失败：${err instanceof Error ? err.message : "未知错误"}`);
+          showToast("操作失败，请重试", "error");
         } finally {
           setBusyActionId(null);
         }
@@ -1711,7 +1721,6 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
         case "navigation": {
           const dest = action.description || city;
           window.open(`https://uri.amap.com/search?keyword=${encodeURIComponent(dest)}&city=${encodeURIComponent(city)}`, "_blank");
-          setToast("已打开导航");
           break;
         }
         case "calendar_event":
@@ -1722,7 +1731,6 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
           const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
           const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(action.title)}&dates=${fmt(start)}/${fmt(end)}&details=${encodeURIComponent(action.description)}`;
           window.open(url, "_blank");
-          setToast("已打开日历");
           break;
         }
         case "share_message": {
@@ -1730,25 +1738,25 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
           if (navigator.share) {
             navigator.share(shareData).catch(() => {});
           } else {
-            navigator.clipboard.writeText(`${action.title}\n${action.description}`).then(() => setToast("已复制到剪贴板"));
+            navigator.clipboard.writeText(`${action.title}\n${action.description}`);
+            showToast("已复制到剪贴板", "success");
           }
           break;
         }
         case "set_reminder":
         case "restaurant_reservation":
         case "ticket_lock":
-          setToast(`${action.title}：${action.description}`);
           break;
         case "memory_save":
           addMemory({ category: "preference", title: action.title, detail: action.description, weight: 0.5 })
-            .then(() => setToast("已保存到记忆"))
-            .catch(() => setToast("保存失败"));
+            .then(() => {})
+            .catch(() => {});
           break;
         default:
-          setToast(action.title);
+          break;
       }
     },
-    [city, setToast, addMemory],
+    [city, addMemory, showToast],
   );
 
   const handleNextAction = useCallback(
@@ -1757,10 +1765,8 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
         case "保存方案":
           if (selectedPlanId) {
             selectPlan(selectedPlanId)
-              .then(() => setToast("方案已保存"))
-              .catch(() => setToast("保存失败"));
-          } else {
-            setToast("请先选择一个方案");
+              .then(() => showToast("方案已保存", "success"))
+              .catch(() => showToast("保存失败，请重试", "error"));
           }
           break;
         case "生成日历": {
@@ -1771,34 +1777,33 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
           const end = new Date(start.getTime() + 3 * 3600_000);
           const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
           window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${fmt(start)}/${fmt(end)}`, "_blank");
-          setToast("已打开日历");
           break;
         }
         case "分享给同行人": {
           const plan = messages.flatMap((m) => (m.role === "assistant" && "plans" in m ? m.plans ?? [] : [])).find((p) => p.id === selectedPlanId);
-          const text = plan ? `${plan.title}\n${plan.summary ?? ""}` : "来看看这个周末计划！";
+          const title = plan?.title ?? "周末出行计划";
+          const text = plan?.timeline.map((t) => `${t.startTime}–${t.endTime} ${t.title}`).join("\n") || title;
           if (navigator.share) {
             navigator.share({ title: "周末有谱", text }).catch(() => {});
           } else {
-            navigator.clipboard.writeText(text).then(() => setToast("已复制到剪贴板"));
+            navigator.clipboard.writeText(text);
+            showToast("已复制到剪贴板", "success");
           }
           break;
         }
         case "查看预约建议":
-          setToast("预约建议已展示在上方执行操作卡片中");
           break;
         case "打开导航": {
           const plan = messages.flatMap((m) => (m.role === "assistant" && "plans" in m ? m.plans ?? [] : [])).find((p) => p.id === selectedPlanId);
           const dest = plan?.title ?? city;
           window.open(`https://uri.amap.com/search?keyword=${encodeURIComponent(dest)}&city=${encodeURIComponent(city)}`, "_blank");
-          setToast("已打开导航");
           break;
         }
         default:
-          setToast(label);
+          break;
       }
     },
-    [selectedPlanId, messages, city, setToast],
+    [selectedPlanId, messages, city, showToast],
   );
 
   /* ── Render: message content ── */
@@ -1881,7 +1886,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
         </div>
       );
     },
-    [selectedPlanId, handleRetryLast, handleNewChat, handleSelectPlan, setToast, handleExecuteAction, busyActionId],
+    [selectedPlanId, handleRetryLast, handleNewChat, handleSelectPlan, handleExecuteAction, busyActionId],
   );
 
   /* ═══════════════════════════════════════════════
@@ -1912,7 +1917,6 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
         onSearchChange={setSearchQuery}
         modelMode={modelMode}
         onModelModeChange={setModelMode}
-        onToast={(msg) => setToast(msg)}
         onReturnHome={handleReturnHome}
         onNavigate={onNavigate}
       />
@@ -1956,14 +1960,10 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
               city={city}
               onCityChange={setSelectedCity}
               onOpenModal={onOpenModal}
-              onToast={setToast}
               modelMode={modelMode}
               onModelModeChange={setModelMode}
+              onToast={showToast}
             />
-
-            {toast && (
-              <InlineToast message={toast} onDone={() => setToast(null)} />
-            )}
 
             <div className={styles.featureChips}>
               {SUGGESTION_PROMPTS.map((p) => (
@@ -2011,35 +2011,46 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
                 city={city}
                 onCityChange={setSelectedCity}
                 onOpenModal={onOpenModal}
-                onToast={setToast}
                 modelMode={modelMode}
                 onModelModeChange={setModelMode}
+                onToast={showToast}
               />
-              {toast && (
-                <InlineToast message={toast} onDone={() => setToast(null)} />
-              )}
             </div>
           </div>
         )}
       </main>
 
-      {/* 返回官网确认弹窗 */}
+      {/* 日程草稿提示弹窗 */}
       <WorkspaceModal
-        open={showReturnConfirm}
-        onClose={() => setShowReturnConfirm(false)}
-        title="离开规划工作区？"
+        open={showDraftNotice}
+        onClose={() => setShowDraftNotice(false)}
+        title="还没有日程草稿"
         width="sm"
       >
         <p className={styles.confirmText}>
-          当前规划内容将保留在本地存储中，下次进入可以继续查看。
+          你可以把想去的地方、时间和预算发给我，我会整理成可执行路线。
         </p>
-        <ConfirmActions
-          cancelLabel="继续规划"
-          confirmLabel="返回官网"
-          onConfirm={handleConfirmReturnHome}
-          onCancel={() => setShowReturnConfirm(false)}
-        />
+        <Button size="small" onClick={() => setShowDraftNotice(false)}>
+          知道了
+        </Button>
       </WorkspaceModal>
+
+      {/* 模式切换提示弹窗 */}
+      <WorkspaceModal
+        open={showModeNotice}
+        onClose={() => setShowModeNotice(false)}
+        title="模式切换"
+        width="sm"
+      >
+        <p className={styles.confirmText}>
+          {modeNoticeMessage}
+        </p>
+        <Button size="small" onClick={() => setShowModeNotice(false)}>
+          知道了
+        </Button>
+      </WorkspaceModal>
+
+      <GlassToast toast={glassToast} onDismiss={dismissToast} />
     </section>
   );
 }

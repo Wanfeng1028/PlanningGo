@@ -94,6 +94,7 @@ export function AuthModal({
   const [error, setError] = useState("");
   const [googleNotice, setGoogleNotice] = useState(false);
   const [meituanNotice, setMeituanNotice] = useState(false);
+  const [trialNotice, setTrialNotice] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [form, setForm] = useState({
@@ -455,10 +456,6 @@ export function AuthModal({
         </div>
       </div>
 
-      <p style={{ fontSize: 12, color: "#9CA3AF", lineHeight: 1.5, textAlign: "center", margin: "8px 0 4px" }}>
-        我们会记录你的偏好与对话数据，以便为你提供个性化推荐。数据仅用于产品优化，绝不泄露给第三方。
-      </p>
-
       <Button type="submit" disabled={loading}>
         {loading ? "进入中…" : "以游客身份开始体验"}
       </Button>
@@ -748,9 +745,13 @@ export function AuthModal({
         </p>
 
         {mode === "login" ? (
-          <p className={styles.hint}>
-            试用账号：xiaoming@example.com / weekend123
-          </p>
+          <button
+            type="button"
+            className={styles.textButton}
+            onClick={() => setTrialNotice(true)}
+          >
+            查看试用账号
+          </button>
         ) : null}
 
         {googleNotice ? (
@@ -788,6 +789,28 @@ export function AuthModal({
                 AppKey。目前开发环境暂未配置，你可以先使用邮箱登录或游客体验。
               </p>
               <Button size="small" onClick={() => setMeituanNotice(false)}>
+                知道了
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {trialNotice ? (
+          <div
+            className={styles.noticeLayer}
+            role="presentation"
+            onMouseDown={() => setTrialNotice(false)}
+          >
+            <div
+              className={styles.noticeCard}
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <h3>试用账号</h3>
+              <p>
+                邮箱：xiaoming@example.com<br />
+                密码：weekend123
+              </p>
+              <Button size="small" onClick={() => setTrialNotice(false)}>
                 知道了
               </Button>
             </div>

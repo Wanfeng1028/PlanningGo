@@ -779,8 +779,8 @@ $green: #22c55e;
   padding-top: clamp(32px, 6vh, 72px);
   padding-left: 16px;
   padding-right: 16px;
-  padding-bottom: clamp(160px, 22vh, 280px);
-  scroll-padding-bottom: clamp(160px, 22vh, 280px);
+  padding-bottom: clamp(100px, 14vh, 160px);
+  scroll-padding-bottom: clamp(100px, 14vh, 160px);
   scrollbar-width: thin;
   scrollbar-color: rgba($text, 0.12) transparent;
 
@@ -808,10 +808,10 @@ $green: #22c55e;
 .featureComposerDock {
   position: absolute;
   left: 50%;
-  bottom: clamp(36px, 6vh, 72px);
+  bottom: clamp(20px, 3vh, 40px);
   transform: translateX(-50%);
   z-index: 30;
-  width: min(760px, calc(100% - 48px));
+  width: min(960px, calc(100% - 48px));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -823,7 +823,7 @@ $green: #22c55e;
    ───────────────────────────────────────────── */
 .featureComposer {
   position: relative;
-  width: min(720px, 100%);
+  width: min(920px, 100%);
   min-height: 56px;
   max-height: 140px;
   border-radius: 28px;
@@ -845,7 +845,7 @@ $green: #22c55e;
 }
 
 .featureComposerCompact {
-  width: min(720px, 100%);
+  width: min(920px, 100%);
 }
 
 .composerInputRow {

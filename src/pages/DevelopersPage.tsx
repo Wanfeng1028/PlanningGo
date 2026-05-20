@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { PageTransition } from "../components/PageTransition";
 import { RevealGroup } from "../components/RevealGroup";
 import { Button } from "../components/Button";
+import { GlassToast, useGlassToast } from "../components/GlassToast";
 import {
   getDeveloperDashboard,
   getDeveloperApps,
@@ -440,8 +441,7 @@ export default function DevelopersPage({
 
   // ui
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const { toast, show, dismiss } = useGlassToast();
 
   // modals
   const [showCreateApp, setShowCreateApp] = useState(false);
@@ -485,23 +485,6 @@ export default function DevelopersPage({
 
   // docs expand
   const [expandedDoc, setExpandedDoc] = useState<string | null>("quickstart");
-
-  const flash = useCallback(
-    (msg: string, type: "success" | "error" = "success") => {
-      if (type === "success") {
-        setSuccessMsg(msg);
-        setError(null);
-      } else {
-        setError(msg);
-        setSuccessMsg(null);
-      }
-      setTimeout(() => {
-        setSuccessMsg(null);
-        setError(null);
-      }, 4000);
-    },
-    []
-  );
 
   /* ── data loading ────────────────────────────────────────────────── */
 
@@ -569,8 +552,6 @@ export default function DevelopersPage({
 
   useEffect(() => {
     if (!isLoggedIn) return;
-    setError(null);
-    setSuccessMsg(null);
     if (activePanel === "overview") loadDashboard();
     else if (activePanel === "apps") loadApps();
     else if (activePanel === "keys") loadApiKeys();
@@ -609,14 +590,14 @@ export default function DevelopersPage({
         description: newAppDesc.trim(),
         environment: newAppEnv,
       });
-      flash("应用创建成功");
+      show("应用创建成功");
       setShowCreateApp(false);
       setNewAppName("");
       setNewAppDesc("");
       setNewAppEnv("sandbox");
       await loadApps();
     } catch (e: unknown) {
-      flash(e instanceof Error ? e.message : "创建失败", "error");
+      show(e instanceof Error ? e.message : "创建失败", "error");
     } finally {
       setLoading(false);
     }
@@ -628,10 +609,10 @@ export default function DevelopersPage({
     setLoading(true);
     try {
       await deleteDeveloperApp(id);
-      flash("应用已删除");
+      show("应用已删除");
       await loadApps();
     } catch (e: unknown) {
-      flash(e instanceof Error ? e.message : "删除失败", "error");
+      show(e instanceof Error ? e.message : "删除失败", "error");
     } finally {
       setLoading(false);
     }
@@ -647,12 +628,12 @@ export default function DevelopersPage({
         expiresIn: newKeyExpiry,
       });
       setCreatedKey(res.key ?? null);
-      flash("API Key 创建成功");
+      show("API Key 创建成功");
       setNewKeyName("");
       setNewKeyScopes(["plans:read", "plans:write"]);
       await loadApiKeys();
     } catch (e: unknown) {
-      flash(e instanceof Error ? e.message : "创建失败", "error");
+      show(e instanceof Error ? e.message : "创建失败", "error");
     } finally {
       setLoading(false);
     }
@@ -663,10 +644,10 @@ export default function DevelopersPage({
     setLoading(true);
     try {
       await revokeApiKey(id);
-      flash("密钥已撤销");
+      show("密钥已撤销");
       await loadApiKeys();
     } catch (e: unknown) {
-      flash(e instanceof Error ? e.message : "撤销失败", "error");
+      show(e instanceof Error ? e.message : "撤销失败", "error");
     } finally {
       setLoading(false);
     }
@@ -680,13 +661,13 @@ export default function DevelopersPage({
         url: newWebhookUrl.trim(),
         events: newWebhookEvents,
       });
-      flash("Webhook 订阅创建成功");
+      show("Webhook 订阅创建成功");
       setShowCreateWebhook(false);
       setNewWebhookUrl("");
       setNewWebhookEvents([]);
       await loadWebhooks();
     } catch (e: unknown) {
-      flash(e instanceof Error ? e.message : "创建失败", "error");
+      show(e instanceof Error ? e.message : "创建失败", "error");
     } finally {
       setLoading(false);
     }
@@ -700,13 +681,13 @@ export default function DevelopersPage({
         url: newWebhookUrl.trim(),
         events: newWebhookEvents,
       });
-      flash("Webhook 已更新");
+      show("Webhook 已更新");
       setEditingWebhook(null);
       setNewWebhookUrl("");
       setNewWebhookEvents([]);
       await loadWebhooks();
     } catch (e: unknown) {
-      flash(e instanceof Error ? e.message : "更新失败", "error");
+      show(e instanceof Error ? e.message : "更新失败", "error");
     } finally {
       setLoading(false);
     }
@@ -717,11 +698,11 @@ export default function DevelopersPage({
     setLoading(true);
     try {
       await deleteWebhook(id);
-      flash("Webhook 已删除");
+      show("Webhook 已删除");
       setDeliveryWebhookId(null);
       await loadWebhooks();
     } catch (e: unknown) {
-      flash(e instanceof Error ? e.message : "删除失败", "error");
+      show(e instanceof Error ? e.message : "删除失败", "error");
     } finally {
       setLoading(false);
     }
@@ -731,9 +712,9 @@ export default function DevelopersPage({
     setLoading(true);
     try {
       await testWebhook(id);
-      flash("测试事件已发送");
+      show("测试事件已发送");
     } catch (e: unknown) {
-      flash(e instanceof Error ? e.message : "发送失败", "error");
+      show(e instanceof Error ? e.message : "发送失败", "error");
     } finally {
       setLoading(false);
     }
@@ -743,9 +724,9 @@ export default function DevelopersPage({
     setLoading(true);
     try {
       await replayWebhook(id);
-      flash("已重新投递");
+      show("已重新投递");
     } catch (e: unknown) {
-      flash(e instanceof Error ? e.message : "重放失败", "error");
+      show(e instanceof Error ? e.message : "重放失败", "error");
     } finally {
       setLoading(false);
     }
@@ -756,10 +737,10 @@ export default function DevelopersPage({
     setLoading(true);
     try {
       await rotateWebhookSecret(id);
-      flash("密钥已轮换");
+      show("密钥已轮换");
       await loadWebhooks();
     } catch (e: unknown) {
-      flash(e instanceof Error ? e.message : "轮换失败", "error");
+      show(e instanceof Error ? e.message : "轮换失败", "error");
     } finally {
       setLoading(false);
     }
@@ -796,7 +777,7 @@ export default function DevelopersPage({
   };
 
   const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => flash("已复制"));
+    navigator.clipboard.writeText(text).then(() => show("已复制"));
   };
 
   const handleSandboxPreset = (ep: string) => {
@@ -1047,14 +1028,6 @@ console.log(data.summary);`;
             </div>
           </div>
         </section>
-
-        {/* Flash */}
-        {successMsg && (
-          <div className={`${s.flash} ${s.flashSuccess}`}>{successMsg}</div>
-        )}
-        {error && (
-          <div className={`${s.flash} ${s.flashError}`}>{error}</div>
-        )}
 
         {/* Metric Cards */}
         <RevealGroup className={s.metricsRow}>
@@ -2870,7 +2843,7 @@ const plan = await client.plans.create({
                             "确认撤销所有 API 密钥？此操作不可逆，所有使用中的密钥将立即失效。"
                           )
                         ) {
-                          flash("所有密钥已撤销");
+                          show("所有密钥已撤销");
                         }
                       }}
                     >
@@ -2885,7 +2858,7 @@ const plan = await client.plans.create({
                             "确认重新生成所有 Webhook Secret？旧 Secret 将立即失效。"
                           )
                         ) {
-                          flash("Webhook Secret 已重新生成");
+                          show("Webhook Secret 已重新生成");
                         }
                       }}
                     >
@@ -2898,6 +2871,8 @@ const plan = await client.plans.create({
           </div>
         </div>
       </div>
+
+      <GlassToast toast={toast} onDismiss={dismiss} />
     </PageTransition>
   );
 }

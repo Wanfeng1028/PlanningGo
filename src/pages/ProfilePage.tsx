@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { Button } from "../components/Button";
 import { RevealGroup } from "../components/RevealGroup";
+import { GlassToast, useGlassToast } from "../components/GlassToast";
 import {
   getProfileBundle,
   getMemories,
@@ -194,7 +195,7 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
   const [passwordForm, setPasswordForm] = useState({ current: "", next: "", confirm: "" });
   const [showPasswords, setShowPasswords] = useState(false);
 
-  const [saveMsg, setSaveMsg] = useState("");
+  const { toast, show, dismiss } = useGlassToast();
   const [confirmDialog, setConfirmDialog] = useState<{ title: string; desc: string; onConfirm: () => void } | null>(null);
 
   // ── Data fetching ──
@@ -314,11 +315,6 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
 
   // ── Handlers ──
 
-  const flash = (msg: string) => {
-    setSaveMsg(msg);
-    setTimeout(() => setSaveMsg(""), 2200);
-  };
-
   const handleSavePersona = async () => {
     try {
       await Promise.all([
@@ -342,10 +338,10 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
           avoidActivityTags: personaForm.avoidActivityTags,
         }),
       ]);
-      flash("已保存");
+      show("已保存");
       fetchBundle();
     } catch {
-      flash("保存失败");
+      show("保存失败");
     }
   };
 
@@ -356,9 +352,9 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
       setMemoryForm({ category: "family", title: "", detail: "", weight: 0.5 });
       const val = (await getMemories()) as any;
       setMemories(Array.isArray(val) ? val : val?.items ?? []);
-      flash("记忆已添加");
+      show("记忆已添加");
     } catch {
-      flash("添加失败");
+      show("添加失败");
     }
   };
 
@@ -370,9 +366,9 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
         try {
           await deleteMemory(id);
           setMemories((prev) => prev.filter((m) => m.id !== id));
-          flash("已删除");
+          show("已删除");
         } catch {
-          flash("删除失败");
+          show("删除失败");
         }
         setConfirmDialog(null);
       },
@@ -386,9 +382,9 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
       setCompanionForm({ name: "", type: "adult", relation: "", ageGroup: "adult", preferences: [], avoid: [], mobility: "normal", diet: "", notes: "" });
       const val = (await getCompanions()) as any;
       setCompanions(Array.isArray(val) ? val : val?.items ?? []);
-      flash("同行人已添加");
+      show("同行人已添加");
     } catch {
-      flash("添加失败");
+      show("添加失败");
     }
   };
 
@@ -400,9 +396,9 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
         try {
           await deleteCompanion(id);
           setCompanions((prev) => prev.filter((c) => c.id !== id));
-          flash("已删除");
+          show("已删除");
         } catch {
-          flash("删除失败");
+          show("删除失败");
         }
         setConfirmDialog(null);
       },
@@ -464,7 +460,7 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
     setPermissions({ ...permissions, [key]: next });
     try {
       await updatePermissions({ [key]: next });
-      flash("设置已保存");
+      show("设置已保存");
     } catch {
       // API 失败时回滚并保存到 localStorage
       setPermissions((p) => (p ? { ...p, [key]: prev } : p));
@@ -474,9 +470,9 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
         localStorage.setItem("pg_permissions", JSON.stringify(local));
         // 恢复乐观更新
         setPermissions((p) => (p ? { ...p, [key]: next } : p));
-        flash("已保存到本地");
+        show("已保存到本地");
       } catch {
-        flash("设置失败，请重试");
+        show("设置失败，请重试");
       }
     }
   };
@@ -503,7 +499,7 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
       if (res?.key) setNewKeyReveal(res.key);
       fetchDevData();
     } catch {
-      flash("创建失败");
+      show("创建失败");
     }
   };
 
@@ -541,15 +537,15 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
 
   const handleChangePassword = async () => {
     if (passwordForm.next !== passwordForm.confirm) {
-      flash("两次密码不一致");
+      show("两次密码不一致");
       return;
     }
     try {
       await changePassword({ currentPassword: passwordForm.current, newPassword: passwordForm.next });
       setPasswordForm({ current: "", next: "", confirm: "" });
-      flash("密码已修改");
+      show("密码已修改");
     } catch {
-      flash("修改失败");
+      show("修改失败");
     }
   };
 
@@ -561,9 +557,9 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
         try {
           await clearMemory();
           setMemories([]);
-          flash("记忆已清除");
+          show("记忆已清除");
         } catch {
-          flash("清除失败");
+          show("清除失败");
         }
         setConfirmDialog(null);
       },
@@ -573,9 +569,9 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
   const handleExportData = async () => {
     try {
       await exportPrivacy();
-      flash("导出已触发，稍后查看");
+      show("导出已触发，稍后查看");
     } catch {
-      flash("导出失败");
+      show("导出失败");
     }
   };
 
@@ -588,7 +584,7 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
           await deleteAccount();
           onLogout();
         } catch {
-          flash("注销失败");
+          show("注销失败");
         }
         setConfirmDialog(null);
       },
@@ -597,7 +593,7 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
 
   const handleCopyKey = (text: string) => {
     navigator.clipboard.writeText(text).catch(() => { });
-    flash("已复制");
+    show("已复制");
   };
 
   // ── Computed ──
@@ -723,7 +719,6 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
 
         <div className={styles.saveRow}>
           <Button onClick={handleSavePersona}>保存</Button>
-          {saveMsg && <span className={styles.saveSuccess}>{saveMsg}</span>}
         </div>
       </div>
 
@@ -851,8 +846,6 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
         <p className={styles.tabDesc}>AI 会根据你的记忆和偏好，给出个性化建议</p>
       </div>
 
-      {saveMsg && <span className={styles.saveSuccess}>{saveMsg}</span>}
-
       {insights.length > 0 && (
         <div className={styles.insightsGrid}>
           {insights.map((ins) => (
@@ -967,8 +960,6 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
         <h2 className={styles.tabTitle}>同行人</h2>
         <p className={styles.tabDesc}>管理家人、朋友的偏好，规划会自动适配</p>
       </div>
-
-      {saveMsg && <span className={styles.saveSuccess}>{saveMsg}</span>}
 
       {isGuest ? (
         <div className={styles.glassCard}>
@@ -1100,8 +1091,6 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
         <p className={styles.tabDesc}>查看历史规划，给好评帮助 AI 更懂你</p>
       </div>
 
-      {saveMsg && <span className={styles.saveSuccess}>{saveMsg}</span>}
-
       <div className={styles.historyList}>
         {history.length === 0 ? (
           <div className={styles.glassCard}>
@@ -1149,8 +1138,6 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
         <h2 className={styles.tabTitle}>通知中心</h2>
         <p className={styles.tabDesc}>管理通知和提醒偏好</p>
       </div>
-
-      {saveMsg && <span className={styles.saveSuccess}>{saveMsg}</span>}
 
       <div className={styles.glassCard}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
@@ -1223,7 +1210,7 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
                       await updateNotificationPreferences(next);
                     } catch {
                       setNotifPrefs((p) => (p ? { ...p, [key]: prev } : p));
-                      flash("设置失败，请重试");
+                      show("设置失败，请重试");
                     }
                   }}
                 />
@@ -1241,8 +1228,6 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
         <h2 className={styles.tabTitle}>隐私与安全</h2>
         <p className={styles.tabDesc}>管理权限、会话和数据</p>
       </div>
-
-      {saveMsg && <span className={styles.saveSuccess}>{saveMsg}</span>}
 
       {permissions && (
         <div className={styles.glassCard}>
@@ -1422,7 +1407,6 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
               </div>
               <div className={styles.saveRow}>
                 <Button onClick={handleChangePassword}>修改密码</Button>
-                {saveMsg && <span className={styles.saveSuccess}>{saveMsg}</span>}
               </div>
             </div>
           </div>
@@ -1539,6 +1523,8 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
           </div>
         </div>
       )}
+
+      <GlassToast toast={toast} onDismiss={dismiss} />
     </div>
   );
 }

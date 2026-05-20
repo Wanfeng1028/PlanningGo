@@ -1,8 +1,9 @@
-import { Menu, X, MapPin, Navigation } from "lucide-react";
+import { Menu, X, MapPin, Navigation, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { navItems } from "../data/navigation";
 import type { ModalKey, NavKey, SessionUser } from "../types";
 import { Button } from "./Button";
+import { Modal } from "./Modal";
 import styles from "./NavBar.module.scss";
 
 interface NavBarProps {
@@ -16,6 +17,7 @@ interface NavBarProps {
 
 export function NavBar({ active, onNavigate, onOpenModal, user, onLogout, onRequestLocation }: NavBarProps) {
   const [open, setOpen] = useState(false);
+  const [showLocationError, setShowLocationError] = useState(false);
 
   const handleNavigate = (key: NavKey) => {
     if (key === "developers") {
@@ -28,6 +30,15 @@ export function NavBar({ active, onNavigate, onOpenModal, user, onLogout, onRequ
   };
 
   const locationLabel = user?.locationLabel || user?.city || "";
+  const isLocationError = locationLabel.includes("不可用") || locationLabel.includes("失败");
+
+  const handleLocationClick = () => {
+    if (isLocationError) {
+      setShowLocationError(true);
+    } else {
+      onRequestLocation?.();
+    }
+  };
 
   return (
     <>
@@ -55,8 +66,8 @@ export function NavBar({ active, onNavigate, onOpenModal, user, onLogout, onRequ
             <button
               type="button"
               className={styles.locationPill}
-              onClick={onRequestLocation}
-              title="点击重新定位"
+              onClick={handleLocationClick}
+              title={isLocationError ? "查看定位失败原因" : "点击重新定位"}
             >
               <MapPin size={14} />
               <span>{locationLabel}</span>
@@ -112,7 +123,14 @@ export function NavBar({ active, onNavigate, onOpenModal, user, onLogout, onRequ
           <button
             type="button"
             className={styles.mobileLocationPill}
-            onClick={() => { onRequestLocation?.(); setOpen(false); }}
+            onClick={() => {
+              if (isLocationError) {
+                setShowLocationError(true);
+              } else {
+                onRequestLocation?.();
+              }
+              setOpen(false);
+            }}
           >
             <MapPin size={14} />
             <span>{locationLabel}</span>
@@ -133,6 +151,22 @@ export function NavBar({ active, onNavigate, onOpenModal, user, onLogout, onRequ
           )}
         </div>
       </div>
+
+      {/* Location error modal */}
+      {showLocationError && (
+        <Modal
+          modal="locationError"
+          onClose={() => setShowLocationError(false)}
+          onPrimary={() => {
+            setShowLocationError(false);
+            onRequestLocation?.();
+          }}
+          onSecondary={() => {
+            setShowLocationError(false);
+            onOpenModal("location");
+          }}
+        />
+      )}
     </>
   );
 }
