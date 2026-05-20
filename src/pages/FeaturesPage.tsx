@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { v4 as uuid } from "uuid";
-import { Button } from "../components/Button";
 import {
   requestPlanning,
   quoteAction as apiQuoteAction,
@@ -14,9 +13,17 @@ import {
 import type { ModalKey, SessionUser } from "../types";
 import styles from "./FeaturesPage.module.scss";
 
-/* ── Types ── */
+/* ═══════════════════════════════════════════════
+   FeaturesPage — Gemini-style AI Planning Workspace
+   ═══════════════════════════════════════════════ */
 
-type Phase =
+interface FeaturesPageProps {
+  user?: SessionUser | null;
+  onOpenModal?: (key: ModalKey) => void;
+  onRequestLocation?: () => void;
+}
+
+type ChatPhase =
   | "idle"
   | "understanding"
   | "planning"
@@ -26,67 +33,18 @@ type Phase =
   | "done"
   | "error";
 
-type UserMessage = { id: string; role: "user"; content: string; ts: number };
-
-type AssistantMessage = {
+interface ChatMessage {
   id: string;
-  role: "assistant";
-  type: "text" | "plan_cards" | "thinking" | "action_cards" | "action_result";
+  role: "user" | "assistant";
   content: string;
-  ts: number;
-  plans?: PlanningPlanCard[];
-  actions?: ExecutionActionCard[];
-};
-
-type ChatMessage = UserMessage | AssistantMessage;
-
-type PlanningPlanCard = {
-  id: string;
-  title: string;
-  summary: string;
-  reason?: string;
-  timeline: { time: string; title: string; subtitle?: string }[];
-  tags: string[];
-  budget: string;
-  distance?: string;
-  risk?: string;
-};
-
-type ExecutionActionCard = {
-  id: string;
-  type: string;
-  title: string;
-  description: string;
-  status: string;
-  confirmLabel?: string;
-  cancelLabel?: string;
-  priceEstimate?: string;
-};
-
-/* ── Constants ── */
-
-const EXAMPLE_CHIPS = [
-  { label: "👨‍👩‍👧 带娃半日游", prompt: "明天带娃半天，三个小时，要有趣又有教育意义" },
-  { label: "👫 情侣约会", prompt: "周六情侣约会，浪漫一点，预算 500 以内" },
-  { label: "🌧️ 雨天室内", prompt: "下雨天适合去哪里玩，最好在室内，交通方便" },
-  { label: "🎤 演唱会夜", prompt: "晚上有演唱会，白天怎么安排最充实" },
-];
-
-const WHAT_IF_OPTIONS = [
-  { key: "rain" as const, label: "🌧️ 如果下雨" },
-  { key: "late" as const, label: "⏰ 如果迟到 1 小时" },
-  { key: "budget" as const, label: "💰 预算减半" },
-];
-
-/* ── Props ── */
-
-interface FeaturesPageProps {
-  user?: SessionUser | null;
-  onOpenModal?: (key: ModalKey) => void;
-  onRequestLocation?: () => void;
+  createdAt: string;
+  status?: "thinking" | "success" | "error";
+  chips?: string[];
+  plans?: PlanningOption[];
+  actions?: PlanningExecutableAction[];
+  actionQuotingId?: string;
+  actionQuotedPreview?: string;
 }
-
-/* ── Attachment type ── */
 
 type AttachmentItem = {
   id: string;
@@ -94,47 +52,125 @@ type AttachmentItem = {
   previewUrl?: string;
 };
 
-/* ── Inline Toast component ── */
+const MODE_OPTIONS = ["快速规划", "精细规划", "亲子优先", "省钱优先"] as const;
 
+/* ── Sidebar mock data ── */
+const SIDEBAR_NAV = [
+  { icon: "✨", label: "新建规划" },
+  { icon: "🔍", label: "搜索记录" },
+  { icon: "📍", label: "地点灵感" },
+  { icon: "📅", label: "日程草稿" },
+  { icon: "⭐", label: "收藏方案" },
+];
+
+const SIDEBAR_RECENT = [
+  "武康路晚餐规划",
+  "亲子半日游",
+  "雨天室内备选",
+  "朋友聚会路线",
+  "演唱会后夜宵",
+  "西湖一日慢游",
+  "带爸妈吃饭",
+];
+
+/* ═══════════════════════════════════════════════
+   Sub-components
+   ═══════════════════════════════════════════════ */
+
+/* ── Inline Toast ── */
 function InlineToast({ message, onDone }: { message: string; onDone: () => void }) {
   useEffect(() => {
-    const t = setTimeout(onDone, 2200);
+    const t = setTimeout(onDone, 2800);
     return () => clearTimeout(t);
   }, [onDone]);
   return <div className={styles.composerToast}>{message}</div>;
 }
 
-/* ── Ambient background (idle only) ── */
-
+/* ── Ambient Background ── */
 function AmbientBackground() {
   return (
     <div className={styles.featureAmbient} aria-hidden="true">
-      <div className={`${styles.bgOrb} ${styles.bgOrb1}`} />
-      <div className={`${styles.bgOrb} ${styles.bgOrb2}`} />
-      <div className={`${styles.bgOrb} ${styles.bgOrb3}`} />
-      <div className={`${styles.bgOrb} ${styles.bgOrb4}`} />
-      <div className={`${styles.bgCard} ${styles.bgCard1}`}>
-        <span>🍜</span>
-        <strong>武康路晚餐</strong>
-        <em>17:30 · 人均 ¥180</em>
-      </div>
-      <div className={`${styles.bgCard} ${styles.bgCard2}`}>
-        <span>☀️</span>
-        <strong>周六 24℃</strong>
-        <em>傍晚可能有雨</em>
-      </div>
-      <div className={`${styles.bgCard} ${styles.bgCard3}`}>
-        <span>🗺️</span>
-        <strong>3 套备选方案</strong>
-        <em>亲子 / 雨天 / 朋友</em>
-      </div>
-      <div className={styles.bgGrid} />
+      <div className={`${styles.ambientOrb} ${styles.ambientOrb1}`} />
+      <div className={`${styles.ambientOrb} ${styles.ambientOrb2}`} />
+      <div className={`${styles.ambientCard} ${styles.ambientCard1}`} />
+      <div className={`${styles.ambientCard} ${styles.ambientCard2}`} />
+      <div className={`${styles.ambientLine} ${styles.ambientLine1}`} />
+      <div className={`${styles.ambientLine} ${styles.ambientLine2}`} />
+      <div className={`${styles.ambientDot} ${styles.ambientDot1}`} />
+      <div className={`${styles.ambientDot} ${styles.ambientDot2}`} />
     </div>
   );
 }
 
-/* ── Gemini-style Composer ── */
+/* ── Sidebar ── */
+function Sidebar({
+  user,
+  open,
+  onClose,
+  onNewChat,
+}: {
+  user?: SessionUser | null;
+  open: boolean;
+  onClose: () => void;
+  onNewChat: () => void;
+}) {
+  return (
+    <>
+      {open && <div className={styles.sidebarOverlay} onClick={onClose} />}
+      <aside className={`${styles.featureSidebar} ${open ? styles.featureSidebarOpen : ""}`}>
+        {/* Header */}
+        <div className={styles.sidebarHeader}>
+          <div className={styles.sidebarLogo}>谱</div>
+          <span className={styles.sidebarBrand}>周末有谱</span>
+        </div>
 
+        <button className={styles.sidebarNewBtn} onClick={onNewChat}>
+          ✨ 新建规划
+        </button>
+
+        {/* Nav */}
+        <nav className={styles.sidebarNav}>
+          <div className={styles.sidebarNavLabel}>功能</div>
+          {SIDEBAR_NAV.map((item) => (
+            <button key={item.label} className={styles.sidebarNavItem}>
+              <span className={styles.sidebarNavIcon}>{item.icon}</span>
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* Recent */}
+        <div className={styles.sidebarNavLabel}>最近规划</div>
+        <div className={styles.sidebarRecent}>
+          {SIDEBAR_RECENT.map((title) => (
+            <button key={title} className={styles.sidebarRecentItem}>
+              <span className={styles.recentDot} />
+              {title}
+            </button>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div className={styles.sidebarFooter}>
+          <div className={styles.sidebarAvatar}>
+            {user?.name?.[0] || "游"}
+          </div>
+          <div className={styles.sidebarUserInfo}>
+            <div className={styles.sidebarUserName}>{user?.name || "游客"}</div>
+            <div className={styles.sidebarUserTag}>
+              {user?.mode === "registered" ? "已注册" : "体验模式"}
+            </div>
+          </div>
+          <button className={styles.sidebarSettingsBtn} title="设置">
+            ⚙
+          </button>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+/* ── Composer (Gemini-style slim capsule) ── */
 interface ComposerProps {
   compact?: boolean;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
@@ -178,8 +214,9 @@ function Composer({
   const valueRef = useRef(value);
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [isRecording, setIsRecording] = useState(false);
+  const [modeOpen, setModeOpen] = useState(false);
+  const [modeIndex, setModeIndex] = useState(1); // "精细规划"
 
-  // Keep ref in sync so speech recognition callback always sees latest value
   useEffect(() => { valueRef.current = value; }, [value]);
 
   /* ── Cleanup preview URLs on unmount ── */
@@ -221,7 +258,6 @@ function Composer({
         return next;
       });
 
-      // reset input so same file can be re-selected
       e.target.value = "";
     },
     [onToast],
@@ -284,7 +320,6 @@ function Composer({
     recognition.onend = () => {
       setIsRecording(false);
       recognitionRef.current = null;
-      // Focus textarea after recording ends
       requestAnimationFrame(() => textareaRef.current?.focus());
     };
 
@@ -293,6 +328,25 @@ function Composer({
     setIsRecording(true);
     onToast?.("正在录音，点击麦克风停止");
   }, [isRecording, SpeechRecognitionCtor, onChange, onToast, textareaRef]);
+
+  /* ── Mode dropdown ── */
+  const handleModeClick = useCallback(() => {
+    setModeOpen((v) => !v);
+  }, []);
+
+  const handleModeSelect = useCallback((idx: number) => {
+    setModeIndex(idx);
+    setModeOpen(false);
+    onToast?.(`已切换为「${MODE_OPTIONS[idx]}」模式`);
+  }, [onToast]);
+
+  // Close mode dropdown on outside click
+  useEffect(() => {
+    if (!modeOpen) return;
+    const close = () => setModeOpen(false);
+    document.addEventListener("click", close, { once: true });
+    return () => document.removeEventListener("click", close);
+  }, [modeOpen]);
 
   /* ── Submit ── */
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -305,7 +359,6 @@ function Composer({
   const handleSubmit = () => {
     if (disabled) return;
     onSubmit(attachments);
-    // Clean up attachment previews
     attachments.forEach((a) => {
       if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
     });
@@ -324,7 +377,6 @@ function Composer({
 
   return (
     <div className={`${styles.featureComposer} ${compact ? styles.featureComposerCompact : ""}`}>
-      {/* hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -334,7 +386,6 @@ function Composer({
         onChange={handleFilesSelected}
       />
 
-      {/* attachment previews */}
       {attachments.length > 0 && (
         <div className={styles.composerAttachments}>
           {attachments.map((att) => (
@@ -367,6 +418,7 @@ function Composer({
         >
           +
         </button>
+
         <textarea
           ref={textareaRef}
           className={styles.composerTextarea}
@@ -376,6 +428,30 @@ function Composer({
           onKeyDown={handleKeyDown}
           rows={1}
         />
+
+        <div style={{ position: "relative" }}>
+          <button
+            className={styles.composerModeButton}
+            type="button"
+            onClick={handleModeClick}
+          >
+            {MODE_OPTIONS[modeIndex]}
+          </button>
+          {modeOpen && (
+            <div className={styles.composerModeDropdown}>
+              {MODE_OPTIONS.map((label, idx) => (
+                <button
+                  key={label}
+                  className={`${styles.composerModeItem} ${idx === modeIndex ? styles.composerModeItemActive : ""}`}
+                  onClick={(e) => { e.stopPropagation(); handleModeSelect(idx); }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <button
           className={`${styles.composerIconButton} ${isRecording ? styles.composerVoiceActive : ""}`}
           type="button"
@@ -385,15 +461,17 @@ function Composer({
         >
           {isRecording ? <span className={styles.voiceDot} /> : "🎙"}
         </button>
+
         <button
           className={styles.composerSendButton}
           type="button"
           disabled={disabled || (!value.trim() && attachments.length === 0)}
           onClick={handleSubmit}
         >
-          开始规划
+          发送
         </button>
       </div>
+
       {showMeta && (
         <div className={styles.composerMetaRow}>
           <span className={styles.composerMetaItem}>📍 {city || "上海"}</span>
@@ -414,725 +492,523 @@ function Composer({
   );
 }
 
-/* ── Main Component ── */
+/* ── Plan Card ── */
+function PlanCardView({
+  plan,
+  selected,
+  onSelect,
+}: {
+  plan: PlanningOption;
+  selected: boolean;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <div className={styles.planCard}>
+      <div className={styles.planCardTitle}>{plan.title}</div>
+      {plan.summary && <div className={styles.planCardReason}>{plan.summary}</div>}
 
-export default function FeaturesPage({ user, onOpenModal, onRequestLocation }: FeaturesPageProps) {
-  void onRequestLocation;
+      {plan.timeline.length > 0 && (
+        <ul className={styles.planCardTimeline}>
+          {plan.timeline.map((step) => (
+            <li key={step.id}>
+              {step.startTime}–{step.endTime} {step.title}
+              {step.poiName ? ` · ${step.poiName}` : ""}
+            </li>
+          ))}
+        </ul>
+      )}
 
-  /* ── State ── */
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+      <div className={styles.planCardMeta}>
+        {plan.totalCostMin > 0 && (
+          <span className={`${styles.planMetaTag} ${styles.planMetaTagBudget}`}>
+            ¥{plan.totalCostMin}–{plan.totalCostMax}
+          </span>
+        )}
+        {plan.walkingKm && plan.walkingKm > 0 && (
+          <span className={`${styles.planMetaTag} ${styles.planMetaTagRoute}`}>
+            步行 {plan.walkingKm}km
+          </span>
+        )}
+        {plan.risks.map((r) => (
+          <span key={r} className={`${styles.planMetaTag} ${styles.planMetaTagRisk}`}>
+            ⚠ {r}
+          </span>
+        ))}
+        {plan.highlights.map((h) => (
+          <span key={h} className={`${styles.planMetaTag} ${styles.planMetaTagDefault}`}>
+            ✦ {h}
+          </span>
+        ))}
+      </div>
+
+      <div className={styles.planCardActions}>
+        <button
+          className={`${styles.actionBtn} ${selected ? styles.actionBtnPrimary : styles.actionBtnSecondary}`}
+          onClick={() => onSelect(plan.id)}
+        >
+          {selected ? "✓ 已选择" : "选这套"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Error Card (inside message stream) ── */
+function ErrorCardView({
+  message,
+  onRetry,
+  onNew,
+}: {
+  message: string;
+  onRetry: () => void;
+  onNew: () => void;
+}) {
+  const [showHint, setShowHint] = useState(false);
+
+  return (
+    <div className={styles.errorCard}>
+      <div className={styles.errorCardTitle}>⚠ 规划服务连接失败</div>
+      <div className={styles.errorCardMessage}>{message}</div>
+
+      <div className={styles.errorCardHint}>
+        {`# .env.local
+VITE_API_BASE=${getApiBase()}
+
+# 启动后端
+npm run dev:api
+
+# 启动前端
+npm run dev`}
+      </div>
+
+      <div className={styles.errorCardActions}>
+        <button
+          className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
+          onClick={onRetry}
+        >
+          重试
+        </button>
+        <button
+          className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
+          onClick={() => setShowHint((v) => !v)}
+        >
+          {showHint ? "收起说明" : "查看启动说明"}
+        </button>
+        <button
+          className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
+          onClick={onNew}
+        >
+          新一轮
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   Main Component
+   ═══════════════════════════════════════════════ */
+
+const EXAMPLE_PROMPTS = [
+  "明天带娃半天，预算 300",
+  "朋友来上海，找小众路线",
+  "下雨天室内好去处",
+  "纪念日约会西餐路线",
+];
+
+export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
+  const [mode, setMode] = useState<"idle" | "chat">("idle");
   const [inputValue, setInputValue] = useState("");
-  const [city] = useState("上海");
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [planId, setPlanId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [actionQuotingId, setActionQuotingId] = useState<string | null>(null);
-  const [actionQuotedPreview, setActionQuotedPreview] = useState<{
-    actionId: string;
-    title: string;
-    price?: string;
-    cancelLabel?: string;
-  } | null>(null);
-  const [cachedActions, setCachedActions] = useState<ExecutionActionCard[]>([]);
-  const [backendOk, setBackendOk] = useState<boolean | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [phase, setPhase] = useState<ChatPhase>("idle");
+  const [isBusy, setIsBusy] = useState(false);
+  const [healthOk, setHealthOk] = useState<boolean | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const endRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const lastPlanIdRef = useRef<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const isBusy = phase === "understanding" || phase === "planning";
-  const isChat = phase !== "idle";
+  const city = user?.city || "上海";
 
-  /* ── Health check ── */
-  useEffect(() => {
-    let cancelled = false;
-    checkHealth().then((res) => {
-      if (!cancelled) setBackendOk(res.ok);
-    });
-    return () => { cancelled = true; };
-  }, []);
-
-  /* ── Auto-scroll messages ── */
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+  /* ── Scroll to bottom helper ── */
+  const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
-      endRef.current?.scrollIntoView({ behavior });
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     });
   }, []);
 
+  /* ── Health check on mount ── */
   useEffect(() => {
-    if (isChat) scrollToBottom();
-  }, [messages, actionQuotedPreview, actionQuotingId, isChat, scrollToBottom]);
+    checkHealth()
+      .then((r) => setHealthOk(r.ok))
+      .catch(() => setHealthOk(false));
+  }, []);
 
-  /* ── Helpers ── */
-  const addMessage = (msg: ChatMessage) => setMessages((prev) => [...prev, msg]);
+  /* ── Auto-scroll when messages change ── */
+  useEffect(() => {
+    if (mode === "chat") scrollToBottom();
+  }, [messages, mode, scrollToBottom]);
 
-  const appendAssistantText = (content: string) => {
-    addMessage({ id: uuid(), role: "assistant", type: "text", content, ts: Date.now() });
-  };
+  /* ── Focus textarea on mode switch ── */
+  useEffect(() => {
+    if (mode === "idle") {
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    }
+  }, [mode]);
 
-  const removeMessage = (id: string) => {
-    setMessages((prev) => prev.filter((m) => m.id !== id));
-  };
+  /* ── Message helpers ── */
+  const addMessage = useCallback((msg: ChatMessage) => {
+    setMessages((prev) => [...prev, msg]);
+  }, []);
 
-  /* ── Adapters ── */
-  const adaptPlan = (opt: PlanningOption): PlanningPlanCard => ({
-    id: opt.id,
-    title: opt.title,
-    summary: opt.summary,
-    timeline: opt.timeline.map((step) => ({
-      time: step.startTime,
-      title: step.title,
-      subtitle: step.poiName
-        ? `${step.poiName}${step.durationMinutes ? ` · ${step.durationMinutes}min` : ""}`
-        : step.durationMinutes
-          ? `${step.durationMinutes}min`
-          : undefined,
-    })),
-    tags: opt.highlights.slice(0, 4),
-    budget: `¥${opt.totalCostMin}–${opt.totalCostMax}`,
-    distance: opt.walkingKm ? `${opt.walkingKm}km` : undefined,
-    risk: opt.risks?.[0],
-  });
-
-  const adaptActions = (actions: PlanningExecutableAction[]): ExecutionActionCard[] =>
-    actions.map((a) => ({
-      id: a.id,
-      type: a.type,
-      title: a.title,
-      description: a.description,
-      status: a.status,
-      priceEstimate: a.priceEstimate,
-      confirmLabel: actionConfirmLabel(a.type),
-      cancelLabel: "取消",
-    }));
-
-  const actionConfirmLabel = (type: string) => {
-    if (type.includes("reservation")) return "预点餐";
-    if (type.includes("ticket")) return "锁优惠";
-    if (type.includes("calendar")) return "下载 ICS";
-    if (type.includes("share")) return "发送到群里";
-    if (type.includes("navigation")) return "打开地图";
-    if (type.includes("memory")) return "保存回忆";
-    return "确认";
-  };
-
-  /* ── Core: submit planning request ── */
-  const doSubmit = async (prompt: string) => {
-    if (!prompt || isBusy) return;
-
-    setError(null);
-    setInputValue("");
-    setActionQuotedPreview(null);
-    setActionQuotingId(null);
-
-    addMessage({ id: uuid(), role: "user", content: prompt, ts: Date.now() });
-    setPhase("understanding");
-
-    // Streaming typewriter
-    const understandingId = uuid();
-    const fullText = "正在理解你的需求，马上生成方案…";
-    let currentText = "";
-    for (let i = 0; i < fullText.length; i++) {
-      currentText += fullText[i];
-      const text = currentText;
+  const updateLastAssistant = useCallback(
+    (patch: Partial<ChatMessage>) => {
       setMessages((prev) => {
-        const exists = prev.some((m) => m.id === understandingId);
-        if (exists) {
-          return prev.map((m) =>
-            m.id === understandingId ? { ...m, content: text } : m
-          );
+        const next = [...prev];
+        for (let i = next.length - 1; i >= 0; i--) {
+          if (next[i].role === "assistant") {
+            next[i] = { ...next[i], ...patch };
+            break;
+          }
         }
-        return [
-          ...prev,
-          {
-            id: understandingId,
-            role: "assistant" as const,
-            type: "text" as const,
-            content: text,
-            ts: Date.now(),
-          },
-        ];
+        return next;
       });
-      await new Promise((r) => setTimeout(r, 35));
-    }
+    },
+    [],
+  );
 
-    setPhase("planning");
+  /* ── Core submit flow ── */
+  const doSubmit = useCallback(
+    async (prompt: string) => {
+      if (!prompt || isBusy) return;
 
-    try {
-      const result = await requestPlanning({ prompt, city });
-      setBackendOk(true);
-      removeMessage(understandingId);
+      setMode("chat");
+      setIsBusy(true);
+      setPhase("understanding");
 
-      const planCards = result.options.map(adaptPlan);
-      const actions = adaptActions(result.executableActions);
-      setPlanId(result.planId);
-      setCachedActions(actions);
-      lastPlanIdRef.current = result.planId;
-
-      appendAssistantText(result.summary || "这是为你生成的方案：");
-      addMessage({
+      // 1) Add user message
+      const userMsg: ChatMessage = {
         id: uuid(),
+        role: "user",
+        content: prompt,
+        createdAt: new Date().toISOString(),
+      };
+      addMessage(userMsg);
+      setInputValue("");
+
+      // 2) Add assistant thinking placeholder
+      const thinkingId = uuid();
+      const thinkingMsg: ChatMessage = {
+        id: thinkingId,
         role: "assistant",
-        type: "plan_cards",
         content: "",
-        plans: planCards,
-        ts: Date.now(),
-      });
-      setPhase("result");
-    } catch (err) {
-      removeMessage(understandingId);
-      const raw = err instanceof Error ? err.message : "请求失败";
-      const isNetwork = raw.includes("无法连接") || raw.includes("Failed to fetch") || raw.includes("网络");
-      const friendly = isNetwork
-        ? "没有连上规划服务。请确认后端已启动：npm run dev:api，并检查 VITE_API_BASE 配置。"
-        : raw;
-      setBackendOk(false);
-      setError(friendly);
-      setPhase("error");
-    }
-  };
+        status: "thinking",
+        chips: ["时间", "预算", city, "天气", "路线"],
+        createdAt: new Date().toISOString(),
+      };
+      addMessage(thinkingMsg);
 
-  const handleComposerSubmit = () => doSubmit(inputValue.trim());
+      // 3) Call API
+      try {
+        setPhase("planning");
+        const result = await requestPlanning({
+          prompt,
+          city,
+          companions: "family",
+        });
 
-  const handleExampleChip = (prompt: string) => doSubmit(prompt);
+        if (result.options && result.options.length > 0) {
+          updateLastAssistant({
+            status: "success",
+            content: result.summary || "为你找到以下方案：",
+            chips: undefined,
+            plans: result.options,
+            actions: result.executableActions,
+          });
+          setPhase("result");
+        } else {
+          updateLastAssistant({
+            status: "success",
+            content: result.summary || "已完成规划。",
+            chips: undefined,
+          });
+          setPhase("done");
+        }
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : "规划服务暂时不可用";
+        updateLastAssistant({
+          status: "error",
+          content: errorMsg,
+          chips: undefined,
+        });
+        setPhase("error");
+      } finally {
+        setIsBusy(false);
+      }
+    },
+    [isBusy, city, addMessage, updateLastAssistant],
+  );
 
-  const handleChipToInput = (prompt: string) => {
+  /* ── Event handlers ── */
+  const handleComposerSubmit = useCallback(
+    (attachments: AttachmentItem[]) => {
+      let prompt = inputValue.trim();
+      if (attachments.length > 0) {
+        const names = attachments.map((a) => a.file.name).join("、");
+        prompt = prompt ? `${prompt}\n[附件: ${names}]` : `[附件: ${names}]`;
+      }
+      doSubmit(prompt);
+    },
+    [inputValue, doSubmit],
+  );
+
+  const handleExampleChip = useCallback((prompt: string) => {
+    doSubmit(prompt);
+  }, [doSubmit]);
+
+  const handleChipToInput = useCallback((prompt: string) => {
     setInputValue(prompt);
     requestAnimationFrame(() => textareaRef.current?.focus());
-  };
+  }, []);
 
-  /* ── Composer buttons ── */
-  const handlePlusClick = () => setToast("附件与更多输入方式稍后接入");
-  const handleVoiceClick = () => setToast("语音输入稍后接入");
-
-  /* ── Plan selection ── */
-  const handleSelectPlan = async (cardId: string, title: string) => {
-    if (phase === "executing") return;
-    setPhase("executing");
-    setActionQuotedPreview(null);
-    setActionQuotingId(null);
-    appendAssistantText(`已选择「${title}」，正在处理…`);
-
-    try {
-      const selectedActions =
-        cachedActions.length > 0
-          ? cachedActions.filter((a) => !(a as any).optionId || (a as any).optionId === cardId)
-          : [];
-
-      if (selectedActions.length > 0) {
-        addMessage({
-          id: uuid(),
-          role: "assistant",
-          type: "action_cards",
-          content: "以下是可以立即执行的操作：",
-          actions: selectedActions,
-          ts: Date.now(),
-        });
-      } else {
-        appendAssistantText("这套方案已选中，后续将接入预约、日历和分享。");
-      }
+  const handleSelectPlan = useCallback(
+    (planId: string) => {
       setPhase("selected");
-    } catch (err) {
-      appendAssistantText(err instanceof Error ? err.message : "选择方案失败");
-      setPhase("error");
-    }
-  };
+      const actionMsg: ChatMessage = {
+        id: uuid(),
+        role: "assistant",
+        content: "这套方案可以继续处理以下事项，你想先做哪一步？",
+        status: "success",
+        createdAt: new Date().toISOString(),
+      };
+      addMessage(actionMsg);
+      scrollToBottom();
+    },
+    [addMessage, scrollToBottom],
+  );
 
-  /* ── Action operations ── */
-  const handleQuoteAction = async (actionId: string) => {
-    setActionQuotingId(actionId);
-    setActionQuotedPreview(null);
-    try {
-      const result = await apiQuoteAction(actionId);
-      setCachedActions((prev) =>
-        prev.map((a) =>
-          a.id === actionId
-            ? { ...a, status: result.status, priceEstimate: result.priceEstimate }
-            : a
-        )
-      );
-      setActionQuotedPreview({
-        actionId,
-        title: result.title,
-        price: result.priceEstimate,
-        cancelLabel: "取消",
-      });
-    } catch (err) {
-      appendAssistantText(err instanceof Error ? err.message : "获取报价失败");
-    } finally {
-      setActionQuotingId(null);
-    }
-  };
+  const handleRetryLast = useCallback(() => {
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+    if (lastUser) doSubmit(lastUser.content);
+  }, [messages, doSubmit]);
 
-  const handleConfirmAction = async (actionId: string) => {
-    setActionQuotingId(actionId);
-    try {
-      const result = await apiConfirmAction(actionId);
-      setCachedActions((prev) =>
-        prev.map((a) => (a.id === actionId ? { ...a, status: result.status } : a))
-      );
-      setActionQuotedPreview(null);
-
-      const action = cachedActions.find((a) => a.id === actionId);
-      const label = action?.type.includes("reservation")
-        ? "预订成功"
-        : action?.type.includes("ticket")
-          ? "已锁定优惠"
-          : action?.type.includes("calendar")
-            ? "ICS 已生成"
-            : "操作成功";
-      appendAssistantText(`✅ ${label} — ${action?.title || ""}`);
-
-      if (action?.type.includes("share")) {
-        appendAssistantText("📋 已复制分享链接，快发给朋友吧！");
-      }
-      if (action?.type.includes("memory") && user?.id) {
-        appendAssistantText("记忆已同步到个人主页 🧠");
-      }
-
-      const allDone = cachedActions
-        .filter((a) => a.id !== actionId)
-        .every((a) => a.status === "confirmed" || a.status === "cancelled");
-      if (allDone) {
-        setPhase("done");
-        appendAssistantText("所有操作已完成 🎉");
-      } else {
-        setPhase("selected");
-      }
-    } catch (err) {
-      appendAssistantText(err instanceof Error ? err.message : "确认失败");
-    } finally {
-      setActionQuotingId(null);
-    }
-  };
-
-  const handleCancelAction = async (actionId: string) => {
-    setActionQuotingId(actionId);
-    try {
-      const result = await apiCancelAction(actionId);
-      setCachedActions((prev) =>
-        prev.map((a) => (a.id === actionId ? { ...a, status: result.status } : a))
-      );
-      setActionQuotedPreview(null);
-
-      const allDone = cachedActions
-        .filter((a) => a.id !== actionId)
-        .every((a) => a.status === "confirmed" || a.status === "cancelled");
-      if (allDone) {
-        setPhase("done");
-        appendAssistantText("所有操作已完成 🎉");
-      } else {
-        setPhase("selected");
-      }
-    } catch (err) {
-      appendAssistantText(err instanceof Error ? err.message : "取消失败");
-    } finally {
-      setActionQuotingId(null);
-    }
-  };
-
-  const handleWhatIf = async (scenario: "rain" | "late" | "budget") => {
-    if (!lastPlanIdRef.current) return;
-    const prompt =
-      scenario === "rain"
-        ? "如果下雨怎么办"
-        : scenario === "late"
-          ? "如果迟到 1 小时怎么办"
-          : "预算减半怎么调整";
-    doSubmit(`${prompt}，基于当前方案调整`);
-  };
-
-  const handleNewRound = () => {
+  const handleNewChat = useCallback(() => {
+    setMode("idle");
     setMessages([]);
     setPhase("idle");
-    setPlanId(null);
-    setError(null);
-    setCachedActions([]);
-    setActionQuotedPreview(null);
-    setActionQuotingId(null);
-    lastPlanIdRef.current = null;
+    setInputValue("");
+    setSidebarOpen(false);
     requestAnimationFrame(() => textareaRef.current?.focus());
-  };
+  }, []);
 
-  /* ── Message renderer ── */
-  const renderMessage = (msg: ChatMessage) => {
-    if (msg.role === "user") {
-      return (
-        <div key={msg.id} className={styles.featureMessageRowRight}>
-          <div className={styles.featureUserBubble}>
-            <p>{msg.content}</p>
+  /* ── Render: message content ── */
+  const renderMessageContent = useCallback(
+    (msg: ChatMessage) => {
+      if (msg.role === "user") {
+        return (
+          <div className={styles.messageUser}>
+            <div className={styles.messageUserBubble}>{msg.content}</div>
           </div>
-        </div>
-      );
-    }
+        );
+      }
 
-    if (msg.type === "thinking") {
+      // Assistant message
       return (
-        <div key={msg.id} className={styles.featureMessageRowLeft}>
-          <div className={styles.featureAssistantBubble}>
-            <div className={styles.featureThinkingDots}>
-              <span /><span /><span />
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (msg.type === "text") {
-      return (
-        <div key={msg.id} className={styles.featureMessageRowLeft}>
-          <div className={styles.featureAssistantBubble}>
-            <p>{msg.content}</p>
-          </div>
-        </div>
-      );
-    }
-
-    if (msg.type === "plan_cards" && msg.plans) {
-      return (
-        <div key={msg.id} className={styles.featureMessageRowLeft}>
-          <div className={styles.featureAssistantBubble}>
-            {msg.content && <p>{msg.content}</p>}
-            <div className={styles.featurePlanCardsScroll}>
-              {msg.plans.map((card) => (
-                <div key={card.id} className={styles.featurePlanCard}>
-                  <div className={styles.featurePlanCardHeader}>
-                    <h4>{card.title}</h4>
+        <div className={styles.messageAssistant}>
+          <div className={styles.messageAssistantBubble}>
+            {/* Thinking state */}
+            {msg.status === "thinking" && (
+              <div className={styles.thinkingContent}>
+                <div>我先整理时间、预算、同行人和位置。</div>
+                {msg.chips && (
+                  <div className={styles.thinkingChips}>
+                    {msg.chips.map((c) => (
+                      <span key={c} className={styles.thinkingChip}>{c}</span>
+                    ))}
                   </div>
-                  <p className={styles.featurePlanCardSummary}>{card.summary}</p>
-                  {card.reason && (
-                    <p className={styles.featurePlanCardReason}>{card.reason}</p>
-                  )}
-                  {card.timeline.length > 0 && (
-                    <div className={styles.featureTimeline}>
-                      {card.timeline.map((step, i) => (
-                        <div key={i} className={styles.featureTimelineItem}>
-                          <span className={styles.featureTimelineTime}>{step.time}</span>
-                          <span className={styles.featureTimelineTitle}>{step.title}</span>
-                          {step.subtitle && (
-                            <span className={styles.featureTimelineSub}>{step.subtitle}</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {card.tags.length > 0 && (
-                    <div className={styles.featurePlanTags}>
-                      {card.tags.map((t, i) => (
-                        <span key={i} className={styles.featurePlanTag}>{t}</span>
-                      ))}
-                    </div>
-                  )}
-                  <div className={styles.featurePlanMeta}>
-                    <span>💰 {card.budget}</span>
-                    {card.distance && <span>🚶 {card.distance}</span>}
-                  </div>
-                  {card.risk && <p className={styles.featurePlanRisk}>⚠️ {card.risk}</p>}
-                  {phase === "result" && (
-                    <Button
-                      variant="primary"
-                      size="small"
-                      className={styles.featurePlanSelectBtn}
-                      onClick={() => handleSelectPlan(card.id, card.title)}
-                    >
-                      选这个方案
-                    </Button>
-                  )}
+                )}
+                <div className={styles.thinkingDots}>
+                  <span /><span /><span />
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (msg.type === "action_cards" && msg.actions) {
-      return (
-        <div key={msg.id} className={styles.featureMessageRowLeft}>
-          <div className={styles.featureAssistantBubble}>
-            {msg.content && <p>{msg.content}</p>}
-            <div className={styles.featureActionCardsGrid}>
-              {msg.actions.map((action) => (
-                <div
-                  key={action.id}
-                  className={`${styles.featureActionCard} ${
-                    action.status === "confirmed" ? styles.featureActionCardConfirmed : ""
-                  } ${action.status === "cancelled" ? styles.featureActionCardCancelled : ""}`}
-                >
-                  <div className={styles.featureActionCardHeader}>
-                    <span className={styles.featureActionTypeIcon}>
-                      {action.type.includes("reservation") && "🍽️"}
-                      {action.type.includes("ticket") && "🎫"}
-                      {action.type.includes("calendar") && "📅"}
-                      {action.type.includes("share") && "📤"}
-                      {action.type.includes("navigation") && "🗺️"}
-                      {action.type.includes("memory") && "🧠"}
-                    </span>
-                    <span className={styles.featureActionTitle}>{action.title}</span>
-                    {action.status === "confirmed" && (
-                      <span className={styles.featureActionConfirmedBadge}>✅ 已确认</span>
-                    )}
-                    {action.status === "cancelled" && (
-                      <span className={styles.featureActionCancelledBadge}>已取消</span>
-                    )}
-                  </div>
-                  <p className={styles.featureActionDesc}>{action.description}</p>
-
-                  {actionQuotedPreview?.actionId === action.id && (
-                    <div className={styles.featureActionPreview}>
-                      <div className={styles.featureActionPreviewContent}>
-                        <div className={styles.featureActionPreviewTitle}>
-                          {actionQuotedPreview.title}
-                        </div>
-                        {actionQuotedPreview.price && (
-                          <div className={styles.featureActionPreviewPrice}>
-                            {actionQuotedPreview.price}
-                          </div>
-                        )}
-                      </div>
-                      <div className={styles.featureActionPreviewActions}>
-                        <Button
-                          variant="primary"
-                          size="small"
-                          disabled={actionQuotingId === action.id}
-                          onClick={() => handleConfirmAction(action.id)}
-                        >
-                          {action.confirmLabel || "确认"}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="small"
-                          disabled={actionQuotingId === action.id}
-                          onClick={() => {
-                            setActionQuotedPreview(null);
-                            handleCancelAction(action.id);
-                          }}
-                        >
-                          {actionQuotedPreview.cancelLabel || "取消"}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {action.status !== "confirmed" &&
-                    action.status !== "cancelled" &&
-                    !actionQuotedPreview?.actionId && (
-                      <div className={styles.featureActionBtns}>
-                        {action.priceEstimate && action.status === "quoted" ? (
-                          <>
-                            <Button
-                              variant="primary"
-                              size="small"
-                              disabled={actionQuotingId === action.id}
-                              onClick={() => handleConfirmAction(action.id)}
-                            >
-                              {actionQuotingId === action.id
-                                ? "处理中…"
-                                : action.confirmLabel || "确认"}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="small"
-                              disabled={actionQuotingId === action.id}
-                              onClick={() => handleCancelAction(action.id)}
-                            >
-                              取消
-                            </Button>
-                          </>
-                        ) : (
-                          <Button
-                            variant="primary"
-                            size="small"
-                            disabled={actionQuotingId === action.id}
-                            onClick={() => handleQuoteAction(action.id)}
-                          >
-                            {actionQuotingId === action.id
-                              ? "查询中…"
-                              : action.confirmLabel || "查看详情"}
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (msg.type === "action_result") {
-      return (
-        <div key={msg.id} className={styles.featureMessageRowLeft}>
-          <div className={styles.featureAssistantBubble}>
-            <p>{msg.content}</p>
-          </div>
-        </div>
-      );
-    }
-
-    return null;
-  };
-
-  /* ── Show what-if bar ── */
-  const showWhatIfBar = phase === "selected" || phase === "done";
-
-  /* ═══════════════════════════════════════════════
-     IDLE STATE — Gemini-style centered entry
-     ═══════════════════════════════════════════════ */
-  if (!isChat) {
-    return (
-      <div className={styles.featureShell}>
-        <AmbientBackground />
-
-        <div className={styles.featureHome}>
-          <h1 className={styles.featureTitle}>周末去哪儿</h1>
-          <p className={styles.featureSubtitle}>输入一句话，Agent帮你规划完美周末</p>
-
-          <Composer
-            textareaRef={textareaRef}
-            value={inputValue}
-            onChange={setInputValue}
-            onSubmit={handleComposerSubmit}
-            disabled={isBusy}
-            showMeta
-            user={user}
-            city={city}
-            onOpenModal={onOpenModal}
-            onToast={setToast}
-          />
-
-          {toast && <InlineToast message={toast} onDone={() => setToast(null)} />}
-
-          <div className={styles.featurePromptChips}>
-            {EXAMPLE_CHIPS.map((chip) => (
-              <button
-                key={chip.label}
-                className={styles.featurePromptChip}
-                onClick={() => handleExampleChip(chip.prompt)}
-              >
-                {chip.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {backendOk === false && (
-          <div className={styles.featureHealthHint}>
-            规划服务暂时没连上，请确认 <code>npm run dev:api</code> 已启动
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  /* ═══════════════════════════════════════════════
-     CHAT STATE — single-viewport workspace
-     ═══════════════════════════════════════════════ */
-  return (
-    <div className={styles.featureShell}>
-      <AmbientBackground />
-
-      <div className={styles.featureChat}>
-        {/* Messages */}
-        <div className={styles.featureMessages}>
-          <div className={styles.featureMessagesInner}>
-            {messages.map(renderMessage)}
-            <div ref={endRef} />
-          </div>
-        </div>
-
-        {/* What-if bar */}
-        {showWhatIfBar && (
-          <div className={styles.featureWhatIfBar}>
-            <span className={styles.featureWhatIfLabel}>💡 如果…</span>
-            {WHAT_IF_OPTIONS.map((opt) => (
-              <button
-                key={opt.key}
-                className={styles.featureWhatIfBtn}
-                onClick={() => handleWhatIf(opt.key)}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Error card */}
-        {phase === "error" && error && (
-          <div className={styles.featureErrorCard}>
-            <div className={styles.featureErrorTitle}>{error}</div>
-            <div className={styles.featureErrorActions}>
-              <Button
-                variant="primary"
-                size="small"
-                onClick={() => {
-                  setError(null);
-                  const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
-                  if (lastUserMsg) doSubmit(lastUserMsg.content);
-                }}
-              >
-                重试
-              </Button>
-              <Button variant="ghost" size="small" onClick={handleNewRound}>
-                新一轮
-              </Button>
-              {backendOk === false && (
-                <button
-                  className={styles.featureErrorHelpToggle}
-                  onClick={(e) => {
-                    const el = e.currentTarget.nextElementSibling as HTMLElement;
-                    if (el) el.hidden = !el.hidden;
-                  }}
-                >
-                  查看启动说明
-                </button>
-              )}
-            </div>
-            {backendOk === false && (
-              <div className={styles.featureErrorHelp} hidden>
-                <pre>{`npm run dev          # 启动前端 (5173)
-npm run dev:api      # 启动后端 (3001)
-
-# .env.local
-VITE_API_BASE=${getApiBase()}
-PORT=3001`}</pre>
               </div>
             )}
-          </div>
-        )}
 
-        {/* Docked composer */}
-        <div className={styles.featureComposerDock}>
-          <div className={styles.featureComposerDockInner}>
-            <button
-              className={styles.featureNewRoundBtn}
-              onClick={handleNewRound}
-              title="新一轮规划"
-            >
-              🔄
-            </button>
+            {/* Error state */}
+            {msg.status === "error" && (
+              <ErrorCardView
+                message={msg.content}
+                onRetry={handleRetryLast}
+                onNew={handleNewChat}
+              />
+            )}
+
+            {/* Success state */}
+            {msg.status === "success" && (
+              <>
+                {msg.content && <div className={styles.resultSummary}>{msg.content}</div>}
+
+                {/* Plan cards */}
+                {msg.plans && msg.plans.length > 0 && (
+                  <div className={styles.planCards}>
+                    {msg.plans.map((plan) => (
+                      <PlanCardView
+                        key={plan.id}
+                        plan={plan}
+                        selected={phase === "selected" || phase === "done"}
+                        onSelect={handleSelectPlan}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Executable actions */}
+                {msg.actions && msg.actions.length > 0 && (
+                  <div className={styles.actionCards}>
+                    {msg.actions.map((action) => (
+                      <div key={action.id} className={styles.actionCard}>
+                        <div className={styles.actionCardTitle}>{action.title}</div>
+                        <div className={styles.actionCardDesc}>{action.description}</div>
+                        {action.priceEstimate && (
+                          <div className={styles.actionCardPrice}>预估：{action.priceEstimate}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Next action chips */}
+                {phase === "selected" && (
+                  <div className={styles.nextActionChips}>
+                    {["保存方案", "生成日历", "分享给同行人", "查看预约建议", "打开导航"].map(
+                      (label) => (
+                        <button
+                          key={label}
+                          className={styles.nextActionChip}
+                          onClick={() => setToast(`${label}功能开发中`)}
+                        >
+                          {label}
+                        </button>
+                      ),
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      );
+    },
+    [phase, handleRetryLast, handleNewChat, handleSelectPlan, setToast],
+  );
+
+  /* ═══════════════════════════════════════════════
+     Main render
+     ═══════════════════════════════════════════════ */
+  return (
+    <section className={styles.featureAppShell}>
+      {/* Mobile menu button */}
+      <button
+        className={styles.sidebarMenuBtn}
+        onClick={() => setSidebarOpen(true)}
+        aria-label="打开菜单"
+      >
+        ☰
+      </button>
+
+      {/* Sidebar */}
+      <Sidebar
+        user={user}
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onNewChat={handleNewChat}
+      />
+
+      {/* Main area */}
+      <main className={styles.featureMain}>
+        <AmbientBackground />
+
+        {mode === "idle" ? (
+          /* ── Idle: centered title + composer ── */
+          <div className={styles.featureHome}>
+            <h1 className={styles.featureHomeTitle}>周末去哪儿</h1>
+            <p className={styles.featureHomeSubtitle}>
+              输入一句话，AI 帮你规划完整周末
+            </p>
+
             <Composer
-              compact
               textareaRef={textareaRef}
               value={inputValue}
               onChange={setInputValue}
               onSubmit={handleComposerSubmit}
               disabled={isBusy}
-              placeholder={
-                phase === "result"
-                  ? "选一个方案，或继续描述…"
-                  : phase === "selected" || phase === "done"
-                    ? "还想调整什么？"
-                    : "继续描述…"
-              }
+              showMeta
+              user={user}
+              city={city}
+              onOpenModal={onOpenModal}
               onToast={setToast}
             />
+
             {toast && <InlineToast message={toast} onDone={() => setToast(null)} />}
+
+            <div className={styles.featureChips}>
+              {EXAMPLE_PROMPTS.map((p) => (
+                <button
+                  key={p}
+                  className={styles.featureChip}
+                  onClick={() => handleChipToInput(p)}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+
+            {healthOk !== null && (
+              <div className={styles.featureHealthHint}>
+                <span
+                  className={styles.healthDot}
+                  style={{ background: healthOk ? "#22c55e" : "#ef4444" }}
+                />
+                {healthOk
+                  ? "规划服务已连接"
+                  : `未连接后端 · ${getApiBase()}`}
+              </div>
+            )}
           </div>
-        </div>
-      </div>
-    </div>
+        ) : (
+          /* ── Chat: messages + docked composer ── */
+          <div className={styles.featureChat}>
+            <div className={styles.featureMessages}>
+              <div className={styles.featureMessagesInner}>
+                {messages.map((msg) => (
+                  <div key={msg.id}>{renderMessageContent(msg)}</div>
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
+            </div>
+
+            <div className={styles.featureComposerDock}>
+              <Composer
+                compact
+                textareaRef={textareaRef}
+                value={inputValue}
+                onChange={setInputValue}
+                onSubmit={handleComposerSubmit}
+                disabled={isBusy}
+                placeholder={
+                  phase === "result"
+                    ? "选一个方案，或继续描述…"
+                    : phase === "selected" || phase === "done"
+                      ? "还想调整什么？"
+                      : "继续描述…"
+                }
+                onToast={setToast}
+              />
+              {toast && <InlineToast message={toast} onDone={() => setToast(null)} />}
+            </div>
+          </div>
+        )}
+      </main>
+    </section>
   );
 }

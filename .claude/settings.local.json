@@ -3,7 +3,12 @@
     "allow": [
       "Bash(npm run *)",
       "Bash(curl -s http://localhost:5173/)",
-      "Bash(pkill -f \"npm run dev\")"
+      "Bash(pkill -f \"npm run dev\")",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3001)",
+      "Bash(taskkill *)",
+      "Bash(Stop-Process *)",
+      "Bash(PORT=3002 npm run *)"
     ]
   }
 }
