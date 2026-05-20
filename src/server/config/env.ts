@@ -33,6 +33,14 @@ const envSchema = z.object({
   // ── 外部工具 ──
   AMAP_WEB_SERVICE_KEY: z.string().optional(),
   QWEATHER_API_KEY: z.string().optional(),
+
+  // ── 美团 OAuth（可选）──
+  MEITUAN_APP_KEY: z.string().optional(),
+  MEITUAN_APP_SECRET: z.string().optional(),
+  MEITUAN_REDIRECT_URI: z.string().optional(),
+  MEITUAN_AUTH_URL: z.string().optional(),
+  MEITUAN_TOKEN_URL: z.string().optional(),
+  MEITUAN_USERINFO_URL: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);

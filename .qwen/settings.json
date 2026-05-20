@@ -28,7 +28,18 @@
       "Bash(tasklist *)",
       "Bash(f *)",
       "Bash('curl -s -x post http://127.0.0.1:3001/api/auth/login -h \"content-type: application/json\" -d \"{\\\"email\\\":\\\"xiaoming@example.com\\\",\\\"password\\\":\\\"weekend123\\\"}\"')",
-      "Bash(do *)"
+      "Bash(do *)",
+      "Bash(ping *)",
+      "Bash(taskkill *)",
+      "Bash(docker compose config)",
+      "Bash(docker ps)",
+      "Bash(copy *)",
+      "Bash(docker info)",
+      "Bash(docker compose up *)",
+      "Bash(start *)",
+      "Bash(docker stop *)",
+      "Bash(pg_isready *)",
+      "Bash(docker exec *)"
     ]
   },
   "$version": 4

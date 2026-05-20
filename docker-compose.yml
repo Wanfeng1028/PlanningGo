@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -51,12 +49,18 @@ services:
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
       BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-10}
       PLANNING_MODE: ${PLANNING_MODE:-mock}
+      ENABLE_LLM_FALLBACK: ${ENABLE_LLM_FALLBACK:-false}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       LLM_MODEL: ${LLM_MODEL:-gpt-4o}
+      LLM_FLASH_MODEL: ${LLM_FLASH_MODEL:-}
+      LLM_PRO_MODEL: ${LLM_PRO_MODEL:-}
       LLM_TIMEOUT_MS: ${LLM_TIMEOUT_MS:-30000}
       AMAP_WEB_SERVICE_KEY: ${AMAP_WEB_SERVICE_KEY:-}
       QWEATHER_API_KEY: ${QWEATHER_API_KEY:-}
+      MEITUAN_APP_KEY: ${MEITUAN_APP_KEY:-}
+      MEITUAN_APP_SECRET: ${MEITUAN_APP_SECRET:-}
+      MEITUAN_REDIRECT_URI: ${MEITUAN_REDIRECT_URI:-http://127.0.0.1:3001/api/auth/meituan/callback}
     depends_on:
       postgres:
         condition: service_healthy

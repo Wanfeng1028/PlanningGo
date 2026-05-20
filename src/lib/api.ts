@@ -724,6 +724,9 @@ export interface ReverseGeocodeResult {
   district: string;
   address: string;
   formattedAddress: string;
+  source?: "amap" | "fallback";
+  confidence?: "high" | "low";
+  needsConfirmation?: boolean;
 }
 
 export async function reverseGeocode(lat: number, lng: number): Promise<ReverseGeocodeResult> {

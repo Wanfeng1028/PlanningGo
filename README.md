@@ -7,7 +7,7 @@
 ![Status](https://img.shields.io/badge/Status-Demo%20Ready-27ae60?style=for-the-badge)
 ![Language](https://img.shields.io/badge/Language-Chinese-3b7f8f?style=for-the-badge)
 
-**周末有谱** 是一个面向本地生活的周末活动规划 Agent。  
+**周末有谱** 是一个面向本地生活的周末活动规划 Agent。
 它不只是给你推荐地点，而是把「想去哪、和谁去、预算多少、天气如何、要不要排队、能不能预订、怎么分享给家人朋友」这些麻烦事串成一条可执行的计划。
 
 你只需要输入一句话，它会帮你拆解需求、生成多套方案、处理约束、给出路线、提醒授权边界，并把最终计划变成可以执行和分享的周末安排。
@@ -23,90 +23,205 @@
 | 记忆沉淀 | 根据反馈沉淀偏好，下次规划时减少重复确认。 |
 | 失败兜底 | 天气变化、排队过长、预算冲突或预约失败时，给出替代方案。 |
 
-## 产品预览
+## 快速开始
 
-### 首页
+### 环境要求
 
-![Home](design/01.png)
+- Node.js >= 20
+- npm >= 10
+- PostgreSQL 16（可选，mock 模式不需要）
+- Redis 7（可选，mock 模式不需要）
 
-### 能力总览
+### 1. 安装依赖
 
-![Capabilities](design/04.png)
+```bash
+npm install
+```
 
-### 演示地图
+### 2. 配置环境变量
 
-![Demo Map](design/05.png)
+```bash
+cp .env.example .env
+```
 
-## 适合谁用
+默认配置使用 `PLANNING_MODE=mock`，无需 LLM Key、高德 Key 或数据库即可启动。
 
-- 想快速安排周末，但不想反复查攻略的人。
-- 和家人、朋友、情侣一起出门，需要兼顾多人偏好的人。
-- 需要雨天备选、预算控制、路线距离和餐厅预约的人。
-- 想把计划发给别人确认，而不是自己反复解释的人。
+### 3. 启动后端
 
-## 典型使用流程
+```bash
+npm run dev:api
+```
 
-1. 输入一句周末需求，例如：  
-   `周六下午带爸妈轻松逛逛，预算人均 200，不要太累，晚饭要靠谱。`
-2. 系统识别同行人、预算、天气、距离和餐饮偏好。
-3. 生成多套可比较的下午方案。
-4. 选择方案后查看路线、时间线和风险提示。
-5. 确认需要授权的操作，例如定位、预约、日历或分享。
-6. 把行程保存并发送给家人或朋友。
+后端启动后监听 `http://127.0.0.1:3001`。
+
+### 4. 启动前端
+
+```bash
+npm run dev
+```
+
+前端启动后访问 `http://127.0.0.1:5173`。
+
+### 快速 Mock 模式（零配置）
+
+不需要数据库、Redis 或任何 API Key：
+
+```bash
+npm install
+cp .env.example .env
+npm run dev:api   # 终端 1：启动后端
+npm run dev       # 终端 2：启动前端
+```
+
+## 完整本地部署（含数据库）
+
+```bash
+# 1. 启动 PostgreSQL 和 Redis
+npm run docker:up
+
+# 2. 生成 Prisma Client
+npm run db:generate
+
+# 3. 执行数据库迁移
+npm run db:migrate
+
+# 4. 导入种子数据（demo 用户 + 管理员）
+npm run db:seed
+
+# 5. 启动后端
+npm run dev:api
+
+# 6. 启动前端
+npm run dev
+```
+
+种子数据中的测试账号：
+- 邮箱：`xiaoming@example.com`，密码：`weekend123`
+- 邮箱：`admin@planninggo.com`，密码：`admin123`
+
+## 生产构建
+
+```bash
+# 构建后端（TypeScript -> dist/server/）+ 前端（Vite -> dist/）
+npm run build
+
+# 启动生产后端
+npm run start:api
+```
+
+构建产物：
+- 后端：`dist/server/index.js`
+- 前端：`dist/`（Vite 静态资源）
+
+## Docker 部署
+
+```bash
+# 启动所有服务（PostgreSQL + Redis + API）
+docker compose up -d
+
+# 查看日志
+docker compose logs -f api
+
+# 停止
+docker compose down
+```
+
+## 端口说明
+
+| 服务 | 地址 |
+| --- | --- |
+| 前端 | http://127.0.0.1:5173 |
+| 后端 | http://127.0.0.1:3001 |
+| 健康检查 | http://127.0.0.1:3001/api/health |
+
+## 接口测试
+
+```bash
+# 健康检查
+curl http://127.0.0.1:3001/api/health
+
+# 登录
+curl -X POST http://127.0.0.1:3001/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"xiaoming@example.com","password":"weekend123"}'
+
+# 游客访问
+curl -X POST http://127.0.0.1:3001/api/auth/guest \
+  -H "Content-Type: application/json" \
+  -d '{}'
+
+# 规划（mock 模式）
+curl -X POST http://127.0.0.1:3001/api/agent/plan \
+  -H "Content-Type: application/json" \
+  -d '{"prompt":"明天带娃半天，预算300","city":"上海","modelMode":"flash"}'
+
+# 逆地理编码
+curl "http://127.0.0.1:3001/api/location/reverse-geocode?lat=31.2304&lng=121.4737"
+
+# 美团登录状态
+curl http://127.0.0.1:3001/api/auth/meituan/start
+```
+
+## 常见问题
+
+**后端启动报错 "ECONNREFUSED"**
+→ PostgreSQL 或 Redis 未启动。运行 `npm run docker:up` 或确认本地服务已运行。
+
+**端口不一致**
+→ 项目统一使用后端 `3001`、前端 `5173`。如需修改，在 `.env` 中设置 `PORT` 和 `VITE_API_BASE`。
+
+**高德 Key 未配置**
+→ 定位功能会使用 fallback 模式，返回低可信度城市匹配，页面会提示用户确认城市。不影响核心功能。
+
+**PLANNING_MODE=mock 不需要 LLM Key**
+→ mock 模式使用本地生成的方案数据，不调用任何 LLM API。
+
+**美团登录未配置**
+→ 返回 `configured: false`，不影响其他登录方式（邮箱、游客）。
+
+**npm run build 失败**
+→ 确保 TypeScript 版本 >= 5.9。运行 `npm run typecheck` 查看具体错误。
+
+## 服务器部署建议
+
+### 方案一：Nginx + PM2
+
+```bash
+# 1. 构建
+npm install
+npm run build
+
+# 2. 使用 PM2 启动后端
+pm2 start dist/server/index.js --name planninggo-api
+
+# 3. Nginx 配置
+# 前端静态文件指向 dist/
+# /api/* 反代到 http://127.0.0.1:3001
+```
+
+### 方案二：Docker Compose
+
+```bash
+# 配置 .env 中的生产变量
+# JWT_ACCESS_SECRET / JWT_REFRESH_SECRET 必须替换为强密钥
+# CORS_ORIGINS 设置为正式域名
+docker compose up -d
+```
+
+### 生产注意事项
+
+- JWT Secret 必须使用强随机字符串，不能使用默认值
+- CORS_ORIGINS 只允许正式域名
+- 数据库和 Redis 不要暴露公网
+- 建议使用 Cloudflare 或 Let's Encrypt 配置 HTTPS
 
 ## 页面模块
 
 - **首页**：产品价值、Demo 主线、方案预览、能力入口。
 - **功能**：需求对话、定位约束、方案生成、路线预订、授权执行。
 - **场景案例**：家庭、朋友、情侣、雨天、亲子低负担、晚出发压缩。
-- **设计亮点**：颜色、组件、状态、导航和交互体验展示。
 - **开发者**：工具日志、质量看板、接口能力和调试信息。
 - **个人中心**：登录注册、画像、通知、隐私和记忆管理。
-
-## 本地部署
-
-请先确保本地已经安装 Node.js 和 npm。
-
-```bash
-npm install
-npm run dev
-```
-
-启动后访问：
-
-```text
-http://127.0.0.1:5173
-```
-
-如需同时启动本地服务接口：
-
-```bash
-npm run dev:api
-```
-
-默认接口地址：
-
-```text
-http://127.0.0.1:8787
-```
-
-可以通过环境变量覆盖：
-
-```bash
-VITE_API_BASE=http://your-api-host
-```
-
-## 生产构建
-
-```bash
-npm run build
-```
-
-构建产物会输出到：
-
-```text
-dist/
-```
 
 ## 项目标签
 

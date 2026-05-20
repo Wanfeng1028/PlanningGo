@@ -77,15 +77,25 @@ export async function registerLocationRoutes(app: FastifyInstance) {
 
     // 优先高德 API
     const amapResult = await amapReverseGeocode(lat, lng);
-    if (amapResult) return sendOk(reply, amapResult);
+    if (amapResult) {
+      return sendOk(reply, {
+        ...amapResult,
+        source: "amap",
+        confidence: "high",
+        needsConfirmation: false,
+      });
+    }
 
-    // Fallback: 最近城市匹配
+    // Fallback: 最近城市匹配（低可信度，需要用户确认）
     const nearest = findNearestCity(lat, lng);
     return sendOk(reply, {
       city: nearest.city,
       district: nearest.district,
       address: `${nearest.city}${nearest.district}`,
       formattedAddress: `${nearest.city}${nearest.district}附近`,
+      source: "fallback",
+      confidence: "low",
+      needsConfirmation: true,
     });
   });
 }

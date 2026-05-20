@@ -13,51 +13,42 @@ interface HomePageProps {
 
 const routeStops = ["浙大紫金港", "地铁/打车", "断桥", "白堤散步", "湖滨休息"];
 
-const designCards = [
-  {
-    label: "定位",
-    title: "先确定用户在哪里",
-    desc: "别离家太远必须依赖定位或手动起点，本次示例为浙大紫金港。",
-  },
-  {
-    label: "规划",
-    title: "生成 3 套下午方案",
-    desc: "亲子低负担、朋友轻社交、雨天室内，各自有时间线和风险。",
-  },
-  {
-    label: "执行",
-    title: "预约/锁单/分享",
-    desc: "确认后 Agent 安排餐厅、票务、日历、导航，支付由用户本人完成。",
-  },
-  {
-    label: "协作",
-    title: "递给老婆 / 发给朋友",
-    desc: "家人确认、朋友投票，反馈会触发方案微调。",
-  },
-  {
-    label: "记忆",
-    title: "把偏好沉淀下来",
-    desc: "下次少问，自动避开排队和高负担路线。",
-  },
-  {
-    label: "兜底",
-    title: "失败也能继续走",
-    desc: "天气、排队、预算冲突、工具失败都有替代方案。",
-  },
-];
-
 const homeSections = [
   {
     title: "小美Agent帮你把事做完",
     intro: "从一句话到可执行安排：路线、餐厅、票务、日历、分享与记忆。",
+    cards: [
+      { label: "理解", title: "一句话理解需求", desc: "自然语言输入，自动识别时间、预算、同行人、偏好和限制条件。" },
+      { label: "补齐", title: "自动补齐约束", desc: "天气、排队、距离、餐饮偏好、雨天备选，Agent 帮你想全。" },
+      { label: "生成", title: "多方案生成", desc: "亲子低负担、朋友轻社交、雨天室内，各自有时间线和风险。" },
+      { label: "兜底", title: "风险兜底", desc: "天气变化、排队过长、预算冲突或预约失败时，自动给出替代方案。" },
+      { label: "执行", title: "可执行动作", desc: "预约、锁单、导航、日历、分享，确认后 Agent 安排一切。" },
+      { label: "迭代", title: "反馈再调整", desc: "家人确认、朋友投票，反馈会触发方案微调，越用越准。" },
+    ],
   },
   {
     title: "家庭 / 朋友双场景入口",
     intro: "家庭：孩子 5 岁、老婆减脂；朋友：4 人，2 男 2 女。",
+    cards: [
+      { label: "亲子", title: "亲子少走路", desc: "优先选择步行距离短、有儿童设施、停车方便的目的地。" },
+      { label: "孝心", title: "带爸妈不折腾", desc: "节奏慢、有座位、卫生间近、餐厅口味适合长辈。" },
+      { label: "社交", title: "朋友聚会不尴尬", desc: "平衡男女偏好、预算透明、有互动环节也有自由时间。" },
+      { label: "浪漫", title: "情侣安静晚餐", desc: "环境好、不吵、有氛围感、提前预约靠窗位置。" },
+      { label: "天气", title: "雨天室内备选", desc: "下雨自动切换室内路线：商场、展览、桌游、咖啡馆。" },
+      { label: "压缩", title: "晚出发压缩路线", desc: "睡过头也能走，自动压缩行程但保留核心体验。" },
+    ],
   },
   {
     title: "核心能力总览",
     intro: "定位、画像、Planning、地图、餐厅库存、授权执行、协作反馈。",
+    cards: [
+      { label: "定位", title: "定位与城市", desc: "浏览器定位 + 高德逆地理编码，自动确定出发城市和起点。" },
+      { label: "画像", title: "用户画像", desc: "同行人、预算、饮食偏好、步行 tolerance，一次设置长期复用。" },
+      { label: "天气", title: "天气与排队", desc: "实时天气影响路线推荐，排队时长影响餐厅选择。" },
+      { label: "路线", title: "路线时间线", desc: "交通、游玩、用餐串成清晰时间线，精确到每个时段。" },
+      { label: "预约", title: "预约与分享", desc: "餐厅预约、票务锁定、日历生成、一键发给同行人确认。" },
+      { label: "记忆", title: "记忆与隐私", desc: "偏好自动沉淀，下次少问；数据本地优先，可随时清除。" },
+    ],
   },
 ];
 
@@ -269,7 +260,7 @@ export function HomePage({ onNavigate, onOpenModal, user, onAuthRequiredNavigate
                       },
                     }}
                   >
-                    {designCards.map((card) => (
+                    {section.cards.map((card) => (
                       <motion.article
                         className={styles.designCard}
                         variants={{

@@ -22,6 +22,9 @@ function isAuthModal(key: ModalKey | null): key is AuthModalKey {
   return key === "login" || key === "register" || key === "guest";
 }
 
+/** 城市优先级：手动选择 > 高德 > 用户画像 > fallback > 默认 */
+const DEFAULT_CITY_LABEL = "选择城市";
+
 export function App() {
   const [active, setActive] = useState<NavKey>("home");
   const [modal, setModal] = useState<ModalKey | null>(null);
@@ -35,6 +38,7 @@ export function App() {
   });
   const [authRedirectTo, setAuthRedirectTo] = useState<NavKey | null>(null);
   const [pendingAfterAuth, setPendingAfterAuth] = useState<NavKey | null>(null);
+  const [locationConfirmCity, setLocationConfirmCity] = useState<string | null>(null);
 
   const openModal = (key: ModalKey) => {
     if (isAuthModal(key) && active === "profile") {
@@ -42,16 +46,12 @@ export function App() {
     } else {
       setAuthRedirectTo(null);
     }
-
-    // 手动打开弹窗时清除待定跳转，避免 NavBar 登录误触发首页按钮的 pending
     if (isAuthModal(key)) {
       setPendingAfterAuth(null);
     }
-
     setModal(key);
   };
 
-  /** 需要登录才能进入的页面：未登录时开弹窗，已登录时直接跳转 */
   const handleAuthRequiredNavigate = (key: NavKey) => {
     if (!user) {
       setPendingAfterAuth(key);
@@ -78,25 +78,63 @@ export function App() {
     setPendingAfterAuth(null);
   };
 
+  /** 用户手动选择城市（最高优先级） */
+  const handleManualCity = useCallback((city: string) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const updated: SessionUser = {
+        ...prev,
+        city,
+        locationSource: "manual",
+        locationLabel: city,
+      };
+      localStorage.setItem("pg_user", JSON.stringify(updated));
+      return updated;
+    });
+    setLocationConfirmCity(null);
+  }, []);
+
   const handleRequestLocation = useCallback(async () => {
     try {
       const pos = await requestBrowserLocation();
       try {
         const geo = await reverseGeocode(pos.latitude, pos.longitude);
         const label = geo.formattedAddress || `${geo.city}${geo.district}`;
-        setUser((prev) => {
-          if (!prev) return prev;
-          const updated: SessionUser = {
-            ...prev,
-            city: geo.city || prev.city,
-            locationLabel: label,
-            latitude: pos.latitude,
-            longitude: pos.longitude,
-            locationSource: "browser",
-          };
-          localStorage.setItem("pg_user", JSON.stringify(updated));
-          return updated;
-        });
+
+        if (geo.needsConfirmation) {
+          // fallback 模式：保存坐标但提示用户确认城市
+          setUser((prev) => {
+            if (!prev) return prev;
+            const updated: SessionUser = {
+              ...prev,
+              latitude: pos.latitude,
+              longitude: pos.longitude,
+              locationSource: "browser",
+              locationLabel: label,
+              // 不覆盖 city，保持用户已有城市或"选择城市"
+              city: prev.city || DEFAULT_CITY_LABEL,
+            };
+            localStorage.setItem("pg_user", JSON.stringify(updated));
+            return updated;
+          });
+          setLocationConfirmCity(geo.city);
+        } else {
+          // 高德精确结果：直接使用
+          setUser((prev) => {
+            if (!prev) return prev;
+            const updated: SessionUser = {
+              ...prev,
+              city: geo.city || prev.city,
+              locationLabel: label,
+              latitude: pos.latitude,
+              longitude: pos.longitude,
+              locationSource: "browser",
+            };
+            localStorage.setItem("pg_user", JSON.stringify(updated));
+            return updated;
+          });
+          setLocationConfirmCity(null);
+        }
       } catch {
         // 逆地理编码失败，仅保存坐标
         setUser((prev) => {
@@ -113,9 +151,31 @@ export function App() {
         });
       }
     } catch {
-      // 定位失败，静默处理
+      // 定位失败
+      setUser((prev) => {
+        if (!prev) return prev;
+        const updated: SessionUser = {
+          ...prev,
+          locationLabel: "定位暂时不可用，请手动选择城市",
+        };
+        localStorage.setItem("pg_user", JSON.stringify(updated));
+        return updated;
+      });
     }
   }, []);
+
+  /** 统一的位置状态，传给子组件 */
+  const locationState = {
+    city: user?.city || DEFAULT_CITY_LABEL,
+    locationLabel: user?.locationLabel || "",
+    latitude: user?.latitude,
+    longitude: user?.longitude,
+    locationSource: user?.locationSource,
+    needsConfirmation: locationConfirmCity !== null,
+    pendingCity: locationConfirmCity,
+    onConfirmCity: handleManualCity,
+    onDismissConfirm: () => setLocationConfirmCity(null),
+  };
 
   const page = (() => {
     switch (active) {
@@ -136,6 +196,7 @@ export function App() {
             onOpenModal={openModal}
             onRequestLocation={handleRequestLocation}
             onNavigate={setActive}
+            location={locationState}
           />
         );
 
@@ -194,6 +255,19 @@ export function App() {
             setAuthRedirectTo(null);
           }}
         />
+      )}
+
+      {/* 城市确认横幅：定位 fallback 时提示用户确认 */}
+      {locationConfirmCity && !isFeatureWorkspace && (
+        <div className={styles.locationBanner}>
+          <span>已获取当前位置，但城市解析需要确认。推测城市：<strong>{locationConfirmCity}</strong></span>
+          <button type="button" className={styles.bannerConfirmBtn} onClick={() => handleManualCity(locationConfirmCity)}>
+            确认 {locationConfirmCity}
+          </button>
+          <button type="button" className={styles.bannerDismissBtn} onClick={() => setLocationConfirmCity(null)}>
+            手动选择
+          </button>
+        </div>
       )}
 
       <main

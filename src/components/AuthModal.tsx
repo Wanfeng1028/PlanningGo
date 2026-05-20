@@ -88,7 +88,7 @@ export function AuthModal({
   });
 
   // ── 游客画像状态 ──
-  const [guestCity, setGuestCity] = useState("北京");
+  const [guestCity, setGuestCity] = useState("");
   const [guestStartPoint, setGuestStartPoint] = useState("家附近");
   const [guestCustomStart, setGuestCustomStart] = useState("");
   const [guestCompanions, setGuestCompanions] =
@@ -174,19 +174,6 @@ export function AuthModal({
     try {
       let result;
       if (mode === "login") {
-        if (
-          form.email === "xiaoming@example.com" &&
-          form.password === "weekend123"
-        ) {
-          onSuccess({
-            id: "demo_xiaoming",
-            name: "小明",
-            mode: "registered",
-            city: "北京",
-          });
-          onClose();
-          return;
-        }
         result = await login(form.email, form.password);
       } else if (mode === "guest") {
         const budget = BUDGET_PRESETS[guestBudgetIdx] ?? BUDGET_PRESETS[2];

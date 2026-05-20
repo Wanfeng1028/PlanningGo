@@ -57,6 +57,50 @@ $green: #22c55e;
   }
 }
 
+/* ── Location confirmation banner ── */
+.featureLocationBanner {
+  position: relative;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 20px;
+  background: linear-gradient(135deg, #fff8e1, #fff3cd);
+  border-bottom: 1px solid rgba($brand, 0.3);
+  font-size: 13px;
+  color: #664d03;
+  flex-shrink: 0;
+}
+
+.featureBannerConfirmBtn {
+  padding: 3px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba($brand, 0.5);
+  background: $brand;
+  color: $text;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: darken($brand, 8%); }
+}
+
+.featureBannerDismissBtn {
+  padding: 3px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(#6c757d, 0.3);
+  background: transparent;
+  color: #664d03;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+
+  &:hover { background: rgba(#6c757d, 0.08); }
+}
+
 .sidebarOverlay {
   display: none;
   @media (max-width: 860px) {

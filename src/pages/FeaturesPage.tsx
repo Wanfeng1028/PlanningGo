@@ -28,6 +28,17 @@ interface FeaturesPageProps {
   onOpenModal?: (key: ModalKey) => void;
   onRequestLocation?: () => void;
   onNavigate?: (key: NavKey) => void;
+  location?: {
+    city: string;
+    locationLabel: string;
+    latitude?: number;
+    longitude?: number;
+    locationSource?: string;
+    needsConfirmation: boolean;
+    pendingCity: string | null;
+    onConfirmCity: (city: string) => void;
+    onDismissConfirm: () => void;
+  };
 }
 
 type ChatPhase =
@@ -157,6 +168,7 @@ function AmbientBackground() {
 /* ── Sidebar ── */
 function Sidebar({
   user,
+  city,
   open,
   onClose,
   onNewChat,
@@ -170,6 +182,7 @@ function Sidebar({
   onReturnHome,
 }: {
   user?: SessionUser | null;
+  city: string;
   open: boolean;
   onClose: () => void;
   onNewChat: () => void;
@@ -306,7 +319,7 @@ function Sidebar({
               <span className={styles.settingsItemLabel}>位置偏好</span>
               <span className={styles.settingsItemDesc}>用于推荐附近目的地</span>
             </span>
-            <span className={styles.settingsItemValue}>{user?.city || "上海"}</span>
+            <span className={styles.settingsItemValue}>{city}</span>
           </button>
 
           <button className={styles.settingsItem} onClick={() => setShowClearConfirm(true)}>
@@ -757,7 +770,7 @@ function Composer({
 
       {showMeta && (
         <div className={styles.composerMetaRow}>
-          <span className={styles.composerMetaItem}>📍 {city || "上海"}</span>
+          <span className={styles.composerMetaItem}>📍 {city}</span>
           {user ? (
             <span className={styles.composerMetaItem}>
               👤 {user.name || "已登录"}
@@ -770,7 +783,7 @@ function Composer({
               登录解锁更多
             </button>
           )}
-          <span className={styles.composerMetaItem}>预约和付款前会先确认</span>
+          <span className={styles.composerMetaItem}></span>
         </div>
       )}
 
@@ -1048,7 +1061,7 @@ const HERO_PHRASES = [
   "把纠结变成安排",
 ] as const;
 
-export default function FeaturesPage({ user, onOpenModal, onNavigate }: FeaturesPageProps) {
+export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestLocation, location }: FeaturesPageProps) {
   const [mode, setMode] = useState<"idle" | "chat">("idle");
   const [inputValue, setInputValue] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -1072,7 +1085,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate }: Features
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const city = user?.city || "上海";
+  const city = location?.city || user?.city || "选择城市";
 
   /* ── Typewriter effect for hero title ── */
   useEffect(() => {
@@ -1532,6 +1545,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate }: Features
       {/* Sidebar */}
       <Sidebar
         user={user}
+        city={city}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         onNewChat={handleNewChat}
@@ -1548,6 +1562,19 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate }: Features
       {/* Main area */}
       <main className={styles.featureMain}>
         <AmbientBackground />
+
+        {/* 城市确认横幅：定位 fallback 时提示用户确认 */}
+        {location?.needsConfirmation && location.pendingCity && (
+          <div className={styles.featureLocationBanner}>
+            <span>已获取当前位置，但城市解析需要确认。</span>
+            <button type="button" className={styles.featureBannerConfirmBtn} onClick={() => location.onConfirmCity(location.pendingCity!)}>
+              确认 {location.pendingCity}
+            </button>
+            <button type="button" className={styles.featureBannerDismissBtn} onClick={location.onDismissConfirm}>
+              手动选择
+            </button>
+          </div>
+        )}
 
         {mode === "idle" ? (
           /* ── Idle: centered title + composer ── */
