@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   FeaturesPage — Gemini-style AI Planning Workspace
+   FeaturesPage — LikeGemini-style AI Planning Workspace
    One-screen fixed layout: sidebar + main (idle / chat)
    ═══════════════════════════════════════════════════════════ */
 
@@ -14,15 +14,16 @@ $green: #22c55e;
 .featureAppShell {
   position: relative;
   width: 100%;
-  height: 100%;
+  height: 100dvh;
   min-height: 0;
   overflow: hidden;
   display: flex;
   background: linear-gradient(180deg, #faf8f4 0%, #f3efe7 100%);
+  animation: featureShellEnter 520ms cubic-bezier(.2,.8,.2,1) both;
 }
 
 /* ─────────────────────────────────────────────
-   B. Sidebar (Gemini-style left rail)
+   B. Sidebar (LikeGemini-style left rail)
    ───────────────────────────────────────────── */
 .featureSidebar {
   flex: 0 0 248px;
@@ -37,6 +38,7 @@ $green: #22c55e;
   flex-direction: column;
   overflow: hidden;
   z-index: 30;
+  animation: sidebarEnter 580ms cubic-bezier(.2,.8,.2,1) both;
 
   @media (max-width: 860px) {
     position: fixed;
@@ -47,6 +49,7 @@ $green: #22c55e;
     transform: translateX(-100%);
     transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
     box-shadow: 4px 0 28px rgba($text, 0.08);
+    animation: none;
 
     &.featureSidebarOpen {
       transform: translateX(0);
@@ -112,7 +115,9 @@ $green: #22c55e;
   gap: 6px;
   margin-bottom: 6px;
   flex-shrink: 0;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 
   &:hover {
     background: rgba($brand, 0.12);
@@ -146,7 +151,9 @@ $green: #22c55e;
   font-weight: 500;
   color: rgba($text, 0.7);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
   border: none;
   background: transparent;
   width: 100%;
@@ -178,7 +185,42 @@ $green: #22c55e;
   overflow-y: auto;
   padding: 0 0 8px;
   scrollbar-width: none;
-  &::-webkit-scrollbar { display: none; }
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.sidebarSearchBox {
+  padding: 4px 12px 8px;
+}
+
+.sidebarSearchInput {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba($text, 0.1);
+  background: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  color: $text;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+
+  &:focus {
+    border-color: rgba($brand, 0.4);
+    background: rgba(255, 255, 255, 0.85);
+  }
+
+  &::placeholder {
+    color: rgba($text, 0.3);
+  }
+}
+
+.sidebarEmpty {
+  padding: 16px 12px;
+  font-size: 12px;
+  color: rgba($text, 0.35);
+  text-align: center;
 }
 
 .sidebarRecentItem {
@@ -191,7 +233,9 @@ $green: #22c55e;
   font-weight: 400;
   color: rgba($text, 0.55);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
   border: none;
   background: transparent;
   width: 100%;
@@ -269,7 +313,9 @@ $green: #22c55e;
   justify-content: center;
   transition: background 0.15s;
 
-  &:hover { background: rgba($text, 0.05); }
+  &:hover {
+    background: rgba($text, 0.05);
+  }
 }
 
 /* ── mobile menu button ── */
@@ -323,6 +369,7 @@ $green: #22c55e;
   border-radius: 50%;
   filter: blur(80px);
   opacity: 0.35;
+  animation: orbFloat 8s ease-in-out infinite alternate;
 
   &.ambientOrb1 {
     width: 320px;
@@ -330,6 +377,7 @@ $green: #22c55e;
     top: -60px;
     right: -80px;
     background: $brand;
+    animation-delay: 0s;
   }
 
   &.ambientOrb2 {
@@ -338,7 +386,13 @@ $green: #22c55e;
     bottom: -40px;
     left: -40px;
     background: #b8c5d6;
+    animation-delay: -4s;
   }
+}
+
+@keyframes orbFloat {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(20px, -30px) scale(1.05); }
 }
 
 .ambientCard {
@@ -347,6 +401,7 @@ $green: #22c55e;
   background: rgba(255, 255, 255, 0.25);
   backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.45);
+  animation: cardFloat 6s ease-in-out infinite alternate;
 
   &.ambientCard1 {
     width: 180px;
@@ -354,6 +409,7 @@ $green: #22c55e;
     top: 15%;
     right: 8%;
     transform: rotate(6deg);
+    animation-delay: -2s;
   }
 
   &.ambientCard2 {
@@ -362,7 +418,13 @@ $green: #22c55e;
     bottom: 22%;
     left: 6%;
     transform: rotate(-3deg);
+    animation-delay: -1s;
   }
+}
+
+@keyframes cardFloat {
+  0% { transform: rotate(6deg) translateY(0); }
+  100% { transform: rotate(6deg) translateY(-15px); }
 }
 
 .ambientLine {
@@ -382,6 +444,23 @@ $green: #22c55e;
     bottom: 30%;
     right: 20%;
   }
+
+  &.ambientLine3 {
+    position: absolute;
+    width: 200px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba($brand, 0.4), transparent);
+    top: 45%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 2px;
+    animation: linePulse 3s ease-in-out infinite;
+  }
+}
+
+@keyframes linePulse {
+  0%, 100% { opacity: 0.3; transform: translateX(-50%) scaleX(0.8); }
+  50% { opacity: 0.6; transform: translateX(-50%) scaleX(1); }
 }
 
 .ambientDot {
@@ -393,6 +472,19 @@ $green: #22c55e;
 
   &.ambientDot1 { top: 25%; left: 42%; }
   &.ambientDot2 { bottom: 35%; right: 35%; }
+  &.ambientDot3 {
+    width: 8px;
+    height: 8px;
+    top: 60%;
+    left: 25%;
+    background: rgba($brand, 0.35);
+    animation: dotPulse 2s ease-in-out infinite;
+  }
+}
+
+@keyframes dotPulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.3); }
 }
 
 /* ─────────────────────────────────────────────
@@ -409,6 +501,7 @@ $green: #22c55e;
   justify-content: center;
   transform: translateY(-28px);
   padding: 0 24px;
+  animation: composerEnter 640ms cubic-bezier(.2,.8,.2,1) 80ms both;
 }
 
 .featureHomeTitle {
@@ -422,6 +515,24 @@ $green: #22c55e;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  min-height: 1.2em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.typewriterCursor {
+  display: inline-block;
+  width: 3px;
+  height: 0.7em;
+  background: $brand;
+  margin-left: 4px;
+  animation: cursorBlink 0.9s step-end infinite;
+}
+
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
 
 .featureHomeSubtitle {
@@ -507,9 +618,16 @@ $green: #22c55e;
   scrollbar-width: thin;
   scrollbar-color: rgba($text, 0.12) transparent;
 
-  &::-webkit-scrollbar { width: 5px; }
-  &::-webkit-scrollbar-thumb { background: rgba($text, 0.12); border-radius: 4px; }
-  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar {
+    width: 5px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba($text, 0.12);
+    border-radius: 4px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
 }
 
 .featureMessagesInner {
@@ -533,7 +651,9 @@ $green: #22c55e;
   background: linear-gradient(0deg, #f5f1ea 50%, rgba(#f5f1ea, 0));
   pointer-events: none;
 
-  > * { pointer-events: auto; }
+  > * {
+    pointer-events: auto;
+  }
 }
 
 /* ─────────────────────────────────────────────
@@ -554,7 +674,10 @@ $green: #22c55e;
   transition: box-shadow 0.2s;
 
   &:focus-within {
-    box-shadow: 0 22px 56px rgba($text, 0.12);
+    box-shadow:
+      0 20px 54px rgba(37, 30, 12, 0.12),
+      0 0 0 1px rgba(255, 199, 44, 0.42),
+      0 0 0 6px rgba(255, 199, 44, 0.12);
   }
 }
 
@@ -586,7 +709,13 @@ $green: #22c55e;
   overflow-y: auto;
   font-family: inherit;
 
-  &::placeholder { color: rgba($text, 0.3); }
+  &::placeholder {
+    color: rgba($text, 0.3);
+  }
+  &:focus {
+    outline: none;
+    border: none;
+  }
 }
 
 /* ── composer buttons ── */
@@ -603,7 +732,9 @@ $green: #22c55e;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
   font-weight: 400;
   padding: 0;
 
@@ -632,10 +763,16 @@ $green: #22c55e;
   flex-shrink: 0;
   transition: background 0.15s, border-color 0.15s;
   position: relative;
+  outline: none;
 
   &:hover {
     background: rgba($brand, 0.1);
     border-color: rgba($brand, 0.25);
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(255, 199, 44, 0.55);
+    outline-offset: 3px;
   }
 }
 
@@ -651,10 +788,17 @@ $green: #22c55e;
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: filter 0.15s, transform 0.1s;
+  transition:
+    filter 0.15s,
+    transform 0.1s;
 
-  &:hover:not(:disabled) { filter: brightness(0.95); transform: scale(1.02); }
-  &:active:not(:disabled) { transform: scale(0.98); }
+  &:hover:not(:disabled) {
+    filter: brightness(0.95);
+    transform: scale(1.02);
+  }
+  &:active:not(:disabled) {
+    transform: scale(0.98);
+  }
 
   &:disabled {
     opacity: 0.45;
@@ -692,7 +836,9 @@ $green: #22c55e;
   cursor: pointer;
   transition: background 0.12s;
 
-  &:hover { background: rgba($text, 0.05); }
+  &:hover {
+    background: rgba($text, 0.05);
+  }
 
   &.composerModeItemActive {
     background: rgba($brand, 0.12);
@@ -728,7 +874,9 @@ $green: #22c55e;
   text-decoration: underline;
   text-underline-offset: 2px;
 
-  &:hover { color: $brand; }
+  &:hover {
+    color: $brand;
+  }
 }
 
 /* ── composer toast ── */
@@ -764,13 +912,24 @@ $green: #22c55e;
 }
 
 @keyframes voicePulseRing {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%      { opacity: 0.4; transform: scale(1.18); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1.18);
+  }
 }
 
 @keyframes voiceDotBlink {
-  from { opacity: 0.4; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0.4;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* ── attachment previews ── */
@@ -780,7 +939,9 @@ $green: #22c55e;
   padding: 6px 10px 2px;
   overflow-x: auto;
   scrollbar-width: none;
-  &::-webkit-scrollbar { display: none; }
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .composerAttachmentThumb {
@@ -827,7 +988,9 @@ $green: #22c55e;
   justify-content: center;
   transition: background 0.15s;
 
-  &:hover { background: #ef4444; }
+  &:hover {
+    background: #ef4444;
+  }
 }
 
 /* ─────────────────────────────────────────────
@@ -893,14 +1056,26 @@ $green: #22c55e;
     background: rgba($text, 0.2);
     animation: thinkingBounce 1.2s ease-in-out infinite;
 
-    &:nth-child(2) { animation-delay: 0.15s; }
-    &:nth-child(3) { animation-delay: 0.3s; }
+    &:nth-child(2) {
+      animation-delay: 0.15s;
+    }
+    &:nth-child(3) {
+      animation-delay: 0.3s;
+    }
   }
 }
 
 @keyframes thinkingBounce {
-  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-  30%           { transform: translateY(-4px); opacity: 1; }
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
 }
 
 .thinkingChips {
@@ -967,7 +1142,9 @@ $green: #22c55e;
     line-height: 1.6;
     padding-left: 6px;
 
-    &::marker { color: $brand; }
+    &::marker {
+      color: $brand;
+    }
   }
 }
 
@@ -1019,21 +1196,29 @@ $green: #22c55e;
   font-weight: 600;
   cursor: pointer;
   border: none;
-  transition: filter 0.15s, transform 0.1s;
+  transition:
+    filter 0.15s,
+    transform 0.1s;
 
-  &:active { transform: scale(0.97); }
+  &:active {
+    transform: scale(0.97);
+  }
 }
 
 .actionBtnPrimary {
   background: $brand;
   color: $text;
-  &:hover { filter: brightness(0.95); }
+  &:hover {
+    filter: brightness(0.95);
+  }
 }
 
 .actionBtnSecondary {
   background: rgba($text, 0.05);
   color: $text;
-  &:hover { background: rgba($text, 0.1); }
+  &:hover {
+    background: rgba($text, 0.1);
+  }
 }
 
 /* ── what-if bar ── */
@@ -1106,11 +1291,21 @@ $green: #22c55e;
   font-weight: 700;
   margin-bottom: 8px;
 
-  &.actionCardStatusQuoted { color: $brand; }
-  &.actionCardStatusExecuting { color: #3b82f6; }
-  &.actionCardStatusSuccess { color: $green; }
-  &.actionCardStatusFailed { color: #ef4444; }
-  &.actionCardStatusCancelled { color: $text-secondary; }
+  &.actionCardStatusQuoted {
+    color: $brand;
+  }
+  &.actionCardStatusExecuting {
+    color: #3b82f6;
+  }
+  &.actionCardStatusSuccess {
+    color: $green;
+  }
+  &.actionCardStatusFailed {
+    color: #ef4444;
+  }
+  &.actionCardStatusCancelled {
+    color: $text-secondary;
+  }
 }
 
 .actionCardActions {
@@ -1199,4 +1394,19 @@ $green: #22c55e;
 @keyframes featureFadeUp {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes featureShellEnter {
+  from { opacity: 0; filter: blur(8px); }
+  to { opacity: 1; filter: blur(0); }
+}
+
+@keyframes sidebarEnter {
+  from { opacity: 0; transform: translateX(-24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes composerEnter {
+  from { opacity: 0; transform: translateY(18px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }

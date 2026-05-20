@@ -3,8 +3,16 @@
   position: relative;
   overflow-x: clip;
   background:
-    radial-gradient(circle at 86% 12%, rgb(var(--color-brand-rgb) / 0.22) 0 14rem, transparent 14.5rem),
-    radial-gradient(circle at 7% 88%, rgb(var(--color-ambient-mist-rgb) / 0.54) 0 13rem, transparent 13.5rem),
+    radial-gradient(
+      circle at 86% 12%,
+      rgb(var(--color-brand-rgb) / 0.22) 0 14rem,
+      transparent 14.5rem
+    ),
+    radial-gradient(
+      circle at 7% 88%,
+      rgb(var(--color-ambient-mist-rgb) / 0.54) 0 13rem,
+      transparent 13.5rem
+    ),
     linear-gradient(180deg, var(--color-page), var(--color-page));
 }
 
@@ -21,8 +29,17 @@
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(132deg, transparent 0 70%, rgb(var(--color-ambient-olive-rgb) / 0.13) 70% 88%, transparent 88%),
-    linear-gradient(17deg, rgb(var(--color-ambient-grey-rgb) / 0.42) 0 17%, transparent 17% 100%);
+    linear-gradient(
+      132deg,
+      transparent 0 70%,
+      rgb(var(--color-ambient-olive-rgb) / 0.13) 70% 88%,
+      transparent 88%
+    ),
+    linear-gradient(
+      17deg,
+      rgb(var(--color-ambient-grey-rgb) / 0.42) 0 17%,
+      transparent 17% 100%
+    );
   opacity: 0.86;
 }
 

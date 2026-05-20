@@ -28,8 +28,10 @@ export function App() {
   const [user, setUser] = useState<SessionUser | null>(() => {
     try {
       const stored = localStorage.getItem("pg_user");
-      return stored ? JSON.parse(stored) as SessionUser : null;
-    } catch { return null; }
+      return stored ? (JSON.parse(stored) as SessionUser) : null;
+    } catch {
+      return null;
+    }
   });
   const [authRedirectTo, setAuthRedirectTo] = useState<NavKey | null>(null);
 
@@ -101,7 +103,13 @@ export function App() {
         return <HomePage onNavigate={setActive} onOpenModal={openModal} />;
 
       case "features":
-        return <FeaturesPage user={user} onOpenModal={openModal} onRequestLocation={handleRequestLocation} />;
+        return (
+          <FeaturesPage
+            user={user}
+            onOpenModal={openModal}
+            onRequestLocation={handleRequestLocation}
+          />
+        );
 
       case "cases":
         return <CasesPage onOpenModal={openModal} onNavigate={setActive} />;
@@ -131,7 +139,9 @@ export function App() {
   })();
 
   return (
-    <div className={`${styles.shell} ${active === "features" ? styles.shellFull : ""}`}>
+    <div
+      className={`${styles.shell} ${active === "features" ? styles.shellFull : ""}`}
+    >
       {active !== "features" && (
         <div className={pageStyles.floatingBubbles} aria-hidden="true">
           {Array.from({ length: 36 }).map((_, index) => (
@@ -154,11 +164,15 @@ export function App() {
         }}
       />
 
-      <main className={`${active === "features" ? styles.contentFull : styles.content} ${active === "features" ? styles.pageFull : styles.page}`}>
+      <main
+        className={`${active === "features" ? styles.contentFull : styles.content} ${active === "features" ? styles.pageFull : styles.page}`}
+      >
         <PageTransition pageKey={active}>{page}</PageTransition>
       </main>
 
-      <footer className={`${styles.footer} ${active === "features" ? styles.footerHidden : ""}`}>
+      <footer
+        className={`${styles.footer} ${active === "features" ? styles.footerHidden : ""}`}
+      >
         <span>周末有谱 · 本地生活规划 Agent</span>
         <span></span>
       </footer>
@@ -166,7 +180,12 @@ export function App() {
       <BottomTabs active={active} onNavigate={setActive} />
 
       {isAuthModal(modal) ? (
-        <AuthModal mode={modal} onClose={closeModal} onSuccess={handleAuthSuccess} onSwitchMode={setModal} />
+        <AuthModal
+          mode={modal}
+          onClose={closeModal}
+          onSuccess={handleAuthSuccess}
+          onSwitchMode={setModal}
+        />
       ) : (
         <Modal modal={modal} onClose={closeModal} />
       )}

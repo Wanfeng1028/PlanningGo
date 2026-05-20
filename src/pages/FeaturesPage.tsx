@@ -52,15 +52,16 @@ type AttachmentItem = {
   previewUrl?: string;
 };
 
-const MODE_OPTIONS = ["快速规划", "精细规划", "亲子优先", "省钱优先"] as const;
+const MODEL_MODES = ["Flash", "Pro"] as const;
+type ModelMode = typeof MODEL_MODES[number];
 
 /* ── Sidebar mock data ── */
 const SIDEBAR_NAV = [
-  { icon: "✨", label: "新建规划" },
-  { icon: "🔍", label: "搜索记录" },
-  { icon: "📍", label: "地点灵感" },
-  { icon: "📅", label: "日程草稿" },
-  { icon: "⭐", label: "收藏方案" },
+  { icon: "✨", label: "新建规划", id: "new" },
+  { icon: "🔍", label: "搜索记录", id: "search" },
+  { icon: "📍", label: "地点灵感", id: "inspiration" },
+  { icon: "📅", label: "日程草稿", id: "drafts" },
+  { icon: "⭐", label: "收藏方案", id: "favorites" },
 ];
 
 const SIDEBAR_RECENT = [
@@ -78,7 +79,13 @@ const SIDEBAR_RECENT = [
    ═══════════════════════════════════════════════ */
 
 /* ── Inline Toast ── */
-function InlineToast({ message, onDone }: { message: string; onDone: () => void }) {
+function InlineToast({
+  message,
+  onDone,
+}: {
+  message: string;
+  onDone: () => void;
+}) {
   useEffect(() => {
     const t = setTimeout(onDone, 2800);
     return () => clearTimeout(t);
@@ -96,8 +103,10 @@ function AmbientBackground() {
       <div className={`${styles.ambientCard} ${styles.ambientCard2}`} />
       <div className={`${styles.ambientLine} ${styles.ambientLine1}`} />
       <div className={`${styles.ambientLine} ${styles.ambientLine2}`} />
+      <div className={`${styles.ambientLine} ${styles.ambientLine3}`} />
       <div className={`${styles.ambientDot} ${styles.ambientDot1}`} />
       <div className={`${styles.ambientDot} ${styles.ambientDot2}`} />
+      <div className={`${styles.ambientDot} ${styles.ambientDot3}`} />
     </div>
   );
 }
@@ -108,12 +117,38 @@ function Sidebar({
   open,
   onClose,
   onNewChat,
+  onNavItemClick,
+  onRecentClick,
+  onSettingsClick,
+  searchQuery,
+  onSearchChange,
 }: {
   user?: SessionUser | null;
   open: boolean;
   onClose: () => void;
   onNewChat: () => void;
+  onNavItemClick: (id: string) => void;
+  onRecentClick: (title: string) => void;
+  onSettingsClick: () => void;
+  searchQuery: string;
+  onSearchChange: (q: string) => void;
 }) {
+  const [showSearch, setShowSearch] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+
+  const handleNavClick = (id: string) => {
+    if (id === "search") {
+      setShowSearch(!showSearch);
+    } else {
+      onNavItemClick(id);
+    }
+    onClose();
+  };
+
+  const filteredRecent = searchQuery
+    ? SIDEBAR_RECENT.filter((t) => t.toLowerCase().includes(searchQuery.toLowerCase()))
+    : SIDEBAR_RECENT;
+
   return (
     <>
       {open && <div className={styles.sidebarOverlay} onClick={onClose} />}
@@ -132,22 +167,39 @@ function Sidebar({
         <nav className={styles.sidebarNav}>
           <div className={styles.sidebarNavLabel}>功能</div>
           {SIDEBAR_NAV.map((item) => (
-            <button key={item.label} className={styles.sidebarNavItem}>
+            <button key={item.id} className={styles.sidebarNavItem} onClick={() => handleNavClick(item.id)}>
               <span className={styles.sidebarNavIcon}>{item.icon}</span>
               {item.label}
             </button>
           ))}
         </nav>
 
+        {/* Search */}
+        {showSearch && (
+          <div className={styles.sidebarSearchBox}>
+            <input
+              type="text"
+              placeholder="搜索记录..."
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className={styles.sidebarSearchInput}
+            />
+          </div>
+        )}
+
         {/* Recent */}
         <div className={styles.sidebarNavLabel}>最近规划</div>
         <div className={styles.sidebarRecent}>
-          {SIDEBAR_RECENT.map((title) => (
-            <button key={title} className={styles.sidebarRecentItem}>
-              <span className={styles.recentDot} />
-              {title}
-            </button>
-          ))}
+          {filteredRecent.length > 0 ? (
+            filteredRecent.map((title) => (
+              <button key={title} className={styles.sidebarRecentItem} onClick={() => onRecentClick(title)}>
+                <span className={styles.recentDot} />
+                {title}
+              </button>
+            ))
+          ) : (
+            <div className={styles.sidebarEmpty}>没有找到匹配记录</div>
+          )}
         </div>
 
         {/* Footer */}
@@ -161,16 +213,25 @@ function Sidebar({
               {user?.mode === "registered" ? "已注册" : "体验模式"}
             </div>
           </div>
-          <button className={styles.sidebarSettingsBtn} title="设置">
-            ⚙
-          </button>
+          <div style={{ position: "relative" }}>
+            <button className={styles.sidebarSettingsBtn} title="设置" onClick={() => setShowSettings(!showSettings)}>
+              ⚙
+            </button>
+            {showSettings && (
+              <div className={styles.sidebarSettingsDropdown}>
+                <button onClick={() => { onSettingsClick(); setShowSettings(false); }}>模型偏好</button>
+                <button onClick={() => { onSettingsClick(); setShowSettings(false); }}>位置偏好</button>
+                <button onClick={() => { onSettingsClick(); setShowSettings(false); }}>清空本地记录</button>
+              </div>
+            )}
+          </div>
         </div>
       </aside>
     </>
   );
 }
 
-/* ── Composer (Gemini-style slim capsule) ── */
+/* ── Composer (Like-style slim capsule) ── */
 interface ComposerProps {
   compact?: boolean;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
@@ -184,6 +245,8 @@ interface ComposerProps {
   city?: string;
   onOpenModal?: (key: ModalKey) => void;
   onToast?: (msg: string) => void;
+  modelMode: ModelMode;
+  onModelModeChange: (mode: ModelMode) => void;
 }
 
 /* ── Speech Recognition typings ── */
@@ -208,6 +271,8 @@ function Composer({
   city,
   onOpenModal,
   onToast,
+  modelMode,
+  onModelModeChange,
 }: ComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -215,9 +280,10 @@ function Composer({
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [modeOpen, setModeOpen] = useState(false);
-  const [modeIndex, setModeIndex] = useState(1); // "精细规划"
 
-  useEffect(() => { valueRef.current = value; }, [value]);
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
 
   /* ── Cleanup preview URLs on unmount ── */
   useEffect(() => {
@@ -284,19 +350,21 @@ function Composer({
     }
 
     if (!SpeechRecognitionCtor) {
-      onToast?.("当前浏览器不支持语音输入，请使用 Chrome");
+      onToast?.("当前浏览器不支持语音输入，可以直接打字。");
       return;
     }
 
     const recognition = new SpeechRecognitionCtor();
     recognition.lang = "zh-CN";
     recognition.interimResults = true;
-    recognition.continuous = true;
+    recognition.continuous = false;
     recognition.maxAlternatives = 1;
 
     let finalTranscript = "";
+    let hasResult = false;
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
+      hasResult = true;
       let interim = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
@@ -311,22 +379,44 @@ function Composer({
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      if (event.error !== "aborted") {
-        onToast?.(`语音识别出错：${event.error}`);
-      }
       setIsRecording(false);
+      recognitionRef.current = null;
+
+      switch (event.error) {
+        case "not-allowed":
+          onToast?.("浏览器没有麦克风权限，请在地址栏允许后重试。");
+          break;
+        case "no-speech":
+          if (!hasResult) {
+            onToast?.("没有听到内容，可以再试一次。");
+          }
+          break;
+        case "audio-capture":
+          onToast?.("没有检测到麦克风设备。");
+          break;
+        case "network":
+          onToast?.("语音服务暂时不可用，可以先打字。");
+          break;
+        case "aborted":
+          // User stopped, no error message needed
+          break;
+        default:
+          onToast?.(`语音识别出错：${event.error}`);
+      }
     };
 
     recognition.onend = () => {
       setIsRecording(false);
       recognitionRef.current = null;
-      requestAnimationFrame(() => textareaRef.current?.focus());
+      if (hasResult) {
+        requestAnimationFrame(() => textareaRef.current?.focus());
+      }
     };
 
     recognitionRef.current = recognition;
     recognition.start();
     setIsRecording(true);
-    onToast?.("正在录音，点击麦克风停止");
+    onToast?.("正在听...");
   }, [isRecording, SpeechRecognitionCtor, onChange, onToast, textareaRef]);
 
   /* ── Mode dropdown ── */
@@ -334,11 +424,11 @@ function Composer({
     setModeOpen((v) => !v);
   }, []);
 
-  const handleModeSelect = useCallback((idx: number) => {
-    setModeIndex(idx);
+  const handleModeSelect = useCallback((mode: ModelMode) => {
+    onModelModeChange(mode);
     setModeOpen(false);
-    onToast?.(`已切换为「${MODE_OPTIONS[idx]}」模式`);
-  }, [onToast]);
+    onToast?.(`已切换为 ${mode} 模式`);
+  }, [onModelModeChange, onToast]);
 
   // Close mode dropdown on outside click
   useEffect(() => {
@@ -368,15 +458,25 @@ function Composer({
   const fileIcon = (file: File) => {
     if (file.type.startsWith("image/")) return null;
     if (file.type.includes("pdf")) return "📄";
-    if (file.type.includes("word") || file.name.endsWith(".doc") || file.name.endsWith(".docx"))
+    if (
+      file.type.includes("word") ||
+      file.name.endsWith(".doc") ||
+      file.name.endsWith(".docx")
+    )
       return "📝";
-    if (file.type.includes("sheet") || file.name.endsWith(".xls") || file.name.endsWith(".xlsx"))
+    if (
+      file.type.includes("sheet") ||
+      file.name.endsWith(".xls") ||
+      file.name.endsWith(".xlsx")
+    )
       return "📊";
     return "📎";
   };
 
   return (
-    <div className={`${styles.featureComposer} ${compact ? styles.featureComposerCompact : ""}`}>
+    <div
+      className={`${styles.featureComposer} ${compact ? styles.featureComposerCompact : ""}`}
+    >
       <input
         ref={fileInputRef}
         type="file"
@@ -393,7 +493,9 @@ function Composer({
               {att.previewUrl ? (
                 <img src={att.previewUrl} alt={att.file.name} />
               ) : (
-                <span className={styles.attachmentFileIcon}>{fileIcon(att.file)}</span>
+                <span className={styles.attachmentFileIcon}>
+                  {fileIcon(att.file)}
+                </span>
               )}
               <button
                 className={styles.composerAttachmentRemove}
@@ -435,17 +537,20 @@ function Composer({
             type="button"
             onClick={handleModeClick}
           >
-            {MODE_OPTIONS[modeIndex]}
+            {modelMode}
           </button>
           {modeOpen && (
             <div className={styles.composerModeDropdown}>
-              {MODE_OPTIONS.map((label, idx) => (
+              {MODEL_MODES.map((mode) => (
                 <button
-                  key={label}
-                  className={`${styles.composerModeItem} ${idx === modeIndex ? styles.composerModeItemActive : ""}`}
-                  onClick={(e) => { e.stopPropagation(); handleModeSelect(idx); }}
+                  key={mode}
+                  className={`${styles.composerModeItem} ${mode === modelMode ? styles.composerModeItemActive : ""}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleModeSelect(mode);
+                  }}
                 >
-                  {label}
+                  {mode}
                 </button>
               ))}
             </div>
@@ -476,7 +581,9 @@ function Composer({
         <div className={styles.composerMetaRow}>
           <span className={styles.composerMetaItem}>📍 {city || "上海"}</span>
           {user ? (
-            <span className={styles.composerMetaItem}>👤 {user.name || "已登录"}</span>
+            <span className={styles.composerMetaItem}>
+              👤 {user.name || "已登录"}
+            </span>
           ) : (
             <button
               className={styles.composerMetaLink}
@@ -505,7 +612,9 @@ function PlanCardView({
   return (
     <div className={styles.planCard}>
       <div className={styles.planCardTitle}>{plan.title}</div>
-      {plan.summary && <div className={styles.planCardReason}>{plan.summary}</div>}
+      {plan.summary && (
+        <div className={styles.planCardReason}>{plan.summary}</div>
+      )}
 
       {plan.timeline.length > 0 && (
         <ul className={styles.planCardTimeline}>
@@ -530,12 +639,18 @@ function PlanCardView({
           </span>
         )}
         {plan.risks.map((r) => (
-          <span key={r} className={`${styles.planMetaTag} ${styles.planMetaTagRisk}`}>
+          <span
+            key={r}
+            className={`${styles.planMetaTag} ${styles.planMetaTagRisk}`}
+          >
             ⚠ {r}
           </span>
         ))}
         {plan.highlights.map((h) => (
-          <span key={h} className={`${styles.planMetaTag} ${styles.planMetaTagDefault}`}>
+          <span
+            key={h}
+            className={`${styles.planMetaTag} ${styles.planMetaTagDefault}`}
+          >
             ✦ {h}
           </span>
         ))}
@@ -616,6 +731,15 @@ const EXAMPLE_PROMPTS = [
   "纪念日约会西餐路线",
 ];
 
+const HERO_PHRASES = [
+  "周末去哪儿",
+  "今天怎么安排",
+  "带谁一起出发",
+  "雨天也有备选",
+  "一句话生成路线",
+  "把纠结变成安排",
+] as const;
+
 export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
   const [mode, setMode] = useState<"idle" | "chat">("idle");
   const [inputValue, setInputValue] = useState("");
@@ -625,11 +749,78 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
   const [healthOk, setHealthOk] = useState<boolean | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [modelMode, setModelMode] = useState<ModelMode>("Flash");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [drafts, setDrafts] = useState<string[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [phraseIndex, setPhraseIndex] = useState(0);
+  const [typedText, setTypedText] = useState("");
+  const [isTyping, setIsTyping] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const city = user?.city || "上海";
+
+  /* ── Typewriter effect for hero title ── */
+  useEffect(() => {
+    const currentPhrase = HERO_PHRASES[phraseIndex];
+    const typeSpeed = 80;
+    const deleteSpeed = 40;
+    const pauseAfterType = 2800;
+    const pauseAfterDelete = 500;
+
+    const typeNextChar = () => {
+      if (!isDeleting && typedText.length < currentPhrase.length) {
+        setTypedText(currentPhrase.slice(0, typedText.length + 1));
+        typingTimerRef.current = setTimeout(typeNextChar, typeSpeed);
+      } else if (!isDeleting && typedText.length === currentPhrase.length) {
+        setIsDeleting(true);
+        typingTimerRef.current = setTimeout(typeNextChar, pauseAfterType);
+      } else if (isDeleting && typedText.length > 0) {
+        setTypedText(typedText.slice(0, -1));
+        typingTimerRef.current = setTimeout(typeNextChar, deleteSpeed);
+      } else {
+        setIsDeleting(false);
+        setPhraseIndex((prev) => (prev + 1) % HERO_PHRASES.length);
+      }
+    };
+
+    typingTimerRef.current = setTimeout(typeNextChar, typeSpeed);
+
+    return () => {
+      if (typingTimerRef.current) {
+        clearTimeout(typingTimerRef.current);
+      }
+    };
+  }, [phraseIndex, typedText, isDeleting]);
+
+  // Load saved preferences from localStorage
+  useEffect(() => {
+    const savedMode = localStorage.getItem("pg_model_mode") as ModelMode;
+    if (savedMode === "Flash" || savedMode === "Pro") {
+      setModelMode(savedMode);
+    }
+    const savedDrafts = localStorage.getItem("pg_drafts");
+    if (savedDrafts) {
+      try {
+        setDrafts(JSON.parse(savedDrafts));
+      } catch {}
+    }
+    const savedFavorites = localStorage.getItem("pg_favorites");
+    if (savedFavorites) {
+      try {
+        setFavorites(JSON.parse(savedFavorites));
+      } catch {}
+    }
+  }, []);
+
+  // Save modelMode to localStorage when changed
+  useEffect(() => {
+    localStorage.setItem("pg_model_mode", modelMode);
+  }, [modelMode]);
 
   /* ── Scroll to bottom helper ── */
   const scrollToBottom = useCallback(() => {
@@ -662,21 +853,18 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
     setMessages((prev) => [...prev, msg]);
   }, []);
 
-  const updateLastAssistant = useCallback(
-    (patch: Partial<ChatMessage>) => {
-      setMessages((prev) => {
-        const next = [...prev];
-        for (let i = next.length - 1; i >= 0; i--) {
-          if (next[i].role === "assistant") {
-            next[i] = { ...next[i], ...patch };
-            break;
-          }
+  const updateLastAssistant = useCallback((patch: Partial<ChatMessage>) => {
+    setMessages((prev) => {
+      const next = [...prev];
+      for (let i = next.length - 1; i >= 0; i--) {
+        if (next[i].role === "assistant") {
+          next[i] = { ...next[i], ...patch };
+          break;
         }
-        return next;
-      });
-    },
-    [],
-  );
+      }
+      return next;
+    });
+  }, []);
 
   /* ── Core submit flow ── */
   const doSubmit = useCallback(
@@ -736,7 +924,8 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
           setPhase("done");
         }
       } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : "规划服务暂时不可用";
+        const errorMsg =
+          err instanceof Error ? err.message : "规划服务暂时不可用";
         updateLastAssistant({
           status: "error",
           content: errorMsg,
@@ -763,9 +952,12 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
     [inputValue, doSubmit],
   );
 
-  const handleExampleChip = useCallback((prompt: string) => {
-    doSubmit(prompt);
-  }, [doSubmit]);
+  const handleExampleChip = useCallback(
+    (prompt: string) => {
+      doSubmit(prompt);
+    },
+    [doSubmit],
+  );
 
   const handleChipToInput = useCallback((prompt: string) => {
     setInputValue(prompt);
@@ -802,6 +994,72 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
     requestAnimationFrame(() => textareaRef.current?.focus());
   }, []);
 
+  /* ── Sidebar handlers ── */
+  const handleNavItemClick = useCallback((id: string) => {
+    switch (id) {
+      case "new":
+        handleNewChat();
+        break;
+      case "inspiration":
+        setInputValue("推荐几个适合周末半日游的地点，少排队，交通方便。");
+        requestAnimationFrame(() => textareaRef.current?.focus());
+        setToast("已填入地点灵感");
+        break;
+      case "drafts":
+        if (drafts.length === 0) {
+          addMessage({
+            id: uuid(),
+            role: "assistant",
+            content: "还没有日程草稿。你可以把想去的地方、时间和预算发给我，我会整理成可执行路线。",
+            status: "success",
+            createdAt: new Date().toISOString(),
+          });
+          setMode("chat");
+        } else {
+          addMessage({
+            id: uuid(),
+            role: "assistant",
+            content: `你有 ${drafts.length} 个日程草稿：\n${drafts.map((d, i) => `${i + 1}. ${d}`).join("\n")}`,
+            status: "success",
+            createdAt: new Date().toISOString(),
+          });
+          setMode("chat");
+        }
+        break;
+      case "favorites":
+        if (favorites.length === 0) {
+          addMessage({
+            id: uuid(),
+            role: "assistant",
+            content: "还没有收藏方案，生成方案后可以收藏。",
+            status: "success",
+            createdAt: new Date().toISOString(),
+          });
+          setMode("chat");
+        } else {
+          addMessage({
+            id: uuid(),
+            role: "assistant",
+            content: `已收藏 ${favorites.length} 个方案：\n${favorites.map((f, i) => `${i + 1}. ${f}`).join("\n")}`,
+            status: "success",
+            createdAt: new Date().toISOString(),
+          });
+          setMode("chat");
+        }
+        break;
+    }
+  }, [handleNewChat, drafts, favorites, addMessage]);
+
+  const handleRecentClick = useCallback((title: string) => {
+    setInputValue(title);
+    setSidebarOpen(false);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }, []);
+
+  const handleSettingsClick = useCallback(() => {
+    setToast("设置功能开发中");
+  }, []);
+
   /* ── Render: message content ── */
   const renderMessageContent = useCallback(
     (msg: ChatMessage) => {
@@ -824,12 +1082,16 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
                 {msg.chips && (
                   <div className={styles.thinkingChips}>
                     {msg.chips.map((c) => (
-                      <span key={c} className={styles.thinkingChip}>{c}</span>
+                      <span key={c} className={styles.thinkingChip}>
+                        {c}
+                      </span>
                     ))}
                   </div>
                 )}
                 <div className={styles.thinkingDots}>
-                  <span /><span /><span />
+                  <span />
+                  <span />
+                  <span />
                 </div>
               </div>
             )}
@@ -846,7 +1108,9 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
             {/* Success state */}
             {msg.status === "success" && (
               <>
-                {msg.content && <div className={styles.resultSummary}>{msg.content}</div>}
+                {msg.content && (
+                  <div className={styles.resultSummary}>{msg.content}</div>
+                )}
 
                 {/* Plan cards */}
                 {msg.plans && msg.plans.length > 0 && (
@@ -867,10 +1131,16 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
                   <div className={styles.actionCards}>
                     {msg.actions.map((action) => (
                       <div key={action.id} className={styles.actionCard}>
-                        <div className={styles.actionCardTitle}>{action.title}</div>
-                        <div className={styles.actionCardDesc}>{action.description}</div>
+                        <div className={styles.actionCardTitle}>
+                          {action.title}
+                        </div>
+                        <div className={styles.actionCardDesc}>
+                          {action.description}
+                        </div>
                         {action.priceEstimate && (
-                          <div className={styles.actionCardPrice}>预估：{action.priceEstimate}</div>
+                          <div className={styles.actionCardPrice}>
+                            预估：{action.priceEstimate}
+                          </div>
                         )}
                       </div>
                     ))}
@@ -880,17 +1150,21 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
                 {/* Next action chips */}
                 {phase === "selected" && (
                   <div className={styles.nextActionChips}>
-                    {["保存方案", "生成日历", "分享给同行人", "查看预约建议", "打开导航"].map(
-                      (label) => (
-                        <button
-                          key={label}
-                          className={styles.nextActionChip}
-                          onClick={() => setToast(`${label}功能开发中`)}
-                        >
-                          {label}
-                        </button>
-                      ),
-                    )}
+                    {[
+                      "保存方案",
+                      "生成日历",
+                      "分享给同行人",
+                      "查看预约建议",
+                      "打开导航",
+                    ].map((label) => (
+                      <button
+                        key={label}
+                        className={styles.nextActionChip}
+                        onClick={() => setToast(`${label}功能开发中`)}
+                      >
+                        {label}
+                      </button>
+                    ))}
                   </div>
                 )}
               </>
@@ -922,6 +1196,11 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         onNewChat={handleNewChat}
+        onNavItemClick={handleNavItemClick}
+        onRecentClick={handleRecentClick}
+        onSettingsClick={handleSettingsClick}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
       />
 
       {/* Main area */}
@@ -931,7 +1210,10 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
         {mode === "idle" ? (
           /* ── Idle: centered title + composer ── */
           <div className={styles.featureHome}>
-            <h1 className={styles.featureHomeTitle}>周末去哪儿</h1>
+            <h1 className={styles.featureHomeTitle}>
+              {typedText}
+              <span className={styles.typewriterCursor} />
+            </h1>
             <p className={styles.featureHomeSubtitle}>
               输入一句话，AI 帮你规划完整周末
             </p>
@@ -947,9 +1229,13 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
               city={city}
               onOpenModal={onOpenModal}
               onToast={setToast}
+              modelMode={modelMode}
+              onModelModeChange={setModelMode}
             />
 
-            {toast && <InlineToast message={toast} onDone={() => setToast(null)} />}
+            {toast && (
+              <InlineToast message={toast} onDone={() => setToast(null)} />
+            )}
 
             <div className={styles.featureChips}>
               {EXAMPLE_PROMPTS.map((p) => (
@@ -969,9 +1255,7 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
                   className={styles.healthDot}
                   style={{ background: healthOk ? "#22c55e" : "#ef4444" }}
                 />
-                {healthOk
-                  ? "规划服务已连接"
-                  : `未连接后端 · ${getApiBase()}`}
+                {healthOk ? "规划服务已连接" : `未连接后端 · ${getApiBase()}`}
               </div>
             )}
           </div>
@@ -995,16 +1279,16 @@ export default function FeaturesPage({ user, onOpenModal }: FeaturesPageProps) {
                 onChange={setInputValue}
                 onSubmit={handleComposerSubmit}
                 disabled={isBusy}
-                placeholder={
-                  phase === "result"
-                    ? "选一个方案，或继续描述…"
-                    : phase === "selected" || phase === "done"
-                      ? "还想调整什么？"
-                      : "继续描述…"
-                }
+                user={user}
+                city={city}
+                onOpenModal={onOpenModal}
                 onToast={setToast}
+                modelMode={modelMode}
+                onModelModeChange={setModelMode}
               />
-              {toast && <InlineToast message={toast} onDone={() => setToast(null)} />}
+              {toast && (
+                <InlineToast message={toast} onDone={() => setToast(null)} />
+              )}
             </div>
           </div>
         )}
