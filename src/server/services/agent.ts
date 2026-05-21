@@ -534,7 +534,7 @@ export async function runLlmPlanningAgent(
  * 原有 Mock 实现的请求验证 Schema
  */
 export const planningRequestSchema = z.object({
-  prompt: z.string().min(1, "prompt is required"),
+  prompt: z.string().min(1, "prompt is required").max(5000, "prompt must be at most 5000 characters"),
   city: z.string().optional(),
   startPoint: z.string().optional(),
   companions: z.enum(["family", "friends", "couple", "solo"]).optional(),

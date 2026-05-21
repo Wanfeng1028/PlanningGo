@@ -1,4 +1,4 @@
-import type { PlanningRequestInput } from "./api";
+import type { PlanningRequestInput, PlanningResult } from "./api";
 
 const API_BASE: string = import.meta.env.VITE_API_BASE || "http://127.0.0.1:3001";
 
@@ -12,6 +12,7 @@ export function setAuthToken(token: string | null) {
 
 export interface StreamOptions {
   onChunk?: (chunk: string) => void;
+  onFinalResult?: (result: PlanningResult) => void;
   onError?: (error: Error) => void;
   onComplete?: () => void;
   signal?: AbortSignal;
@@ -21,7 +22,7 @@ export async function streamFetch(
   url: string,
   options: RequestInit & StreamOptions
 ): Promise<void> {
-  const { onChunk, onError, onComplete, signal, ...fetchOptions } = options;
+  const { onChunk, onFinalResult, onError, onComplete, signal, ...fetchOptions } = options;
 
   try {
     const response = await fetch(url, {
@@ -38,6 +39,7 @@ export async function streamFetch(
 
     const decoder = new TextDecoder();
     let buffer = "";
+    let completed = false;
 
     try {
       while (true) {
@@ -54,23 +56,54 @@ export async function streamFetch(
           if (line.startsWith("data: ")) {
             const data = line.slice(6);
             if (data === "[DONE]") {
+              completed = true;
               onComplete?.();
               return;
             }
+            if (data.startsWith("[FINAL_RESULT]")) {
+              try {
+                const result = JSON.parse(data.slice("[FINAL_RESULT]".length)) as PlanningResult;
+                onFinalResult?.(result);
+              } catch {
+                // Ignore parse errors
+              }
+              continue;
+            }
             try {
-              const parsed = JSON.parse(data);
-              onChunk?.(parsed.content || "");
-            } catch {
-              // Ignore parse errors
+              const parsed = JSON.parse(data) as { content?: string; error?: string; done?: boolean; result?: PlanningResult };
+              if (typeof parsed.error === "string") {
+                throw new Error(parsed.error);
+              }
+              if (typeof parsed.content === "string") {
+                onChunk?.(parsed.content);
+                continue;
+              }
+              if (parsed.done === true && parsed.result) {
+                onFinalResult?.(parsed.result as PlanningResult);
+                continue;
+              }
+            } catch (parseError) {
+              if (parseError instanceof Error && parseError.name !== "SyntaxError") {
+                throw parseError;
+              }
+              // Ignore non-JSON chunks
             }
           }
         }
+      }
+      if (!completed) {
+        onComplete?.();
       }
     } finally {
       reader.releaseLock();
     }
   } catch (error) {
-    onError?.(error instanceof Error ? error : new Error(String(error)));
+    const streamError = error instanceof Error ? error : new Error(String(error));
+    if (onError) {
+      onError(streamError);
+      return;
+    }
+    throw streamError;
   }
 }
 

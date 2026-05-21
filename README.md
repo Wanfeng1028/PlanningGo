@@ -210,6 +210,7 @@ pm2 start dist/server/index.js --name planninggo-api
 ```bash
 # 配置 .env 中的生产变量
 # JWT_ACCESS_SECRET / JWT_REFRESH_SECRET 必须替换为强密钥
+# 可使用 openssl rand -hex 32 生成
 # CORS_ORIGINS 设置为正式域名
 docker compose up -d
 ```

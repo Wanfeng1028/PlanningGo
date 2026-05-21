@@ -2,7 +2,7 @@
  * Agent 路由 — /api/agent/*
  */
 
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { PrismaClient } from "../../generated/prisma/client.js";
 import { ZodError, z } from "zod";
 import { parseDemand, planningRequestSchema, runPlanningAgent, simulateWhatIf } from "../services/agent.js";
@@ -11,11 +11,49 @@ import { saveActions } from "../services/store.js";
 import * as mem from "../services/memoryStore.js";
 
 export async function registerAgentRoutes(app: FastifyInstance) {
-  // Rate limiting for planning endpoints
+  // Global per-endpoint guard (kept lenient); strict model-based quota handled below.
   const planningRateLimit = {
-    max: 10, // 10 requests per minute
+    max: 100, // 100 requests per minute
     timeWindow: "1 minute",
     skipOnError: true,
+  };
+
+  const planningModeQuota = {
+    flash: { max: 30, windowMs: 60 * 60 * 1000 },
+    pro: { max: 100, windowMs: 60 * 60 * 1000 },
+  } as const;
+  const maxPlanningCounterEntries = 2000;
+  const planningCounters = new Map<string, { count: number; resetAt: number }>();
+  type PlanningModeBody = { modelMode?: "flash" | "pro" };
+
+  const enforcePlanningQuota = (request: FastifyRequest<{ Body: PlanningModeBody }>, reply: FastifyReply): boolean => {
+    if (planningCounters.size > maxPlanningCounterEntries) {
+      const now = Date.now();
+      for (const [k, v] of planningCounters.entries()) {
+        if (v.resetAt <= now) planningCounters.delete(k);
+      }
+    }
+    const modelMode = request?.body?.modelMode === "pro" ? "pro" : "flash";
+    const quota = planningModeQuota[modelMode];
+    const identity = request.userId ?? request.ip ?? "anonymous";
+    const key = `${identity}:${modelMode}`;
+    const now = Date.now();
+    const current = planningCounters.get(key);
+    if (!current || now >= current.resetAt) {
+      planningCounters.set(key, { count: 1, resetAt: now + quota.windowMs });
+      return true;
+    }
+    if (current.count >= quota.max) {
+      const retryAfterSec = Math.max(1, Math.ceil((current.resetAt - now) / 1000));
+      reply
+        .status(429)
+        .header("Retry-After", String(retryAfterSec))
+        .send({ error: "RATE_LIMIT_EXCEEDED", message: `当前模型请求过于频繁，请 ${retryAfterSec} 秒后重试` });
+      return false;
+    }
+    current.count += 1;
+    planningCounters.set(key, current);
+    return true;
   };
 
   app.post(
@@ -40,7 +78,10 @@ export async function registerAgentRoutes(app: FastifyInstance) {
     "/api/agent/plan",
     {
       config: { rateLimit: planningRateLimit },
-      preHandler: [app.optionalAuthGuard],
+      preHandler: [app.optionalAuthGuard, (request, reply, done) => {
+        if (!enforcePlanningQuota(request as FastifyRequest<{ Body: PlanningModeBody }>, reply)) return;
+        done();
+      }],
     },
     async (request, reply) => {
     try {
@@ -114,7 +155,7 @@ export async function registerAgentRoutes(app: FastifyInstance) {
         mem.addMessage({ conversationId, role: "assistant", content: assistantContent });
       }
 
-      return result;
+      return { ...result, conversationId };
     } catch (error) {
       if (error instanceof ZodError) return reply.status(400).send({ error: "INVALID_REQUEST", issues: error.issues });
       throw error;
@@ -126,7 +167,10 @@ export async function registerAgentRoutes(app: FastifyInstance) {
     "/api/agent/plan/stream",
     {
       config: { rateLimit: planningRateLimit },
-      preHandler: [app.optionalAuthGuard],
+      preHandler: [app.optionalAuthGuard, (request, reply, done) => {
+        if (!enforcePlanningQuota(request as FastifyRequest<{ Body: PlanningModeBody }>, reply)) return;
+        done();
+      }],
     },
     async (request, reply) => {
       try {
@@ -193,8 +237,11 @@ export async function registerAgentRoutes(app: FastifyInstance) {
           await new Promise((resolve) => setTimeout(resolve, 10));
         }
 
-        // Send final result
-        reply.raw.write(`data: ${JSON.stringify({ done: true, result })}\n\n`);
+        // Send final structured result for progressive UI hydration
+        const finalResult = { ...result, conversationId };
+        reply.raw.write(`data: [FINAL_RESULT]${JSON.stringify(finalResult)}\n\n`);
+        reply.raw.write(`data: ${JSON.stringify({ done: true, result: finalResult })}\n\n`);
+        reply.raw.write("data: [DONE]\n\n");
 
         // ── 4. 保存助手消息 ──
         if (db) {
@@ -213,12 +260,15 @@ export async function registerAgentRoutes(app: FastifyInstance) {
         } else {
           mem.addMessage({ conversationId, role: "assistant", content: summary });
         }
+        reply.raw.end();
       } catch (error) {
         if (error instanceof ZodError) {
           reply.raw.write(`data: ${JSON.stringify({ error: "INVALID_REQUEST", issues: error.issues })}\n\n`);
         } else {
           reply.raw.write(`data: ${JSON.stringify({ error: "INTERNAL_SERVER_ERROR" })}\n\n`);
         }
+        reply.raw.write("data: [DONE]\n\n");
+        reply.raw.end();
       }
     }
   );

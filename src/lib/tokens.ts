@@ -54,7 +54,7 @@ export function estimateTokens(text: string): number {
 }
 
 export const MAX_INPUT_TOKENS = 4000;
-export const MAX_INPUT_CHARS = 10000;
+export const MAX_INPUT_CHARS = 5000;
 
 export function validateInputLength(text: string): {
   valid: boolean;
