@@ -39,6 +39,7 @@ export async function streamFetch(
 
     const decoder = new TextDecoder();
     let buffer = "";
+    let completed = false;
 
     try {
       while (true) {
@@ -55,6 +56,7 @@ export async function streamFetch(
           if (line.startsWith("data: ")) {
             const data = line.slice(6);
             if (data === "[DONE]") {
+              completed = true;
               onComplete?.();
               return;
             }
@@ -68,10 +70,9 @@ export async function streamFetch(
               continue;
             }
             try {
-              const parsed = JSON.parse(data);
+              const parsed = JSON.parse(data) as { content?: string; error?: string; done?: boolean; result?: PlanningResult };
               if (typeof parsed.error === "string") {
-                onError?.(new Error(parsed.error));
-                continue;
+                throw new Error(parsed.error);
               }
               if (typeof parsed.content === "string") {
                 onChunk?.(parsed.content);
@@ -81,19 +82,27 @@ export async function streamFetch(
                 onFinalResult?.(parsed.result as PlanningResult);
                 continue;
               }
-            } catch {
-              // Ignore parse errors
+            } catch (parseError) {
+              if (parseError instanceof Error && parseError.name !== "SyntaxError") {
+                throw parseError;
+              }
+              // Ignore non-JSON chunks
             }
           }
         }
       }
-      onComplete?.();
+      if (!completed) {
+        onComplete?.();
+      }
     } finally {
       reader.releaseLock();
     }
   } catch (error) {
     const streamError = error instanceof Error ? error : new Error(String(error));
-    onError?.(streamError);
+    if (onError) {
+      onError(streamError);
+      return;
+    }
     throw streamError;
   }
 }

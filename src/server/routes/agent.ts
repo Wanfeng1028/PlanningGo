@@ -2,7 +2,7 @@
  * Agent 路由 — /api/agent/*
  */
 
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { PrismaClient } from "../../generated/prisma/client.js";
 import { ZodError, z } from "zod";
 import { parseDemand, planningRequestSchema, runPlanningAgent, simulateWhatIf } from "../services/agent.js";
@@ -22,9 +22,17 @@ export async function registerAgentRoutes(app: FastifyInstance) {
     flash: { max: 30, windowMs: 60 * 60 * 1000 },
     pro: { max: 100, windowMs: 60 * 60 * 1000 },
   } as const;
+  const maxPlanningCounterEntries = 2000;
   const planningCounters = new Map<string, { count: number; resetAt: number }>();
+  type PlanningModeBody = { modelMode?: "flash" | "pro" };
 
-  const enforcePlanningQuota = (request: any, reply: any): boolean => {
+  const enforcePlanningQuota = (request: FastifyRequest<{ Body: PlanningModeBody }>, reply: FastifyReply): boolean => {
+    if (planningCounters.size > maxPlanningCounterEntries) {
+      const now = Date.now();
+      for (const [k, v] of planningCounters.entries()) {
+        if (v.resetAt <= now) planningCounters.delete(k);
+      }
+    }
     const modelMode = request?.body?.modelMode === "pro" ? "pro" : "flash";
     const quota = planningModeQuota[modelMode];
     const identity = request.userId ?? request.ip ?? "anonymous";
@@ -71,7 +79,7 @@ export async function registerAgentRoutes(app: FastifyInstance) {
     {
       config: { rateLimit: planningRateLimit },
       preHandler: [app.optionalAuthGuard, (request, reply, done) => {
-        if (!enforcePlanningQuota(request, reply)) return done();
+        if (!enforcePlanningQuota(request as FastifyRequest<{ Body: PlanningModeBody }>, reply)) return;
         done();
       }],
     },
@@ -160,7 +168,7 @@ export async function registerAgentRoutes(app: FastifyInstance) {
     {
       config: { rateLimit: planningRateLimit },
       preHandler: [app.optionalAuthGuard, (request, reply, done) => {
-        if (!enforcePlanningQuota(request, reply)) return done();
+        if (!enforcePlanningQuota(request as FastifyRequest<{ Body: PlanningModeBody }>, reply)) return;
         done();
       }],
     },

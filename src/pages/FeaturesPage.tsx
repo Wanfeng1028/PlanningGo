@@ -1487,8 +1487,9 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
       setIsBusy(true);
       setPhase("understanding");
 
-      const targetSessionId = currentSessionIdRef.current ?? uuid();
-      if (!currentSessionIdRef.current) {
+      let targetSessionId = currentSessionIdRef.current;
+      if (!targetSessionId) {
+        targetSessionId = uuid();
         const newSession: ChatSession = {
           id: targetSessionId,
           title: prompt.length > 20 ? prompt.slice(0, 20) + "…" : prompt,
@@ -1502,6 +1503,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
         setChatSessions((prev) => [newSession, ...prev]);
         setSessionMessages(targetSessionId, []);
       }
+      if (!targetSessionId) return;
 
       // 1) Add user message
       const userMsg: ChatMessage = {
