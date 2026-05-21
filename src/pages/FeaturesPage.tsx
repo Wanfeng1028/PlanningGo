@@ -476,6 +476,14 @@ function Composer({
     valueRef.current = value;
   }, [value]);
 
+  /* ── Auto-resize textarea as content grows/shrinks ── */
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value, textareaRef]);
+
   /* ── Cleanup preview URLs on unmount ── */
   useEffect(() => {
     return () => {
