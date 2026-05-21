@@ -86,6 +86,7 @@ export const executionActionSchema = z.object({
   id: z.string(),
   planId: z.string(),
   optionId: z.string(),
+  userId: z.string().optional(),
   type: z.enum([
     "restaurant_reservation",
     "ticket_lock",

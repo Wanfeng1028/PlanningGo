@@ -17,10 +17,6 @@ import {
   upsertReservation,
   vote,
   saveActions,
-  listActions,
-  quoteAction,
-  confirmAction,
-  cancelAction,
 } from "./services/store";
 
 export async function registerRoutes(app: FastifyInstance) {

@@ -214,9 +214,13 @@ export function clearLongTermMemory() {
 
 const actionStore = new Map<string, ExecutionAction>();
 
-export function listActions(planId?: string): ExecutionAction[] {
+export function listActions(planId?: string, userId?: string): ExecutionAction[] {
   const all = Array.from(actionStore.values());
-  return planId ? all.filter((a) => a.planId === planId) : all;
+  let filtered = planId ? all.filter((a) => a.planId === planId) : all;
+  if (userId) {
+    filtered = filtered.filter((a) => !a.userId || a.userId === userId);
+  }
+  return filtered;
 }
 
 export function getAction(id: string): ExecutionAction | undefined {
@@ -237,17 +241,42 @@ export function updateActionStatus(id: string, status: ExecutionAction["status"]
   return next;
 }
 
-export function quoteAction(id: string): ExecutionAction | null {
+function assertActionOwnership(action: ExecutionAction, userId: string): void {
+  if (action.userId && action.userId !== userId) {
+    throw new Error("FORBIDDEN: action does not belong to this user");
+  }
+}
+
+function assertActionNotExpired(action: ExecutionAction): void {
+  if (action.expiresAt && new Date(action.expiresAt) < new Date()) {
+    throw new Error("ACTION_EXPIRED");
+  }
+}
+
+const PAYMENT_TYPES = new Set(["restaurant_reservation", "ticket_lock"]);
+
+function assertActionTypeAllowed(action: ExecutionAction): void {
+  if (PAYMENT_TYPES.has(action.type)) {
+    throw new Error("PAYMENT_DISABLED: payment actions are not allowed in this version");
+  }
+}
+
+export function quoteAction(id: string, userId: string): ExecutionAction | null {
   const action = actionStore.get(id);
   if (!action) return null;
+  assertActionOwnership(action, userId);
+  assertActionNotExpired(action);
   const next: ExecutionAction = { ...action, status: "quoted" };
   actionStore.set(id, next);
   return next;
 }
 
-export function confirmAction(id: string): ExecutionAction | null {
+export function confirmAction(id: string, userId: string): ExecutionAction | null {
   const action = actionStore.get(id);
   if (!action) return null;
+  assertActionOwnership(action, userId);
+  assertActionNotExpired(action);
+  assertActionTypeAllowed(action);
   if (!action.confirmationRequired) {
     const next: ExecutionAction = { ...action, status: "success" };
     actionStore.set(id, next);
@@ -261,9 +290,10 @@ export function confirmAction(id: string): ExecutionAction | null {
   return final;
 }
 
-export function cancelAction(id: string): ExecutionAction | null {
+export function cancelAction(id: string, userId: string): ExecutionAction | null {
   const action = actionStore.get(id);
   if (!action) return null;
+  assertActionOwnership(action, userId);
   const next: ExecutionAction = { ...action, status: "cancelled" };
   actionStore.set(id, next);
   return next;
