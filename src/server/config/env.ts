@@ -89,6 +89,29 @@ const envSchema = z.object({
     .string()
     .default("false")
     .transform((v) => v === "true"),
+
+  // ── 生产环境安全开关 ──
+  ENABLE_DEMO_AUTH: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true"),
+  ENABLE_DEV_SANDBOX: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true"),
+  ALLOW_MOCK_PROVIDER_IN_PRODUCTION: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true"),
+  REQUIRE_DB_IN_PRODUCTION: z
+    .string()
+    .default("true")
+    .transform((v) => v === "true"),
+  REQUIRE_REDIS_IN_PRODUCTION: z
+    .string()
+    .default("true")
+    .transform((v) => v === "true"),
+  COOKIE_SECRET: z.string().optional(),
 });
 
 const insecureJwtSecrets = new Set([
@@ -120,8 +143,39 @@ export function validateProductionJwtSecrets(input: {
   }
 }
 
+const insecureDefaultDatabaseUrl = "postgresql://planninggo:planninggo@localhost:5432/planninggo?schema=public";
+
+export function validateProductionRuntime(input: typeof env) {
+  if (input.NODE_ENV !== "production") return;
+
+  if (input.PLANNING_MODE === "mock" && !input.ALLOW_MOCK_PROVIDER_IN_PRODUCTION) {
+    throw new Error("生产环境禁止使用 PLANNING_MODE=mock（除非显式设置 ALLOW_MOCK_PROVIDER_IN_PRODUCTION=true）");
+  }
+
+  if (!input.DATABASE_URL || input.DATABASE_URL === insecureDefaultDatabaseUrl) {
+    throw new Error("生产环境必须配置真实 DATABASE_URL，不能使用默认本地数据库");
+  }
+
+  if (!input.REDIS_URL || input.REDIS_URL.includes("localhost")) {
+    throw new Error("生产环境必须配置真实 REDIS_URL，不能使用默认本地 Redis");
+  }
+
+  if (!input.COOKIE_SECRET || input.COOKIE_SECRET.length < 32) {
+    throw new Error("生产环境必须配置至少 32 位 COOKIE_SECRET");
+  }
+
+  if (input.ENABLE_DEMO_AUTH) {
+    throw new Error("生产环境禁止开启 ENABLE_DEMO_AUTH");
+  }
+
+  if (input.AUTO_EXECUTION_ALLOW_PAYMENT) {
+    throw new Error("第一版生产环境禁止开启 AUTO_EXECUTION_ALLOW_PAYMENT");
+  }
+}
+
 export const env = envSchema.parse(process.env);
 validateProductionJwtSecrets(env);
+validateProductionRuntime(env);
 
 export const corsOrigins = env.CORS_ORIGINS.split(",")
   .map((item) => item.trim())
