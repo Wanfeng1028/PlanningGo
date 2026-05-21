@@ -283,6 +283,17 @@ export interface PlanningExecutableAction {
   priceEstimate?: string;
 }
 
+export interface PlanningRequestInput {
+  prompt: string;
+  city?: string;
+  startPoint?: string;
+  companions?: "family" | "friends" | "couple" | "solo";
+  budget?: number;
+  modelMode?: "flash" | "pro";
+  conversationId?: string;
+  guestId?: string;
+}
+
 export interface PlanningResult {
   traceId: string;
   planId: string;
@@ -301,16 +312,7 @@ export interface PlanningResult {
   };
 }
 
-export async function requestPlanning(input: {
-  prompt: string;
-  city?: string;
-  startPoint?: string;
-  companions?: "family" | "friends" | "couple" | "solo";
-  budget?: number;
-  modelMode?: "flash" | "pro";
-  conversationId?: string;
-  guestId?: string;
-}): Promise<PlanningResult> {
+export async function requestPlanning(input: PlanningRequestInput): Promise<PlanningResult> {
   return apiJson<PlanningResult>("/api/agent/plan", {
     method: "POST",
     body: JSON.stringify(input),

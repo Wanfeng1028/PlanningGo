@@ -1534,7 +1534,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
       try {
         setPhase("planning");
         let streamedContent = "";
-        let finalResult: PlanningResult | null = null;
+        let finalResult: PlanningResult | null = null as PlanningResult | null;
 
         await streamPlanningRequest(
           {
@@ -1554,7 +1554,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
                 chips: undefined,
               });
             },
-            onFinalResult: (result) => {
+            onFinalResult: (result: PlanningResult) => {
               finalResult = result;
             },
           }
@@ -1563,7 +1563,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
         if (!finalResult) {
           throw new Error("规划流未返回最终结果，请稍后重试");
         }
-        const result = finalResult;
+        const result = finalResult as unknown as PlanningResult;
 
         // Validate session hasn't changed (race condition protection)
         if (currentSessionIdRef.current !== targetSessionId) {
