@@ -39,7 +39,10 @@
       "Bash(start *)",
       "Bash(docker stop *)",
       "Bash(pg_isready *)",
-      "Bash(docker exec *)"
+      "Bash(docker exec *)",
+      "Bash(redis-cli *)",
+      "Bash(npm test)",
+      "Bash(git add *)"
     ]
   },
   "$version": 4

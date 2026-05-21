@@ -36,7 +36,7 @@ const PROGRESS_CLASS = {
 
 export function GlassToast({ toast, onDismiss }: GlassToastProps) {
   const [exiting, setExiting] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const dismiss = useCallback(() => {
     setExiting(true);
@@ -85,7 +85,7 @@ export function GlassToast({ toast, onDismiss }: GlassToastProps) {
 let _toastId = 0;
 export function useGlassToast() {
   const [toast, setToast] = useState<ToastMessage | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const show = useCallback((text: string, type: ToastType = "success", duration?: number) => {
     clearTimeout(timerRef.current);
