@@ -20,6 +20,7 @@ import type {
   DeveloperSecurity,
   DeveloperSandboxResult,
 } from "../types";
+import { retryWithBackoff, refreshToken } from "./retry";
 
 export interface AgentPlanResponse {
   traceId: string;
@@ -118,68 +119,69 @@ export async function requestAgentPlan(prompt: string): Promise<AgentPlanRespons
 }
 
 async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers: Record<string, string> = {
-    "content-type": "application/json",
-    ...(init?.headers as Record<string, string> ?? {}),
-  };
-  if (_authToken) {
-    headers.authorization = `Bearer ${_authToken}`;
-  }
-
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE}${path}`, {
-      ...init,
-      headers,
-    });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("fetch")) {
-      throw new Error("无法连接规划服务，请确认后端已启动（npm run dev:api）并检查 VITE_API_BASE 配置。");
+  return retryWithBackoff(async () => {
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+      ...(init?.headers as Record<string, string> ?? {}),
+    };
+    if (_authToken) {
+      headers.authorization = `Bearer ${_authToken}`;
     }
-    throw new Error(`网络请求失败：${msg}`);
-  }
 
-  let body: unknown;
-  try {
-    body = await response.json();
-  } catch {
-    body = undefined;
-  }
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE}${path}`, {
+        ...init,
+        headers,
+        signal: AbortSignal.timeout(30000), // 30 second timeout
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("fetch")) {
+        throw new Error("无法连接规划服务，请确认后端已启动（npm run dev:api）并检查 VITE_API_BASE 配置。");
+      }
+      throw new Error(`网络请求失败：${msg}`);
+    }
 
-  if (!response.ok) {
-    // 提取后端返回的错误信息
-    let msg: string | undefined;
-    if (body && typeof body === "object") {
-      const obj = body as Record<string, unknown>;
-      if (typeof obj.message === "string") {
-        msg = obj.message;
-      } else if (typeof obj.error === "string") {
-        msg = obj.error;
-      } else if (obj.error && typeof obj.error === "object" && "message" in (obj.error as Record<string, unknown>)) {
-        msg = (obj.error as Record<string, unknown>).message as string;
+    // Handle 401 - Token expired
+    if (response.status === 401) {
+      const newToken = await refreshToken();
+      if (newToken) {
+        // Retry with new token
+        headers.authorization = `Bearer ${newToken}`;
+        response = await fetch(`${API_BASE}${path}`, {
+          ...init,
+          headers,
+          signal: AbortSignal.timeout(30000),
+        });
+      } else {
+        throw new Error("请重新登录");
       }
     }
 
-    if (!msg) {
-      if (response.status === 400) msg = "请求参数不完整，我需要再确认城市或出发地。";
-      else if (response.status === 500) msg = "规划服务刚刚出错了，可以重试一次。";
-      else msg = `请求失败 (${response.status})`;
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch {
+      body = undefined;
     }
 
-    if (import.meta.env.DEV) {
-      console.warn(`[api] ${path} ${response.status}`, body);
+    if (!response.ok) {
+      // Extract error message from backend
+      let msg: string | undefined;
+      if (body && typeof body === "object") {
+        const obj = body as Record<string, unknown>;
+        if (typeof obj.message === "string") {
+          msg = obj.message;
+        } else if (typeof obj.error === "string") {
+          msg = obj.error;
+        }
+      }
+      throw new Error(msg || `HTTP ${response.status}`);
     }
 
-    throw new Error(msg);
-  }
-
-  // 兼容 { ok, data } 包装格式和扁平格式
-  if (body && typeof body === "object" && "ok" in body && "data" in body) {
-    return (body as { data: T }).data;
-  }
-
-  return body as T;
+    return body as T;
+  });
 }
 
 // ── Auth ──
@@ -288,6 +290,13 @@ export interface PlanningResult {
   options: PlanningOption[];
   executableActions: PlanningExecutableAction[];
   nextActions: string[];
+  input: {
+    prompt: string;
+    city?: string;
+    startPoint?: string;
+    companions?: "family" | "friends" | "couple" | "solo";
+    budget?: number;
+  };
 }
 
 export async function requestPlanning(input: {
@@ -750,7 +759,7 @@ export interface MessageItem {
   conversationId: string;
   role: "user" | "assistant" | "system";
   content: string;
-  payloadJson?: any;
+  payloadJson?: Record<string, unknown>;
   createdAt: string;
 }
 

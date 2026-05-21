@@ -24,8 +24,11 @@ import {
   PopoverItem,
   ConfirmActions,
 } from "../components/FeatureModal";
-import { WorkspaceModal } from "../components/WorkspaceModal";
 import { GlassToast, useGlassToast } from "../components/GlassToast";
+import { validateInputLength } from "../lib/tokens";
+import { sanitizeMarkdown } from "../lib/sanitize";
+import { streamPlanningRequest } from "../lib/stream";
+import { WorkspaceModal } from "../components/WorkspaceModal";
 import { Button } from "../components/Button";
 import type { ModalKey, NavKey, SessionUser } from "../types";
 import styles from "./FeaturesPage.module.scss";
@@ -1245,9 +1248,12 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const composerDockRef = useRef<HTMLDivElement>(null);
   const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const currentSessionIdRef = useRef<string | null>(null);
 
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const city = selectedCity || location?.city || user?.city || "选择城市";
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
 
   const { toast: glassToast, show: showToast, dismiss: dismissToast } = useGlassToast();
 
@@ -1342,13 +1348,34 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
     );
   }, [messages, currentSessionId]);
 
-  /* ── Scroll to bottom helper (use scrollTop to avoid ancestor scroll) ── */
+  /* ── Scroll to bottom helper with user intent detection ── */
+  const handleMessagesScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      const container = e.currentTarget;
+      const { scrollTop, scrollHeight, clientHeight } = container;
+
+      // If user is not at bottom (within 100px), disable auto-scroll
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+      setShouldAutoScroll(isAtBottom);
+    },
+    []
+  );
+
   const scrollToBottom = useCallback(() => {
+    if (!shouldAutoScroll) return; // Respect user's scroll intent
+
     requestAnimationFrame(() => {
       const el = messagesContainerRef.current;
       if (el) el.scrollTop = el.scrollHeight;
     });
-  }, []);
+  }, [shouldAutoScroll]);
+
+  // Auto-scroll only when user is at bottom
+  useEffect(() => {
+    if (shouldAutoScroll && mode === "chat") {
+      scrollToBottom();
+    }
+  }, [messages, mode, shouldAutoScroll, scrollToBottom]);
 
   /* ── Health check on mount ── */
   useEffect(() => {
@@ -1361,6 +1388,11 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
   useEffect(() => {
     conversationIdRef.current = conversationId;
   }, [conversationId]);
+
+  /* ── Sync currentSessionId ref for race condition protection ── */
+  useEffect(() => {
+    currentSessionIdRef.current = currentSessionId;
+  }, [currentSessionId]);
 
   /* ── Auto-scroll when messages change ── */
   useEffect(() => {
@@ -1396,6 +1428,16 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
   const doSubmit = useCallback(
     async (prompt: string) => {
       if (!prompt || isBusy) return;
+
+      // Validate input length
+      const validation = validateInputLength(prompt);
+      if (!validation.valid) {
+        showToast(validation.error!, "error");
+        return;
+      }
+
+      const controller = new AbortController();
+      setAbortController(controller);
 
       setMode("chat");
       setIsBusy(true);
@@ -1441,9 +1483,41 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
       // Track event
       apiTrackEvent({ eventName: "send_planning_prompt", payload: { prompt, city, modelMode }, page: "features" }).catch(() => {});
 
-      // 3) Call API
+      // 3) Call API with streaming
       try {
         setPhase("planning");
+        let streamedContent = "";
+        let finalResult: any = null;
+
+        await streamPlanningRequest(
+          {
+            prompt,
+            city,
+            companions: "family",
+            modelMode: toApiModelMode(modelMode),
+            conversationId: conversationIdRef.current ?? undefined,
+          },
+          {
+            signal: controller.signal,
+            onChunk: (chunk) => {
+              streamedContent += chunk;
+              updateLastAssistant({
+                status: "success",
+                content: streamedContent,
+                chips: undefined,
+              });
+            },
+            onComplete: () => {
+              // Streaming complete, final result will be in the last chunk
+            },
+            onError: (error) => {
+              throw error;
+            },
+          }
+        );
+
+        // For now, fall back to blocking API for full result
+        // TODO: Update backend streaming to send full result in SSE
         const result = await requestPlanning({
           prompt,
           city,
@@ -1451,6 +1525,12 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
           modelMode: toApiModelMode(modelMode),
           conversationId: conversationIdRef.current ?? undefined,
         });
+
+        // Validate session hasn't changed (race condition protection)
+        if (currentSessionIdRef.current !== currentSessionId) {
+          console.warn("[Session] Session changed during request, ignoring response");
+          return;
+        }
 
         // Store conversationId from backend
         if (result.conversationId) {
@@ -1466,7 +1546,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
         // 确保 options 数组存在且不为空
         if (result.options && result.options.length > 0) {
           // 为每个 option 生成唯一 ID（如果后端没有提供）
-          const optionsWithIds = result.options.map((opt, idx) => ({
+          const optionsWithIds = result.options.map((opt: PlanningOption, idx: number) => ({
             ...opt,
             id: opt.id || `plan_${idx}`,
           }));
@@ -1488,6 +1568,12 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
           setPhase("done");
         }
       } catch (err) {
+        // Validate session hasn't changed (race condition protection)
+        if (currentSessionIdRef.current !== currentSessionId) {
+          console.warn("[Session] Session changed during request, ignoring error");
+          return;
+        }
+
         const errorMsg =
           err instanceof Error ? err.message : "规划服务暂时不可用";
         updateLastAssistant({
@@ -1500,10 +1586,22 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
         reportClientError({ message: errorMsg, route: "/api/agent/plan" }).catch(() => {});
       } finally {
         setIsBusy(false);
+        setAbortController(null);
       }
     },
     [isBusy, city, modelMode, addMessage, updateLastAssistant],
   );
+
+  const handleStopGeneration = useCallback(() => {
+    abortController?.abort();
+    setAbortController(null);
+    setIsBusy(false);
+    updateLastAssistant({
+      status: "error",
+      content: "已停止生成",
+      chips: undefined,
+    });
+  }, [abortController, updateLastAssistant]);
 
   /* ── Event handlers ── */
   const handleComposerSubmit = useCallback(
@@ -1855,7 +1953,10 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
             {msg.status === "success" && (
               <>
                 {msg.content && (
-                  <div className={styles.resultSummary}>{msg.content}</div>
+                  <div
+                    className={styles.resultSummary}
+                    dangerouslySetInnerHTML={{ __html: sanitizeMarkdown(msg.content) }}
+                  />
                 )}
 
                 {/* Plan cards with embedded action chips */}
@@ -1990,7 +2091,11 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
         ) : (
           /* ── Chat: messages + docked composer ── */
           <div className={styles.featureChat}>
-            <div className={styles.featureMessages} ref={messagesContainerRef}>
+            <div
+              className={styles.featureMessages}
+              ref={messagesContainerRef}
+              onScroll={handleMessagesScroll}
+            >
               <div className={styles.featureMessagesInner}>
                 {messages.map((msg) => (
                   <div key={msg.id}>{renderMessageContent(msg)}</div>
@@ -2000,6 +2105,15 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
             </div>
 
             <div className={styles.featureComposerDock} ref={composerDockRef}>
+              {isBusy && (
+                <button
+                  type="button"
+                  className={styles.stopGenerationBtn}
+                  onClick={handleStopGeneration}
+                >
+                  ⏹ 停止生成
+                </button>
+              )}
               <Composer
                 compact
                 textareaRef={textareaRef}

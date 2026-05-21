@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import type { PlanningOption } from "./lib/api";
 
 export type NavKey = "home" | "features" | "cases" | "developers" | "profile";
 
@@ -40,6 +41,25 @@ export interface FlowItem {
   mode: "page" | "modal" | "drawer" | "sheet" | "state";
   modal?: ModalKey;
 }
+
+// ── Message Payload Types ──
+export interface PlanPayload {
+  planId: string;
+  options: PlanningOption[];
+  summary: string;
+}
+
+export interface ActionPayload {
+  actionId: string;
+  type: string;
+  status: string;
+}
+
+export type MessagePayload =
+  | { type: "plan"; data: PlanPayload }
+  | { type: "action"; data: ActionPayload }
+  | { type: "error"; error: string }
+  | { type: "metadata"; data: Record<string, unknown> };
 
 export interface SectionBlock {
   id: string;
