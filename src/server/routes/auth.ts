@@ -17,6 +17,12 @@ const registerSchema = z.object({
   email: z.string().email("邮箱格式不正确"),
   password: z.string().min(6, "密码至少6位"),
   displayName: z.string().max(50).optional(),
+  name: z.string().max(50).optional(),
+  city: z.string().optional(),
+  startPoint: z.string().optional(),
+  companions: z.string().optional(),
+  budgetMin: z.number().int().optional(),
+  budgetMax: z.number().int().optional(),
 });
 
 const loginSchema = z.object({
@@ -66,7 +72,33 @@ export async function registerAuthRoutes(app: FastifyInstance) {
 
     app.post("/api/auth/register", async (request, reply) => {
       const body = registerSchema.parse(request.body);
-      const result = await authService.register(body.email, body.password, body.displayName, getClientMeta(request));
+      const displayName = body.displayName ?? body.name ?? body.email.split("@")[0];
+      const result = await authService.register(body.email, body.password, displayName, getClientMeta(request));
+      // 创建用户画像（如果数据库可用）
+      if (app.db && body.city) {
+        try {
+          await app.db.userProfile.upsert({
+            where: { userId: result.user.id },
+            update: {
+              city: body.city,
+              startPoint: body.startPoint,
+              companions: body.companions ?? "solo",
+              budgetMin: body.budgetMin,
+              budgetMax: body.budgetMax,
+            },
+            create: {
+              userId: result.user.id,
+              city: body.city,
+              startPoint: body.startPoint,
+              companions: body.companions ?? "solo",
+              budgetMin: body.budgetMin,
+              budgetMax: body.budgetMax,
+            },
+          });
+        } catch {
+          // 非阻断：画像创建失败不影响注册
+        }
+      }
       return sendCreated(reply, result);
     });
 
@@ -122,8 +154,9 @@ export async function registerAuthRoutes(app: FastifyInstance) {
 
   app.post("/api/auth/register", async (request, reply) => {
     const body = registerSchema.parse(request.body);
+    const displayName = body.displayName ?? body.name ?? body.email.split("@")[0];
     try {
-      const result = await mem.register(body.email, body.password, body.displayName, getClientMeta(request));
+      const result = await mem.register(body.email, body.password, displayName, getClientMeta(request));
       return sendCreated(reply, result);
     } catch (err: any) {
       return sendError(reply, 409, "EMAIL_EXISTS", err.message);
