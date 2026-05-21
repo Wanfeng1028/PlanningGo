@@ -56,6 +56,8 @@ export class AmapMapProvider implements MapProvider {
         photos?: Array<{ url: string }>;
         tel?: string;
         distance?: string;
+        cityname?: string;
+        adcode?: string;
       }>;
     };
 
@@ -77,6 +79,8 @@ export class AmapMapProvider implements MapProvider {
         tel: poi.tel,
         distance: poi.distance ? parseInt(poi.distance, 10) : undefined,
         source: "amap",
+        city: poi.cityname,
+        adcode: poi.adcode,
       };
     });
   }

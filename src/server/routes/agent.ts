@@ -134,7 +134,16 @@ export async function registerAgentRoutes(app: FastifyInstance) {
       }
 
       // ── 3. 运行规划管道 ──
-      const result = await runPlanningPipeline(input);
+      const result = await runPlanningPipeline({
+        ...input,
+        providers: app.providers ?? undefined,
+        userId,
+      });
+
+      // ── 3.5 保存生成的 actions ──
+      if (result.executableActions?.length) {
+        saveActions(result.executableActions);
+      }
 
       // ── 4. 保存助手消息 ──
       const assistantContent = result.summary || "为你找到以下方案：";
@@ -228,7 +237,16 @@ export async function registerAgentRoutes(app: FastifyInstance) {
         }
 
         // ── 3. 运行规划管道并流式返回 ──
-        const result = await runPlanningPipeline(input);
+        const result = await runPlanningPipeline({
+          ...input,
+          providers: app.providers ?? undefined,
+          userId,
+        });
+
+        // 保存生成的 actions
+        if (result.executableActions?.length) {
+          saveActions(result.executableActions);
+        }
 
         // Stream the summary
         const summary = result.summary || "为你找到以下方案：";

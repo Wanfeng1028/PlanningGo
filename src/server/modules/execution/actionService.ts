@@ -9,19 +9,21 @@ export function createActionsForPlans(input: {
   planId: string;
   options: ActivityPlan[];
   intent: UserIntent;
+  userId?: string;
 }): ExecutionAction[] {
+  const userId = input.userId ?? "anonymous";
   const actions: ExecutionAction[] = [];
 
   for (const option of input.options) {
     for (const step of option.timeline) {
       if (step.bookingNeeded) {
-        actions.push(createBookingAction(input.planId, option.id, step, input.intent));
+        actions.push(createBookingAction(input.planId, option.id, step, input.intent, userId));
       }
     }
 
-    actions.push(createNavigationAction(input.planId, option.id, option));
-    actions.push(createCalendarAction(input.planId, option.id, option));
-    actions.push(createShareAction(input.planId, option.id, option, input.intent));
+    actions.push(createNavigationAction(input.planId, option.id, option, userId));
+    actions.push(createCalendarAction(input.planId, option.id, option, userId));
+    actions.push(createShareAction(input.planId, option.id, option, input.intent, userId));
   }
 
   return actions;
@@ -32,6 +34,7 @@ function createBookingAction(
   optionId: string,
   step: ActivityPlan["timeline"][number],
   intent: UserIntent,
+  userId: string,
 ): ExecutionAction {
   const isMeal = step.type === "meal";
   const type = isMeal ? "restaurant_reservation" : "ticket_lock";
@@ -40,6 +43,7 @@ function createBookingAction(
     id: createId(isMeal ? "act_restaurant" : "act_ticket"),
     planId,
     optionId,
+    userId,
     type,
     status: "waiting_confirm",
     title: isMeal ? `预约 ${step.poiName}` : `锁定 ${step.poiName}`,
@@ -59,11 +63,12 @@ function createBookingAction(
   };
 }
 
-function createNavigationAction(planId: string, optionId: string, option: ActivityPlan): ExecutionAction {
+function createNavigationAction(planId: string, optionId: string, option: ActivityPlan, userId: string): ExecutionAction {
   return {
     id: createId("act_nav"),
     planId,
     optionId,
+    userId,
     type: "navigation",
     status: "draft",
     title: "生成导航路线",
@@ -76,11 +81,12 @@ function createNavigationAction(planId: string, optionId: string, option: Activi
   };
 }
 
-function createCalendarAction(planId: string, optionId: string, option: ActivityPlan): ExecutionAction {
+function createCalendarAction(planId: string, optionId: string, option: ActivityPlan, userId: string): ExecutionAction {
   return {
     id: createId("act_calendar"),
     planId,
     optionId,
+    userId,
     type: "calendar_event",
     status: "waiting_confirm",
     title: "写入日历提醒",
@@ -100,11 +106,13 @@ function createShareAction(
   optionId: string,
   option: ActivityPlan,
   intent: UserIntent,
+  userId: string,
 ): ExecutionAction {
   return {
     id: createId("act_share"),
     planId,
     optionId,
+    userId,
     type: "share_message",
     status: "waiting_confirm",
     title: intent.participantMode === "friends" ? "发给朋友投票" : "发给家人确认",

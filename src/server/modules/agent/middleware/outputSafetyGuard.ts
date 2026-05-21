@@ -10,7 +10,8 @@ export interface OutputSafetyResult {
 }
 
 /**
- * Validate that output doesn't contain cities other than the allowed city
+ * 校验输出是否包含非目标城市。
+ * 发现非法城市直接返回不安全，不做文本替换。
  */
 export function validateOutputCitySafety(text: string, allowedCity: string): OutputSafetyResult {
   const cityNames = extractChineseCityNames(text);
@@ -19,28 +20,10 @@ export function validateOutputCitySafety(text: string, allowedCity: string): Out
   if (illegalCities.length > 0) {
     return {
       safe: false,
-      reason: `输出包含非目标城市：${illegalCities.join(", ")}`,
+      reason: `输出包含非目标城市：${illegalCities.join(", ")}，需要重新规划`,
       illegalCities,
     };
   }
 
   return { safe: true };
-}
-
-/**
- * Sanitize output by removing illegal city mentions
- * This is a simple implementation - in production you might want more sophisticated NLP
- */
-export function sanitizeOutputCity(text: string, allowedCity: string): string {
-  const cityNames = extractChineseCityNames(text);
-  let sanitized = text;
-
-  for (const city of cityNames) {
-    if (city !== allowedCity) {
-      // Replace city name with allowed city or remove
-      sanitized = sanitized.replace(new RegExp(city, "g"), allowedCity);
-    }
-  }
-
-  return sanitized;
 }

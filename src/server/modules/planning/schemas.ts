@@ -1,4 +1,15 @@
 import { z } from "zod";
+import type { MapProvider, LlmProvider, BookingProvider } from "../../providers/types.js";
+
+// ============================================================================
+// PlanningProviders - 规划链路依赖注入
+// ============================================================================
+
+export interface PlanningProviders {
+  map: MapProvider;
+  llm: LlmProvider;
+  booking: BookingProvider;
+}
 
 // ============================================================================
 // UserIntent - 用户需求意图
@@ -53,6 +64,8 @@ export const candidatePoiSchema = z.object({
   bookingAvailable: z.boolean().default(true),
   queueRisk: z.enum(["low", "medium", "high", "unknown"]).default("unknown"),
   riskFlags: z.array(z.string()).default([]),
+  city: z.string().optional(),
+  adcode: z.string().optional(),
 });
 
 export type CandidatePoi = z.infer<typeof candidatePoiSchema>;
@@ -86,7 +99,7 @@ export const executionActionSchema = z.object({
   id: z.string(),
   planId: z.string(),
   optionId: z.string(),
-  userId: z.string().optional(),
+  userId: z.string(),
   type: z.enum([
     "restaurant_reservation",
     "ticket_lock",

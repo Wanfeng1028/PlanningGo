@@ -47,8 +47,11 @@ const guestProfileSchema = z.object({
 }).optional();
 
 const changePasswordSchema = z.object({
-  oldPassword: z.string().min(1),
+  oldPassword: z.string().min(1).optional(),
+  currentPassword: z.string().min(1).optional(),
   newPassword: z.string().min(6),
+}).refine((data) => data.oldPassword || data.currentPassword, {
+  message: "oldPassword 或 currentPassword 必填其一",
 });
 
 function getClientMeta(request: { headers: Record<string, string | string[] | undefined>; ip: string }) {
@@ -142,7 +145,8 @@ export async function registerAuthRoutes(app: FastifyInstance) {
 
     app.post("/api/auth/change-password", { preHandler: [app.authGuard] }, async (request, reply) => {
       const body = changePasswordSchema.parse(request.body);
-      await authService.changePassword(request.userId!, body.oldPassword, body.newPassword);
+      const oldPassword = body.oldPassword ?? body.currentPassword!;
+      await authService.changePassword(request.userId!, oldPassword, body.newPassword);
       return sendNoContent(reply);
     });
 

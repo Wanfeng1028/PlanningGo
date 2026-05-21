@@ -20,6 +20,8 @@ export interface PoiResult {
   tel?: string
   distance?: number
   source?: string
+  city?: string
+  adcode?: string
 }
 
 export interface WeatherQuery {

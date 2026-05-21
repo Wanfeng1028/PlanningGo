@@ -45,10 +45,14 @@ export function GlassToast({ toast, onDismiss }: GlassToastProps) {
 
   useEffect(() => {
     if (!toast) return;
-    setExiting(false);
+    // Defer state reset outside the effect callback to satisfy lint rule
+    const raf = requestAnimationFrame(() => setExiting(false));
     const duration = toast.duration ?? 2800;
     timerRef.current = setTimeout(dismiss, duration);
-    return () => clearTimeout(timerRef.current);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timerRef.current);
+    };
   }, [toast, dismiss]);
 
   if (!toast) return null;

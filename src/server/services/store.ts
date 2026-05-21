@@ -218,7 +218,8 @@ export function listActions(planId?: string, userId?: string): ExecutionAction[]
   const all = Array.from(actionStore.values());
   let filtered = planId ? all.filter((a) => a.planId === planId) : all;
   if (userId) {
-    filtered = filtered.filter((a) => !a.userId || a.userId === userId);
+    // 只返回属于该用户的 action（没有 userId 的 action 不可见）
+    filtered = filtered.filter((a) => a.userId === userId);
   }
   return filtered;
 }
@@ -242,7 +243,7 @@ export function updateActionStatus(id: string, status: ExecutionAction["status"]
 }
 
 function assertActionOwnership(action: ExecutionAction, userId: string): void {
-  if (action.userId && action.userId !== userId) {
+  if (!action.userId || action.userId !== userId) {
     throw new Error("FORBIDDEN: action does not belong to this user");
   }
 }
