@@ -29,7 +29,16 @@ async function redisPlugin(app: FastifyInstance) {
     app.decorate("redis", redis);
     app.log.info("✅ Redis connected");
   } catch (err) {
-    app.log.warn("⚠️  Redis not available, sessions will be in-memory only");
+    app.log.error(
+      { error: err instanceof Error ? err.message : String(err) },
+      "Redis connection failed",
+    );
+
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    }
+
+    app.log.warn("Redis not available, sessions will be in-memory only in non-production mode");
     app.decorate("redis", null);
   }
 

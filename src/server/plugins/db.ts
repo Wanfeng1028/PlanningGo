@@ -26,8 +26,17 @@ async function dbPlugin(app: FastifyInstance) {
     app.decorate("db", db);
     app.log.info("✅ PostgreSQL connected");
   } catch (err) {
-    app.log.warn({ error: err instanceof Error ? err.message : String(err) }, "⚠️  PostgreSQL not available, using in-memory fallback");
+    app.log.error(
+      { error: err instanceof Error ? err.message : String(err) },
+      "PostgreSQL connection failed",
+    );
     if (db) { try { await db.$disconnect(); } catch { /* */ } }
+
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    }
+
+    app.log.warn("PostgreSQL not available, using in-memory fallback in non-production mode");
     app.decorate("db", null);
   }
 
