@@ -1,4 +1,4 @@
-import type { PlanningRequestInput } from "./api";
+import type { PlanningRequestInput, PlanningResult } from "./api";
 
 const API_BASE: string = import.meta.env.VITE_API_BASE || "http://127.0.0.1:3001";
 
@@ -12,6 +12,7 @@ export function setAuthToken(token: string | null) {
 
 export interface StreamOptions {
   onChunk?: (chunk: string) => void;
+  onFinalResult?: (result: PlanningResult) => void;
   onError?: (error: Error) => void;
   onComplete?: () => void;
   signal?: AbortSignal;
@@ -21,7 +22,7 @@ export async function streamFetch(
   url: string,
   options: RequestInit & StreamOptions
 ): Promise<void> {
-  const { onChunk, onError, onComplete, signal, ...fetchOptions } = options;
+  const { onChunk, onFinalResult, onError, onComplete, signal, ...fetchOptions } = options;
 
   try {
     const response = await fetch(url, {
@@ -57,20 +58,43 @@ export async function streamFetch(
               onComplete?.();
               return;
             }
+            if (data.startsWith("[FINAL_RESULT]")) {
+              try {
+                const result = JSON.parse(data.slice("[FINAL_RESULT]".length)) as PlanningResult;
+                onFinalResult?.(result);
+              } catch {
+                // Ignore parse errors
+              }
+              continue;
+            }
             try {
               const parsed = JSON.parse(data);
-              onChunk?.(parsed.content || "");
+              if (typeof parsed.error === "string") {
+                onError?.(new Error(parsed.error));
+                continue;
+              }
+              if (typeof parsed.content === "string") {
+                onChunk?.(parsed.content);
+                continue;
+              }
+              if (parsed.done === true && parsed.result) {
+                onFinalResult?.(parsed.result as PlanningResult);
+                continue;
+              }
             } catch {
               // Ignore parse errors
             }
           }
         }
       }
+      onComplete?.();
     } finally {
       reader.releaseLock();
     }
   } catch (error) {
-    onError?.(error instanceof Error ? error : new Error(String(error)));
+    const streamError = error instanceof Error ? error : new Error(String(error));
+    onError?.(streamError);
+    throw streamError;
   }
 }
 

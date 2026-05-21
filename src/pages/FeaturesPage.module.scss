@@ -1008,6 +1008,24 @@ $green: #22c55e;
   }
 }
 
+.composerLimitRow {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 2px;
+}
+
+.composerLimitItem {
+  font-size: 11px;
+  color: rgba($text, 0.42);
+}
+
+.composerLimitExceeded {
+  color: #dc2626;
+  font-weight: 600;
+}
+
 /* ── composer meta (idle only) ── */
 .composerMetaRow {
   display: flex;

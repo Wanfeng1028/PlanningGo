@@ -147,6 +147,7 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
     if (response.status === 401) {
       const newToken = await refreshToken();
       if (newToken) {
+        setAuthToken(newToken);
         // Retry with new token
         headers.authorization = `Bearer ${newToken}`;
         response = await fetch(`${API_BASE}${path}`, {
@@ -155,6 +156,7 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
           signal: AbortSignal.timeout(30000),
         });
       } else {
+        setAuthToken(null);
         throw new Error("请重新登录");
       }
     }

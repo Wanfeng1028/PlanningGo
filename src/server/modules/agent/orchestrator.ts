@@ -44,8 +44,21 @@ export async function runPlanningPipeline(
 
   // 5. 生成方案
   let options;
+  const shouldFallbackToMock = (error: unknown): boolean => {
+    if (!env.ENABLE_LLM_FALLBACK) return false;
+    const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+    return message.includes("timeout") || message.includes("超时") || message.includes("timed out");
+  };
   if (mode === "llm") {
-    options = await generateLlmPlans({ traceId, planId, intent, context, candidates: ranked });
+    try {
+      options = await generateLlmPlans({ traceId, planId, intent, context, candidates: ranked });
+    } catch (error) {
+      if (shouldFallbackToMock(error)) {
+        options = generateMockPlans({ traceId, planId, intent, context, candidates: ranked });
+      } else {
+        throw error;
+      }
+    }
   } else if (mode === "hybrid") {
     try {
       options = await generateLlmPlans({ traceId, planId, intent, context, candidates: ranked });

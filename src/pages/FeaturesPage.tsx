@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { v4 as uuid } from "uuid";
 import { ArrowLeft } from "lucide-react";
 import {
-  requestPlanning,
   quoteAction as apiQuoteAction,
   confirmAction as apiConfirmAction,
   cancelAction as apiCancelAction,
@@ -17,6 +16,7 @@ import {
   reportClientError,
   type PlanningOption,
   type PlanningExecutableAction,
+  type PlanningResult,
   type ConversationItem,
 } from "../lib/api";
 import {
@@ -25,7 +25,7 @@ import {
   ConfirmActions,
 } from "../components/FeatureModal";
 import { GlassToast, useGlassToast } from "../components/GlassToast";
-import { validateInputLength } from "../lib/tokens";
+import { MAX_INPUT_CHARS, MAX_INPUT_TOKENS, validateInputLength } from "../lib/tokens";
 import { sanitizeMarkdown } from "../lib/sanitize";
 import { streamPlanningRequest } from "../lib/stream";
 import { WorkspaceModal } from "../components/WorkspaceModal";
@@ -470,6 +470,7 @@ function Composer({
   const [cityOpen, setCityOpen] = useState(false);
   const [cityStep, setCityStep] = useState<"city" | "district">("city");
   const [selectedCityName, setSelectedCityName] = useState<string>("");
+  const inputValidation = useMemo(() => validateInputLength(value), [value]);
 
   useEffect(() => {
     valueRef.current = value;
@@ -773,7 +774,10 @@ function Composer({
           className={styles.composerTextarea}
           placeholder={placeholder || "明天带娃半天，预算 300，想玩点不一样的…"}
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            const next = e.target.value;
+            onChange(next.length <= MAX_INPUT_CHARS ? next : next.slice(0, MAX_INPUT_CHARS));
+          }}
           onKeyDown={handleKeyDown}
           rows={1}
         />
@@ -821,6 +825,19 @@ function Composer({
         >
           发送
         </button>
+      </div>
+
+      <div className={styles.composerLimitRow}>
+        <span
+          className={`${styles.composerLimitItem} ${!inputValidation.valid ? styles.composerLimitExceeded : ""}`}
+        >
+          {inputValidation.charCount}/{MAX_INPUT_CHARS} 字符
+        </span>
+        <span
+          className={`${styles.composerLimitItem} ${!inputValidation.valid ? styles.composerLimitExceeded : ""}`}
+        >
+          约 {inputValidation.tokenCount}/{MAX_INPUT_TOKENS} tokens
+        </span>
       </div>
 
       {showMeta && (
@@ -1236,6 +1253,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
+  const messagesBySessionRef = useRef<Map<string, ChatMessage[]>>(new Map());
   const [backendSessions, setBackendSessions] = useState<ConversationItem[]>([]);
   const [busyActionId, setBusyActionId] = useState<string | null>(null);
   const [phraseIndex, setPhraseIndex] = useState(0);
@@ -1312,7 +1330,13 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
     const savedSessions = localStorage.getItem("pg_chat_sessions");
     if (savedSessions) {
       try {
-        setChatSessions(JSON.parse(savedSessions));
+        const parsed = JSON.parse(savedSessions) as ChatSession[];
+        setChatSessions(parsed);
+        const map = new Map<string, ChatMessage[]>();
+        parsed.forEach((session) => {
+          map.set(session.id, session.messages ?? []);
+        });
+        messagesBySessionRef.current = map;
       } catch {}
     }
 
@@ -1335,18 +1359,6 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
       localStorage.setItem("pg_chat_sessions", JSON.stringify(chatSessions));
     }
   }, [chatSessions]);
-
-  // Auto-sync messages → current session
-  useEffect(() => {
-    if (!currentSessionId || messages.length === 0) return;
-    setChatSessions((prev) =>
-      prev.map((s) =>
-        s.id === currentSessionId
-          ? { ...s, messages, updatedAt: new Date().toISOString() }
-          : s,
-      ),
-    );
-  }, [messages, currentSessionId]);
 
   /* ── Scroll to bottom helper with user intent detection ── */
   const handleMessagesScroll = useCallback(
@@ -1407,12 +1419,44 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
   }, [mode]);
 
   /* ── Message helpers ── */
-  const addMessage = useCallback((msg: ChatMessage) => {
-    setMessages((prev) => [...prev, msg]);
+  const updateSessionMessages = useCallback((sessionId: string, updater: (prev: ChatMessage[]) => ChatMessage[]) => {
+    const prevSessionMessages = messagesBySessionRef.current.get(sessionId) ?? [];
+    const nextSessionMessages = updater(prevSessionMessages);
+    messagesBySessionRef.current.set(sessionId, nextSessionMessages);
+
+    setChatSessions((prev) =>
+      prev.map((session) =>
+        session.id === sessionId
+          ? { ...session, messages: nextSessionMessages, updatedAt: new Date().toISOString() }
+          : session,
+      ),
+    );
+
+    if (currentSessionIdRef.current === sessionId) {
+      setMessages(nextSessionMessages);
+    }
   }, []);
 
-  const updateLastAssistant = useCallback((patch: Partial<ChatMessage>) => {
-    setMessages((prev) => {
+  const addMessage = useCallback((sessionId: string, msg: ChatMessage) => {
+    updateSessionMessages(sessionId, (prev) => [...prev, msg]);
+  }, [updateSessionMessages]);
+
+  const setSessionMessages = useCallback((sessionId: string, sessionMessages: ChatMessage[]) => {
+    messagesBySessionRef.current.set(sessionId, sessionMessages);
+    setChatSessions((prev) =>
+      prev.map((session) =>
+        session.id === sessionId
+          ? { ...session, messages: sessionMessages, updatedAt: new Date().toISOString() }
+          : session,
+      ),
+    );
+    if (currentSessionIdRef.current === sessionId) {
+      setMessages(sessionMessages);
+    }
+  }, []);
+
+  const updateLastAssistant = useCallback((sessionId: string, patch: Partial<ChatMessage>) => {
+    updateSessionMessages(sessionId, (prev) => {
       const next = [...prev];
       for (let i = next.length - 1; i >= 0; i--) {
         if (next[i].role === "assistant") {
@@ -1422,7 +1466,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
       }
       return next;
     });
-  }, []);
+  }, [updateSessionMessages]);
 
   /* ── Core submit flow ── */
   const doSubmit = useCallback(
@@ -1443,19 +1487,20 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
       setIsBusy(true);
       setPhase("understanding");
 
-      // Create new session if needed
-      if (!currentSessionId) {
-        const sid = uuid();
+      const targetSessionId = currentSessionIdRef.current ?? uuid();
+      if (!currentSessionIdRef.current) {
         const newSession: ChatSession = {
-          id: sid,
+          id: targetSessionId,
           title: prompt.length > 20 ? prompt.slice(0, 20) + "…" : prompt,
           messages: [],
           city,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
-        setCurrentSessionId(sid);
+        setCurrentSessionId(targetSessionId);
+        currentSessionIdRef.current = targetSessionId;
         setChatSessions((prev) => [newSession, ...prev]);
+        setSessionMessages(targetSessionId, []);
       }
 
       // 1) Add user message
@@ -1465,7 +1510,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
         content: prompt,
         createdAt: new Date().toISOString(),
       };
-      addMessage(userMsg);
+      addMessage(targetSessionId, userMsg);
       setInputValue("");
 
       // 2) Add assistant thinking placeholder
@@ -1478,7 +1523,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
         chips: ["时间", "预算", city, "天气", "路线"],
         createdAt: new Date().toISOString(),
       };
-      addMessage(thinkingMsg);
+      addMessage(targetSessionId, thinkingMsg);
 
       // Track event
       apiTrackEvent({ eventName: "send_planning_prompt", payload: { prompt, city, modelMode }, page: "features" }).catch(() => {});
@@ -1487,7 +1532,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
       try {
         setPhase("planning");
         let streamedContent = "";
-        let finalResult: any = null;
+        let finalResult: PlanningResult | null = null;
 
         await streamPlanningRequest(
           {
@@ -1501,33 +1546,25 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
             signal: controller.signal,
             onChunk: (chunk) => {
               streamedContent += chunk;
-              updateLastAssistant({
+              updateLastAssistant(targetSessionId, {
                 status: "success",
                 content: streamedContent,
                 chips: undefined,
               });
             },
-            onComplete: () => {
-              // Streaming complete, final result will be in the last chunk
-            },
-            onError: (error) => {
-              throw error;
+            onFinalResult: (result) => {
+              finalResult = result;
             },
           }
         );
 
-        // For now, fall back to blocking API for full result
-        // TODO: Update backend streaming to send full result in SSE
-        const result = await requestPlanning({
-          prompt,
-          city,
-          companions: "family",
-          modelMode: toApiModelMode(modelMode),
-          conversationId: conversationIdRef.current ?? undefined,
-        });
+        if (!finalResult) {
+          throw new Error("规划流未返回最终结果，请稍后重试");
+        }
+        const result = finalResult;
 
         // Validate session hasn't changed (race condition protection)
-        if (currentSessionIdRef.current !== currentSessionId) {
+        if (currentSessionIdRef.current !== targetSessionId) {
           console.warn("[Session] Session changed during request, ignoring response");
           return;
         }
@@ -1551,7 +1588,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
             id: opt.id || `plan_${idx}`,
           }));
 
-          updateLastAssistant({
+          updateLastAssistant(targetSessionId, {
             status: "success",
             content: result.summary || "为你找到以下方案：",
             chips: undefined,
@@ -1560,7 +1597,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
           });
           setPhase("result");
         } else {
-          updateLastAssistant({
+          updateLastAssistant(targetSessionId, {
             status: "success",
             content: result.summary || "已完成规划。",
             chips: undefined,
@@ -1569,14 +1606,14 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
         }
       } catch (err) {
         // Validate session hasn't changed (race condition protection)
-        if (currentSessionIdRef.current !== currentSessionId) {
+        if (currentSessionIdRef.current !== targetSessionId) {
           console.warn("[Session] Session changed during request, ignoring error");
           return;
         }
 
         const errorMsg =
           err instanceof Error ? err.message : "规划服务暂时不可用";
-        updateLastAssistant({
+        updateLastAssistant(targetSessionId, {
           status: "error",
           content: errorMsg,
           chips: undefined,
@@ -1589,14 +1626,15 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
         setAbortController(null);
       }
     },
-    [isBusy, city, modelMode, addMessage, updateLastAssistant],
+    [isBusy, city, modelMode, addMessage, setSessionMessages, showToast, updateLastAssistant],
   );
 
   const handleStopGeneration = useCallback(() => {
     abortController?.abort();
     setAbortController(null);
     setIsBusy(false);
-    updateLastAssistant({
+    if (!currentSessionIdRef.current) return;
+    updateLastAssistant(currentSessionIdRef.current, {
       status: "error",
       content: "已停止生成",
       chips: undefined,
@@ -1650,6 +1688,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
     setInputValue("");
     setSelectedPlanId(null);
     setCurrentSessionId(null);
+    currentSessionIdRef.current = null;
     setConversationId(null);
     conversationIdRef.current = null;
     setSidebarOpen(false);
@@ -1668,9 +1707,10 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
           createdAt: m.createdAt,
         }));
         setCurrentSessionId(sessionId);
+        currentSessionIdRef.current = sessionId;
         setConversationId(sessionId);
         conversationIdRef.current = sessionId;
-        setMessages(loadedMessages);
+        setSessionMessages(sessionId, loadedMessages);
         setMode("chat");
         setPhase("result");
         setSelectedPlanId(null);
@@ -1686,7 +1726,8 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
     const session = chatSessions.find((s) => s.id === sessionId);
     if (!session) return;
     setCurrentSessionId(sessionId);
-    setMessages(session.messages);
+    currentSessionIdRef.current = sessionId;
+    setSessionMessages(sessionId, session.messages);
     setMode("chat");
     const lastAssistant = [...session.messages].reverse().find((m) => m.role === "assistant");
     if (lastAssistant && "status" in lastAssistant && lastAssistant.status === "success") {
@@ -1698,51 +1739,54 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
     setSidebarOpen(false);
     setInputValue("");
     requestAnimationFrame(() => textareaRef.current?.focus());
-  }, [chatSessions]);
+  }, [chatSessions, setSessionMessages]);
 
   /* ── Return to home ── */
   const handleReturnHome = useCallback(() => {
     // Auto-save current conversation before navigating home
     if (inputValue.trim() || messages.length > 0) {
-      // If there's unsaved input, add it as a user message
-      if (inputValue.trim()) {
-        const userMsg: ChatMessage = {
-          id: uuid(),
-          role: "user",
-          content: inputValue.trim(),
-          createdAt: new Date().toISOString(),
-        };
-        addMessage(userMsg);
-        setInputValue("");
-      }
-
-      // Ensure current session is updated with latest messages
-      if (currentSessionId) {
-        setChatSessions((prev) =>
-          prev.map((s) =>
-            s.id === currentSessionId
-              ? { ...s, messages, updatedAt: new Date().toISOString() }
-              : s
-          )
-        );
-      } else if (messages.length > 0) {
-        // Create a new session if one doesn't exist
-        const sid = uuid();
+      let targetSessionId = currentSessionIdRef.current;
+      if (!targetSessionId && messages.length > 0) {
+        targetSessionId = uuid();
         const newSession: ChatSession = {
-          id: sid,
+          id: targetSessionId,
           title: messages[0].content.length > 20 ? messages[0].content.slice(0, 20) + "…" : messages[0].content,
           messages,
           city,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
-        setCurrentSessionId(sid);
+        setCurrentSessionId(targetSessionId);
+        currentSessionIdRef.current = targetSessionId;
         setChatSessions((prev) => [newSession, ...prev]);
+      }
+
+      // If there's unsaved input, add it as a user message
+      if (inputValue.trim() && targetSessionId) {
+        const userMsg: ChatMessage = {
+          id: uuid(),
+          role: "user",
+          content: inputValue.trim(),
+          createdAt: new Date().toISOString(),
+        };
+        addMessage(targetSessionId, userMsg);
+        setInputValue("");
+      }
+
+      // Ensure current session is updated with latest messages
+      if (targetSessionId) {
+        setChatSessions((prev) =>
+          prev.map((s) =>
+            s.id === targetSessionId
+              ? { ...s, messages, updatedAt: new Date().toISOString() }
+              : s
+          )
+        );
       }
     }
     // Navigate home immediately
     onNavigate?.("home");
-  }, [inputValue, messages, currentSessionId, city, onNavigate]);
+  }, [inputValue, messages, city, onNavigate, addMessage]);
 
   const handleConfirmReturnHome = useCallback(() => {
     onNavigate?.("home");
@@ -1762,7 +1806,23 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
         if (drafts.length === 0) {
           setShowDraftNotice(true);
         } else {
-          addMessage({
+          let targetSessionId = currentSessionIdRef.current;
+          if (!targetSessionId) {
+            targetSessionId = uuid();
+            const newSession: ChatSession = {
+              id: targetSessionId,
+              title: "草稿清单",
+              messages: [],
+              city,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            setCurrentSessionId(targetSessionId);
+            currentSessionIdRef.current = targetSessionId;
+            setChatSessions((prev) => [newSession, ...prev]);
+            setSessionMessages(targetSessionId, []);
+          }
+          addMessage(targetSessionId, {
             id: uuid(),
             role: "assistant",
             content: `你有 ${drafts.length} 个日程草稿：\n${drafts.map((d, i) => `${i + 1}. ${d}`).join("\n")}`,
@@ -1780,7 +1840,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
         }
         break;
     }
-  }, [handleNewChat, drafts, favorites, onNavigate, showToast]);
+  }, [handleNewChat, drafts, favorites, onNavigate, showToast, addMessage, city, setSessionMessages]);
 
   /* ── Action handlers ── */
   const handleExecuteAction = useCallback(
@@ -1795,17 +1855,19 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
           const result = await confirmExecAction(action.id);
           showToast(`${action.title} 已完成`, "success");
           // Update action status in messages
-          setMessages((prev) =>
-            prev.map((msg) => {
-              if (!msg.actions) return msg;
-              return {
-                ...msg,
-                actions: msg.actions.map((a) =>
-                  a.id === action.id ? { ...a, status: result.status || "done" } : a
-                ),
-              };
-            })
-          );
+          if (currentSessionIdRef.current) {
+            updateSessionMessages(currentSessionIdRef.current, (prev) =>
+              prev.map((msg) => {
+                if (!msg.actions) return msg;
+                return {
+                  ...msg,
+                  actions: msg.actions.map((a) =>
+                    a.id === action.id ? { ...a, status: result.status || "done" } : a
+                  ),
+                };
+              }),
+            );
+          }
         } catch (err) {
           showToast("操作失败，请重试", "error");
         } finally {
@@ -1854,7 +1916,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
           break;
       }
     },
-    [city, addMemory, showToast],
+    [city, addMemory, showToast, updateSessionMessages],
   );
 
   const handleNextAction = useCallback(

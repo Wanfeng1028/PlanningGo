@@ -91,7 +91,37 @@ const envSchema = z.object({
     .transform((v) => v === "true"),
 });
 
+const insecureJwtSecrets = new Set([
+  "dev-access-secret-change-me-in-production-32b",
+  "dev-refresh-secret-change-me-in-production-32b",
+  "change-me-access-secret",
+  "change-me-refresh-secret",
+  "dev-access-secret",
+  "dev-refresh-secret",
+]);
+
+export function isStrongJwtSecret(secret: string): boolean {
+  return secret.length >= 32 && !insecureJwtSecrets.has(secret);
+}
+
+export function validateProductionJwtSecrets(input: {
+  NODE_ENV: "development" | "test" | "production";
+  JWT_ACCESS_SECRET: string;
+  JWT_REFRESH_SECRET: string;
+}) {
+  if (input.NODE_ENV !== "production") return;
+  const weak: string[] = [];
+  if (!isStrongJwtSecret(input.JWT_ACCESS_SECRET)) weak.push("JWT_ACCESS_SECRET");
+  if (!isStrongJwtSecret(input.JWT_REFRESH_SECRET)) weak.push("JWT_REFRESH_SECRET");
+  if (weak.length > 0) {
+    throw new Error(
+      `生产环境检测到弱 JWT 密钥：${weak.join(", ")}。请使用至少 32 位随机强密钥（例如：openssl rand -hex 32）。`,
+    );
+  }
+}
+
 export const env = envSchema.parse(process.env);
+validateProductionJwtSecrets(env);
 
 export const corsOrigins = env.CORS_ORIGINS.split(",")
   .map((item) => item.trim())
