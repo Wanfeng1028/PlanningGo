@@ -3,15 +3,20 @@
  * 创建 demo 用户和初始数据
  */
 
-import { PrismaClient } from "../src/generated/prisma/client.js";
-import { PrismaPg } from "@prisma/adapter-pg";
-import bcrypt from "bcryptjs";
-
-const connectionString = process.env.DATABASE_URL ?? "postgresql://planninggo:planninggo@localhost:5432/planninggo?schema=public";
-const adapter = new PrismaPg({ connectionString });
-const prisma = new PrismaClient({ adapter });
+if (process.env.NODE_ENV === "production") {
+  console.error("❌ Refusing to run seed in production");
+  process.exit(1);
+}
 
 async function main() {
+  const { PrismaClient } = await import("../src/generated/prisma/client.js");
+  const { PrismaPg } = await import("@prisma/adapter-pg");
+  const bcrypt = await import("bcryptjs");
+
+  const connectionString = process.env.DATABASE_URL ?? "postgresql://planninggo:planninggo@localhost:5432/planninggo?schema=public";
+  const adapter = new PrismaPg({ connectionString });
+  const prisma = new PrismaClient({ adapter });
+
   console.log("🌱 开始 seed...");
 
   // ── Demo 用户 ──
@@ -95,13 +100,10 @@ async function main() {
   console.log(`  ✅ Admin 用户: ${adminUser.email} (${adminUser.id})`);
 
   console.log("🎉 Seed 完成!");
+  await prisma.$disconnect();
 }
 
-main()
-  .catch((e) => {
-    console.error("❌ Seed 失败:", e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+main().catch((e) => {
+  console.error("❌ Seed 失败:", e);
+  process.exit(1);
+});

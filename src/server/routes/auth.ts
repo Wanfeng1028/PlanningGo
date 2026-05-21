@@ -11,6 +11,7 @@ import { TokenService } from "../services/tokenService.js";
 import { AuthService } from "../services/authService.js";
 import * as mem from "../services/memoryStore.js";
 import { sendOk, sendCreated, sendNoContent, sendError } from "../common/response.js";
+import { env } from "../config/env.js";
 
 const registerSchema = z.object({
   email: z.string().email("邮箱格式不正确"),
@@ -82,6 +83,9 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     });
 
     app.post("/api/auth/demo", async (request, reply) => {
+      if (!env.ENABLE_DEMO_AUTH) {
+        return sendError(reply, 404, "NOT_FOUND", "Not found");
+      }
       const result = await authService.demoLogin(getClientMeta(request));
       return sendOk(reply, result);
     });
@@ -143,6 +147,9 @@ export async function registerAuthRoutes(app: FastifyInstance) {
   });
 
   app.post("/api/auth/demo", async (request, reply) => {
+    if (!env.ENABLE_DEMO_AUTH) {
+      return sendError(reply, 404, "NOT_FOUND", "Not found");
+    }
     const result = await mem.demoLogin(getClientMeta(request));
     return sendOk(reply, result);
   });
