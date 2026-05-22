@@ -769,7 +769,7 @@ export interface MessageItem {
 
 export interface ConversationDetail extends ConversationItem {
   messages: MessageItem[];
-  plans: any[];
+  plans: Record<string, unknown>[];
 }
 
 export async function createConversation(input?: {
@@ -803,7 +803,7 @@ export async function addConversationMessage(
   conversationId: string,
   role: "user" | "assistant" | "system",
   content: string,
-  payloadJson?: any,
+  payloadJson?: unknown,
 ): Promise<MessageItem> {
   return apiJson<MessageItem>(`/api/conversations/${conversationId}/messages`, {
     method: "POST",
@@ -823,19 +823,19 @@ export async function togglePlanFavorite(planId: string): Promise<{ id: string; 
   return apiJson(`/api/plans/${planId}/favorite`, { method: "POST" });
 }
 
-export async function listFavoritePlans(): Promise<any[]> {
-  return apiJson<any[]>("/api/plans/favorites");
+export async function listFavoritePlans(): Promise<Record<string, unknown>[]> {
+  return apiJson<Record<string, unknown>[]>("/api/plans/favorites");
 }
 
 // ═══════════════════════════════════════════════════
 // Execution Actions API (confirm/cancel)
 // ═══════════════════════════════════════════════════
 
-export async function confirmExecAction(actionId: string): Promise<any> {
+export async function confirmExecAction(actionId: string): Promise<Record<string, unknown>> {
   return apiJson(`/api/actions/${actionId}/confirm`, { method: "POST" });
 }
 
-export async function cancelExecAction(actionId: string): Promise<any> {
+export async function cancelExecAction(actionId: string): Promise<Record<string, unknown>> {
   return apiJson(`/api/actions/${actionId}/cancel`, { method: "POST" });
 }
 
@@ -845,7 +845,7 @@ export async function cancelExecAction(actionId: string): Promise<any> {
 
 export async function trackEvent(input: {
   eventName: string;
-  payload?: any;
+  payload?: Record<string, unknown>;
   page?: string;
   guestId?: string;
   conversationId?: string;
@@ -858,7 +858,7 @@ export async function trackEvent(input: {
 
 export async function trackEventBatch(events: Array<{
   eventName: string;
-  payload?: any;
+  payload?: Record<string, unknown>;
   page?: string;
   guestId?: string;
   conversationId?: string;
@@ -874,7 +874,7 @@ export async function reportClientError(input: {
   stack?: string;
   route?: string;
   guestId?: string;
-  payload?: any;
+  payload?: Record<string, unknown>;
 }): Promise<{ id: string }> {
   return apiJson("/api/client-errors", {
     method: "POST",

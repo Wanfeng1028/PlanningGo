@@ -1,4 +1,4 @@
-import { Menu, X, MapPin, Navigation, AlertCircle } from "lucide-react";
+import { Menu, X, MapPin, Navigation } from "lucide-react";
 import { useState } from "react";
 import { navItems } from "../data/navigation";
 import type { ModalKey, NavKey, SessionUser } from "../types";

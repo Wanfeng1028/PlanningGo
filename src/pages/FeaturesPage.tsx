@@ -2,16 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { v4 as uuid } from "uuid";
 import { ArrowLeft } from "lucide-react";
 import {
-  quoteAction as apiQuoteAction,
-  confirmAction as apiConfirmAction,
-  cancelAction as apiCancelAction,
   confirmExecAction,
   checkHealth,
   addMemory,
   selectPlan,
   listConversations,
   getConversation,
-  togglePlanFavorite,
   trackEvent as apiTrackEvent,
   reportClientError,
   type PlanningOption,
@@ -457,7 +453,7 @@ function Composer({
   onToast,
 }: ComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const valueRef = useRef(value);
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [isRecording, setIsRecording] = useState(false);
@@ -583,8 +579,8 @@ function Composer({
 
   /* ── Voice recording ── */
   const SpeechRecognitionCtor = useMemo(() => {
-    const w = window as any;
-    return w.SpeechRecognition || w.webkitSpeechRecognition || null;
+    const w = window as unknown as Record<string, unknown>;
+    return (w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null) as (new () => SpeechRecognition) | null;
   }, []);
 
   const toggleRecording = useCallback(() => {
@@ -1241,11 +1237,11 @@ const HERO_PHRASES = [
   "把纠结变成安排",
 ] as const;
 
-export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestLocation, location }: FeaturesPageProps) {
+export default function FeaturesPage({ user, onOpenModal, onNavigate, location }: FeaturesPageProps) {
   const [mode, setMode] = useState<"idle" | "chat">("idle");
   const [inputValue, setInputValue] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [phase, setPhase] = useState<ChatPhase>("idle");
+  const [, setPhase] = useState<ChatPhase>("idle");
   const [isBusy, setIsBusy] = useState(false);
   const [healthOk, setHealthOk] = useState<boolean | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -1253,7 +1249,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [showDraftNotice, setShowDraftNotice] = useState(false);
   const [showModeNotice, setShowModeNotice] = useState(false);
-  const [modeNoticeMessage, setModeNoticeMessage] = useState("");
+  const [modeNoticeMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [drafts, setDrafts] = useState<string[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -1262,11 +1258,10 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
   const [conversationId, setConversationId] = useState<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
   const messagesBySessionRef = useRef<Map<string, ChatMessage[]>>(new Map());
-  const [backendSessions, setBackendSessions] = useState<ConversationItem[]>([]);
+  const [, setBackendSessions] = useState<ConversationItem[]>([]);
   const [busyActionId, setBusyActionId] = useState<string | null>(null);
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [typedText, setTypedText] = useState("");
-  const [isTyping, setIsTyping] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1289,7 +1284,6 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
     const typeSpeed = 80;
     const deleteSpeed = 40;
     const pauseAfterType = 2800;
-    const pauseAfterDelete = 500;
 
     const typeNextChar = () => {
       if (!isDeleting && typedText.length < currentPhrase.length) {
@@ -1318,9 +1312,9 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
 
   // Load saved preferences from localStorage
   useEffect(() => {
-    const savedMode = localStorage.getItem("pg_model_mode") as ModelMode;
-    if (savedMode === "Flash" || savedMode === "Pro") {
-      setModelMode(savedMode);
+    const savedMode = localStorage.getItem("pg_model_mode");
+    if (savedMode && (MODEL_MODES as readonly string[]).includes(savedMode)) {
+      setModelMode(savedMode as ModelMode);
     }
     const savedDrafts = localStorage.getItem("pg_drafts");
     if (savedDrafts) {
