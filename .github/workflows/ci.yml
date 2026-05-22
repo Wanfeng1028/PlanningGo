@@ -20,7 +20,7 @@ jobs:
         env:
           POSTGRES_USER: planninggo
           POSTGRES_PASSWORD: planninggo_ci
-          POSTGRES_DB: planninggo_test
+          POSTGRES_DB: planninggo
         ports:
           - 5432:5432
         options: >-
@@ -40,7 +40,7 @@ jobs:
           --health-retries=5
 
     env:
-      DATABASE_URL: postgresql://planninggo:planninggo_ci@localhost:5432/planninggo_test
+      DATABASE_URL: postgresql://planninggo:planninggo_ci@localhost:5432/planninggo
       REDIS_URL: redis://localhost:6379
       NODE_ENV: test
 

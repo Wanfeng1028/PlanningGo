@@ -7,6 +7,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { sendOk, sendCreated, sendNoContent, sendError } from "../common/response.js";
 import { UnauthorizedError } from "../common/errors.js";
+import { nullToUndefined, toRecordOrEmpty, toStringArray } from "../common/json.js";
 import { DeveloperRepository } from "../repositories/developerRepository.js";
 
 interface AuthenticatedRequest extends FastifyRequest {
@@ -21,16 +22,12 @@ function uid(req: FastifyRequest): string {
 }
 
 /** 脱敏请求体：移除敏感字段 */
-function sanitizePreview(obj: Record<string, unknown> | null | undefined): Record<string, unknown> {
-  if (!obj || typeof obj !== "object") return {};
+function sanitizePreview(obj: unknown): Record<string, unknown> {
+  const input = toRecordOrEmpty(obj);
   const sensitive = new Set(["password", "token", "authorization", "apiKey", "refreshToken", "accessToken", "secret", "keyHash"]);
   const result: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (sensitive.has(k)) {
-      result[k] = "***";
-    } else {
-      result[k] = v;
-    }
+  for (const [k, v] of Object.entries(input)) {
+    result[k] = sensitive.has(k) ? "***" : v;
   }
   return result;
 }
@@ -534,35 +531,37 @@ interface RequestLogRecord {
   createdAt: Date;
 }
 
-function mapApiKey(key: ApiKeyRecord) {
+function mapApiKey(key: any) {
   return {
     id: key.id,
     name: key.name,
     prefix: key.prefix,
-    scopes: key.scopes,
+    scopes: toStringArray(key.scopes),
     status: key.status,
     environment: key.environment ?? "sandbox",
-    appId: key.appId,
-    expiresAt: key.expiresAt,
-    lastUsedAt: key.lastUsedAt,
+    appId: nullToUndefined(key.appId),
+    expiresAt: nullToUndefined(key.expiresAt),
+    lastUsedAt: nullToUndefined(key.lastUsedAt),
     createdAt: key.createdAt,
   };
 }
 
-function mapWebhook(hook: WebhookRecord) {
+function mapWebhook(hook: any) {
+  const events = toStringArray(hook.events);
   return {
     id: hook.id,
     url: hook.url,
-    events: hook.events ?? [hook.event],
+    // events 优先用新字段；兼容旧字段 event
+    events: events.length > 0 ? events : hook.event ? [hook.event] : [],
     enabled: hook.enabled,
-    appId: hook.appId,
+    appId: nullToUndefined(hook.appId),
     secret: hook.secretHash ? "••••••••" : undefined,
     createdAt: hook.createdAt,
     updatedAt: hook.updatedAt,
   };
 }
 
-function mapRequestLog(log: RequestLogRecord) {
+function mapRequestLog(log: any) {
   return {
     id: log.id,
     method: log.method,
@@ -570,9 +569,9 @@ function mapRequestLog(log: RequestLogRecord) {
     statusCode: log.statusCode,
     latencyMs: log.latencyMs,
     traceId: log.traceId,
-    errorCode: log.errorCode,
+    errorCode: nullToUndefined(log.errorCode),
     apiKeyPrefix: log.apiKeyPrefix,
-    appId: log.appId,
+    appId: nullToUndefined(log.appId),
     createdAt: log.createdAt,
   };
 }
