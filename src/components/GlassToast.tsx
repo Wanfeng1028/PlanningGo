@@ -36,7 +36,8 @@ const PROGRESS_CLASS = {
 
 export function GlassToast({ toast, onDismiss }: GlassToastProps) {
   const [exiting, setExiting] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  // useRef requires an initial value in TS strict mode
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const dismiss = useCallback(() => {
     setExiting(true);
@@ -45,10 +46,16 @@ export function GlassToast({ toast, onDismiss }: GlassToastProps) {
 
   useEffect(() => {
     if (!toast) return;
+
     setExiting(false);
     const duration = toast.duration ?? 2800;
+
+    if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(dismiss, duration);
-    return () => clearTimeout(timerRef.current);
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, [toast, dismiss]);
 
   if (!toast) return null;
@@ -81,17 +88,21 @@ export function GlassToast({ toast, onDismiss }: GlassToastProps) {
   );
 }
 
-/** 便捷 hook：返回 [currentToast, showToast] */
+/** 便捷 hook：返回 { toast, show, dismiss } */
 let _toastId = 0;
 export function useGlassToast() {
   const [toast, setToast] = useState<ToastMessage | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  // useRef requires an initial value in TS strict mode
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const show = useCallback((text: string, type: ToastType = "success", duration?: number) => {
-    clearTimeout(timerRef.current);
-    const id = String(++_toastId);
-    setToast({ id, text, type, duration });
-  }, []);
+  const show = useCallback(
+    (text: string, type: ToastType = "success", duration?: number) => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      const id = String(++_toastId);
+      setToast({ id, text, type, duration });
+    },
+    []
+  );
 
   const dismiss = useCallback(() => {
     setToast(null);
