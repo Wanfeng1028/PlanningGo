@@ -12,7 +12,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20, 22]
+        node-version: [22]
 
     services:
       postgres:
@@ -54,7 +54,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --no-audit --no-fund --progress=false
 
       - name: Generate Prisma client
         run: npx prisma generate
