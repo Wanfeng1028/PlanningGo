@@ -9,18 +9,36 @@ import { sendOk, sendCreated, sendNoContent, sendError } from "../common/respons
 import { UnauthorizedError } from "../common/errors.js";
 import { DeveloperRepository } from "../repositories/developerRepository.js";
 
+interface AuthenticatedRequest extends FastifyRequest {
+  userId?: string;
+  traceId?: string;
+}
+
 function uid(req: FastifyRequest): string {
-  const id = (req as any).userId;
+  const id = (req as AuthenticatedRequest).userId;
   if (!id) throw new UnauthorizedError("未登录");
   return id;
 }
 
 /** 脱敏请求体：移除敏感字段 */
-function sanitizePreview(obj: Record<string, unknown> | null | undefined): Record<string, unknown> {
-  if (!obj || typeof obj !== "object") return {};
+function toRecordOrEmpty(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value as Record<string, unknown>;
+}
+
+function toStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function nullToUndefined<T>(value: T | null | undefined): T | undefined {
+  return value ?? undefined;
+}
+
+function sanitizePreview(obj: unknown): Record<string, unknown> {
+  const input = toRecordOrEmpty(obj);
   const sensitive = new Set(["password", "token", "authorization", "apiKey", "refreshToken", "accessToken", "secret", "keyHash"]);
   const result: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(obj)) {
+  for (const [k, v] of Object.entries(input)) {
     if (sensitive.has(k)) {
       result[k] = "***";
     } else {
@@ -121,7 +139,7 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
       expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
     }
 
-    const { apiKey, rawKey, prefix } = await repo.createApiKey(userId, {
+    const { apiKey, rawKey } = await repo.createApiKey(userId, {
       name: input.name,
       appId: input.appId,
       scopes: input.scopes,
@@ -136,7 +154,7 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
         action: "api_key.created",
         resourceType: "api_key",
         resourceId: apiKey.id,
-        traceId: (request as any).traceId ?? "",
+        traceId: (request as AuthenticatedRequest).traceId ?? "",
       },
     });
 
@@ -172,7 +190,7 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
         action: "api_key.revoked",
         resourceType: "api_key",
         resourceId: id,
-        traceId: (request as any).traceId ?? "",
+        traceId: (request as AuthenticatedRequest).traceId ?? "",
       },
     });
 
@@ -200,7 +218,7 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
         resourceType: "api_key",
         resourceId: "",
         metadata: { count },
-        traceId: (request as any).traceId ?? "",
+        traceId: (request as AuthenticatedRequest).traceId ?? "",
       },
     });
 
@@ -281,7 +299,7 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
         action: "webhook.created",
         resourceType: "webhook",
         resourceId: webhook.id,
-        traceId: (request as any).traceId ?? "",
+        traceId: (request as AuthenticatedRequest).traceId ?? "",
       },
     });
 
@@ -396,13 +414,10 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
     }).parse(request.body);
 
     const startTime = Date.now();
-    const traceId = (request as any).traceId ?? `sbx_${Date.now()}`;
+    const traceId = (request as AuthenticatedRequest).traceId ?? `sbx_${Date.now()}`;
 
     try {
       // 转发到实际业务接口
-      let result: unknown;
-      const body = JSON.stringify(input.body ?? {});
-
       const response = await app.inject({
         method: input.method,
         url: input.endpoint,
@@ -428,7 +443,7 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
         statusCode: response.statusCode,
         latencyMs,
         traceId,
-        requestPreview: sanitizePreview(input.body as Record<string, unknown>),
+        requestPreview: sanitizePreview(input.body),
         responsePreview: { statusCode: response.statusCode, body: responseBody },
       });
 
@@ -449,7 +464,7 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
         latencyMs,
         traceId,
         errorCode: "SANDBOX_ERROR",
-        requestPreview: sanitizePreview(input.body as Record<string, unknown>),
+        requestPreview: sanitizePreview(input.body),
         responsePreview: { error: errorMessage },
       });
 
@@ -491,35 +506,74 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
 
 // ── Helpers ──
 
-function mapApiKey(key: any) {
+interface ApiKeyRecord {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: unknown;
+  status: string;
+  environment?: string | null;
+  appId?: string | null;
+  expiresAt?: Date | null;
+  lastUsedAt?: Date | null;
+  createdAt: Date;
+}
+
+interface WebhookRecord {
+  id: string;
+  url: string;
+  events?: unknown;
+  event?: string;
+  enabled: boolean;
+  appId?: string | null;
+  secretHash?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface RequestLogRecord {
+  id: string;
+  method: string;
+  path: string;
+  statusCode: number;
+  latencyMs: number;
+  traceId?: string | null;
+  errorCode?: string | null;
+  apiKeyPrefix?: string | null;
+  appId?: string | null;
+  createdAt: Date;
+}
+
+function mapApiKey(key: ApiKeyRecord) {
   return {
     id: key.id,
     name: key.name,
     prefix: key.prefix,
-    scopes: key.scopes,
+    scopes: toStringArray(key.scopes),
     status: key.status,
     environment: key.environment ?? "sandbox",
-    appId: key.appId,
-    expiresAt: key.expiresAt,
-    lastUsedAt: key.lastUsedAt,
+    appId: nullToUndefined(key.appId),
+    expiresAt: nullToUndefined(key.expiresAt),
+    lastUsedAt: nullToUndefined(key.lastUsedAt),
     createdAt: key.createdAt,
   };
 }
 
-function mapWebhook(hook: any) {
+function mapWebhook(hook: WebhookRecord) {
+  const events = toStringArray(hook.events);
   return {
     id: hook.id,
     url: hook.url,
-    events: hook.events ?? [hook.event],
+    events: events.length > 0 ? events : hook.event ? [hook.event] : [],
     enabled: hook.enabled,
-    appId: hook.appId,
+    appId: nullToUndefined(hook.appId),
     secret: hook.secretHash ? "••••••••" : undefined,
     createdAt: hook.createdAt,
     updatedAt: hook.updatedAt,
   };
 }
 
-function mapRequestLog(log: any) {
+function mapRequestLog(log: RequestLogRecord) {
   return {
     id: log.id,
     method: log.method,
@@ -527,9 +581,9 @@ function mapRequestLog(log: any) {
     statusCode: log.statusCode,
     latencyMs: log.latencyMs,
     traceId: log.traceId,
-    errorCode: log.errorCode,
+    errorCode: nullToUndefined(log.errorCode),
     apiKeyPrefix: log.apiKeyPrefix,
-    appId: log.appId,
+    appId: nullToUndefined(log.appId),
     createdAt: log.createdAt,
   };
 }
