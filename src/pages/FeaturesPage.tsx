@@ -2119,7 +2119,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, onRequestL
               <span className={styles.typewriterCursor} />
             </h1>
             <p className={styles.featureHomeSubtitle}>
-              输入一句话，AI 帮你规划完整周末
+              输入一句话，Agent 帮你规划完整周末
             </p>
 
             <Composer

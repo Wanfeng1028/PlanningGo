@@ -100,6 +100,11 @@ a {
   outline-offset: 3px;
 }
 
+textarea:focus-visible,
+input:focus-visible {
+  outline: none;
+}
+
 ::selection {
   color: var(--color-text-primary);
   background: rgb(var(--color-brand-rgb) / 0.55);
