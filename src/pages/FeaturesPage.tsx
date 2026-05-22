@@ -98,6 +98,20 @@ type VoiceState =
   | "error"
   | "processing";
 
+/** Minimal Web Speech API interface */
+interface SpeechRecognitionInstance {
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+}
+
 const MODEL_MODES = ["Flash", "Pro"] as const;
 type ModelMode = typeof MODEL_MODES[number];
 
@@ -453,7 +467,7 @@ function Composer({
   onToast,
 }: ComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const valueRef = useRef(value);
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [isRecording, setIsRecording] = useState(false);
@@ -580,7 +594,7 @@ function Composer({
   /* ── Voice recording ── */
   const SpeechRecognitionCtor = useMemo(() => {
     const w = window as unknown as Record<string, unknown>;
-    return (w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null) as (new () => SpeechRecognition) | null;
+    return (w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null) as (new () => SpeechRecognitionInstance) | null;
   }, []);
 
   const toggleRecording = useCallback(() => {
@@ -1860,13 +1874,14 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
           showToast(`${action.title} 已完成`, "success");
           // Update action status in messages
           if (currentSessionIdRef.current) {
+            const newStatus = (result.status as string) || "done";
             updateSessionMessages(currentSessionIdRef.current, (prev) =>
               prev.map((msg) => {
                 if (!msg.actions) return msg;
                 return {
                   ...msg,
                   actions: msg.actions.map((a) =>
-                    a.id === action.id ? { ...a, status: result.status || "done" } : a
+                    a.id === action.id ? { ...a, status: newStatus } : a
                   ),
                 };
               }),
