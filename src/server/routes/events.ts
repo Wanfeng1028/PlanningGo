@@ -8,6 +8,11 @@ import { z } from "zod";
 import { sendOk, sendCreated, sendError } from "../common/response.js";
 import * as mem from "../services/memoryStore.js";
 
+interface AuthenticatedRequest {
+  userId?: string;
+  traceId?: string;
+}
+
 export async function registerEventRoutes(app: FastifyInstance) {
   // ── 记录用户事件 ──
   app.post("/api/events", { preHandler: [app.optionalAuthGuard] }, async (request, reply) => {
@@ -21,7 +26,7 @@ export async function registerEventRoutes(app: FastifyInstance) {
       })
       .parse(request.body);
 
-    const userId = (request as any).userId as string | undefined;
+    const userId = (request as AuthenticatedRequest).userId as string | undefined;
     const db: PrismaClient | null = app.db;
 
     if (db) {
@@ -34,7 +39,7 @@ export async function registerEventRoutes(app: FastifyInstance) {
             eventName: body.eventName,
             eventPayloadJson: body.payload ?? {},
             page: body.page ?? "",
-            traceId: (request as any).traceId ?? "",
+            traceId: (request as AuthenticatedRequest).traceId ?? "",
           },
         });
         return sendCreated(reply, { id: evt.id });
@@ -69,7 +74,7 @@ export async function registerEventRoutes(app: FastifyInstance) {
       })
       .parse(request.body);
 
-    const userId = (request as any).userId as string | undefined;
+    const userId = (request as AuthenticatedRequest).userId as string | undefined;
     const db: PrismaClient | null = app.db;
     const ids: string[] = [];
 
@@ -84,7 +89,7 @@ export async function registerEventRoutes(app: FastifyInstance) {
               eventName: evt.eventName,
               eventPayloadJson: evt.payload ?? {},
               page: evt.page ?? "",
-              traceId: (request as any).traceId ?? "",
+              traceId: (request as AuthenticatedRequest).traceId ?? "",
             },
           });
           ids.push(created.id);
@@ -120,7 +125,7 @@ export async function registerEventRoutes(app: FastifyInstance) {
       })
       .parse(request.body);
 
-    const userId = (request as any).userId as string | undefined;
+    const userId = (request as AuthenticatedRequest).userId as string | undefined;
     const db: PrismaClient | null = app.db;
 
     if (db) {
@@ -129,7 +134,7 @@ export async function registerEventRoutes(app: FastifyInstance) {
           data: {
             userId: userId ?? undefined,
             guestId: !userId ? (body.guestId ?? null) : null,
-            traceId: (request as any).traceId ?? "",
+            traceId: (request as AuthenticatedRequest).traceId ?? "",
             route: body.route ?? "",
             message: body.message,
             stack: body.stack ?? null,

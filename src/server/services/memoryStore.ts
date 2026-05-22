@@ -93,7 +93,7 @@ interface MemoryMessage {
   conversationId: string;
   role: string;
   content: string;
-  payloadJson: any | null;
+  payloadJson: unknown | null;
   createdAt: Date;
 }
 
@@ -105,7 +105,7 @@ interface MemoryExecAction {
   description: string;
   status: string;
   priceEstimate: string | null;
-  metadata: any;
+  metadata: unknown;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -118,7 +118,7 @@ interface MemoryPlan {
   title: string;
   summary: string;
   favorite: boolean;
-  options: any[];
+  options: unknown[];
   execActions: MemoryExecAction[];
   createdAt: Date;
   updatedAt: Date;
@@ -130,7 +130,7 @@ interface MemoryUserEvent {
   guestId: string | null;
   conversationId: string | null;
   eventName: string;
-  eventPayloadJson: any;
+  eventPayloadJson: unknown;
   page: string;
   traceId: string;
   createdAt: Date;
@@ -144,7 +144,7 @@ interface MemoryErrorLog {
   route: string;
   message: string;
   stack: string | null;
-  payloadJson: any | null;
+  payloadJson: unknown | null;
   createdAt: Date;
 }
 

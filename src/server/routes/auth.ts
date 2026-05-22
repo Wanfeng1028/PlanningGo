@@ -162,8 +162,9 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     try {
       const result = await mem.register(body.email, body.password, displayName, getClientMeta(request));
       return sendCreated(reply, result);
-    } catch (err: any) {
-      return sendError(reply, 409, "EMAIL_EXISTS", err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "注册失败";
+      return sendError(reply, 409, "EMAIL_EXISTS", message);
     }
   });
 
@@ -172,8 +173,9 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     try {
       const result = await mem.login(body.email, body.password, getClientMeta(request));
       return sendOk(reply, result);
-    } catch (err: any) {
-      return sendError(reply, 401, "INVALID_CREDENTIALS", err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "登录失败";
+      return sendError(reply, 401, "INVALID_CREDENTIALS", message);
     }
   });
 

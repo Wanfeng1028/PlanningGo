@@ -9,8 +9,13 @@ import { sendOk, sendCreated, sendNoContent, sendError } from "../common/respons
 import { UnauthorizedError } from "../common/errors.js";
 import { DeveloperRepository } from "../repositories/developerRepository.js";
 
+interface AuthenticatedRequest extends FastifyRequest {
+  userId?: string;
+  traceId?: string;
+}
+
 function uid(req: FastifyRequest): string {
-  const id = (req as any).userId;
+  const id = (req as AuthenticatedRequest).userId;
   if (!id) throw new UnauthorizedError("未登录");
   return id;
 }
@@ -136,7 +141,7 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
         action: "api_key.created",
         resourceType: "api_key",
         resourceId: apiKey.id,
-        traceId: (request as any).traceId ?? "",
+        traceId: (request as AuthenticatedRequest).traceId ?? "",
       },
     });
 
@@ -172,7 +177,7 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
         action: "api_key.revoked",
         resourceType: "api_key",
         resourceId: id,
-        traceId: (request as any).traceId ?? "",
+        traceId: (request as AuthenticatedRequest).traceId ?? "",
       },
     });
 
@@ -200,7 +205,7 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
         resourceType: "api_key",
         resourceId: "",
         metadata: { count },
-        traceId: (request as any).traceId ?? "",
+        traceId: (request as AuthenticatedRequest).traceId ?? "",
       },
     });
 
@@ -253,8 +258,8 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
 
     return sendOk(reply, {
       ...mapRequestLog(log),
-      requestPreview: sanitizePreview(log.requestPreview as Record<string, unknown>),
-      responsePreview: sanitizePreview(log.responsePreview as Record<string, unknown>),
+      requestPreview: sanitizePreview(log.requestPreview),
+      responsePreview: sanitizePreview(log.responsePreview),
     });
   });
 
@@ -281,7 +286,7 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
         action: "webhook.created",
         resourceType: "webhook",
         resourceId: webhook.id,
-        traceId: (request as any).traceId ?? "",
+        traceId: (request as AuthenticatedRequest).traceId ?? "",
       },
     });
 
@@ -396,7 +401,7 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
     }).parse(request.body);
 
     const startTime = Date.now();
-    const traceId = (request as any).traceId ?? `sbx_${Date.now()}`;
+    const traceId = (request as AuthenticatedRequest).traceId ?? `sbx_${Date.now()}`;
 
     try {
       // 转发到实际业务接口
@@ -428,7 +433,7 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
         statusCode: response.statusCode,
         latencyMs,
         traceId,
-        requestPreview: sanitizePreview(input.body as Record<string, unknown>),
+        requestPreview: sanitizePreview(input.body),
         responsePreview: { statusCode: response.statusCode, body: responseBody },
       });
 
@@ -449,7 +454,7 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
         latencyMs,
         traceId,
         errorCode: "SANDBOX_ERROR",
-        requestPreview: sanitizePreview(input.body as Record<string, unknown>),
+        requestPreview: sanitizePreview(input.body),
         responsePreview: { error: errorMessage },
       });
 
@@ -491,7 +496,45 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
 
 // ── Helpers ──
 
-function mapApiKey(key: any) {
+interface ApiKeyRecord {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: string[];
+  status: string;
+  environment?: string;
+  appId?: string;
+  expiresAt?: Date;
+  lastUsedAt?: Date;
+  createdAt: Date;
+}
+
+interface WebhookRecord {
+  id: string;
+  url: string;
+  events?: string[];
+  event?: string;
+  enabled: boolean;
+  appId?: string;
+  secretHash?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface RequestLogRecord {
+  id: string;
+  method: string;
+  path: string;
+  statusCode: number;
+  latencyMs: number;
+  traceId?: string;
+  errorCode?: string;
+  apiKeyPrefix?: string;
+  appId?: string;
+  createdAt: Date;
+}
+
+function mapApiKey(key: ApiKeyRecord) {
   return {
     id: key.id,
     name: key.name,
@@ -506,7 +549,7 @@ function mapApiKey(key: any) {
   };
 }
 
-function mapWebhook(hook: any) {
+function mapWebhook(hook: WebhookRecord) {
   return {
     id: hook.id,
     url: hook.url,
@@ -519,7 +562,7 @@ function mapWebhook(hook: any) {
   };
 }
 
-function mapRequestLog(log: any) {
+function mapRequestLog(log: RequestLogRecord) {
   return {
     id: log.id,
     method: log.method,

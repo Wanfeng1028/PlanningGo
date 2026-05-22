@@ -145,7 +145,7 @@ export class AuthService {
     await this.userRepo.update(userId, {});
 
     // 用 raw query 更新 passwordHash（因为 update 不暴露该字段）
-    await (this.userRepo as unknown as { db: { user: { update: Function } } }).db.user.update({
+    await (this.userRepo as unknown as { db: { user: { update: (args: { where: { id: string }; data: { passwordHash: string } }) => Promise<unknown> } } }).db.user.update({
       where: { id: userId },
       data: { passwordHash },
     });

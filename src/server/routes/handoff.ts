@@ -2,6 +2,11 @@ import type { FastifyInstance } from "fastify";
 import { createMobileHandoff, getHandoffByToken, claimHandoff, getHandoffStatus, consumeHandoff } from "../modules/handoff/qrService";
 import type { PermissionScope } from "../modules/agent/middleware/permissionGuard";
 
+interface AuthenticatedRequest {
+  userId?: string;
+  guestId?: string;
+}
+
 export async function registerHandoffRoutes(fastify: FastifyInstance) {
   /**
    * Create a mobile handoff session
@@ -16,8 +21,8 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
     };
 
     try {
-      const userId = (request as any).userId;
-      const guestId = (request as any).guestId;
+      const userId = (request as AuthenticatedRequest).userId;
+      const guestId = (request as AuthenticatedRequest).guestId;
 
       const result = await createMobileHandoff({
         conversationId: body.conversationId,

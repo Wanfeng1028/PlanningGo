@@ -69,7 +69,7 @@ export async function registerConversationRoutes(app: FastifyInstance) {
 
     if (db) {
       try {
-        const where: any = {};
+        const where: { userId?: string; guestId?: string } = {};
         if (userId) where.userId = userId;
         else if (query.guestId) where.guestId = query.guestId;
         else return sendOk(reply, []);
