@@ -45,7 +45,11 @@
       "Bash(git add *)",
       "Bash(git commit *)",
       "Bash(git push *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(chcp *)",
+      "Agent(general-purpose)",
+      "Bash(python *)",
+      "Bash(python3 *)"
     ]
   },
   "$version": 4
