@@ -43,8 +43,8 @@ export async function registerEventRoutes(app: FastifyInstance) {
           },
         });
         return sendCreated(reply, { id: evt.id });
-      } catch {
-        // fallback
+      } catch (err) {
+        app.log.warn({ err }, "DB event tracking failed, falling back to memory");
       }
     }
 
@@ -78,36 +78,43 @@ export async function registerEventRoutes(app: FastifyInstance) {
     const db: PrismaClient | null = app.db;
     const ids: string[] = [];
 
-    for (const evt of body.events) {
-      if (db) {
-        try {
-          const created = await db.userEvent.create({
-            data: {
-              userId: userId ?? undefined,
-              guestId: !userId ? (evt.guestId ?? null) : null,
-              conversationId: evt.conversationId ?? null,
-              eventName: evt.eventName,
-              eventPayloadJson: evt.payload ?? {},
-              page: evt.page ?? "",
-              traceId: (request as AuthenticatedRequest).traceId ?? "",
-            },
-          });
-          ids.push(created.id);
-          continue;
-        } catch {
-          // fallback
-        }
+    if (db) {
+      try {
+        const data = body.events.map((evt) => ({
+          userId: userId ?? undefined,
+          guestId: !userId ? (evt.guestId ?? null) : null,
+          conversationId: evt.conversationId ?? null,
+          eventName: evt.eventName,
+          eventPayloadJson: evt.payload ?? {},
+          page: evt.page ?? "",
+          traceId: (request as AuthenticatedRequest).traceId ?? "",
+        }));
+        await db.userEvent.createMany({ data });
+        const created = await db.userEvent.findMany({
+          where: { userId: userId ?? undefined, traceId: (request as AuthenticatedRequest).traceId ?? "" },
+          orderBy: { createdAt: "desc" },
+          take: body.events.length,
+          select: { id: true },
+        });
+        ids.push(...created.map((e) => e.id));
+      } catch (err) {
+        app.log.warn({ err }, "DB batch event failed, falling back to memory");
       }
-      const created = mem.trackEvent({
-        userId,
-        guestId: !userId ? evt.guestId : undefined,
-        conversationId: evt.conversationId,
-        eventName: evt.eventName,
-        eventPayloadJson: evt.payload,
-        page: evt.page,
-        traceId: (request as any).traceId,
-      });
-      ids.push(created.id);
+    }
+
+    if (ids.length === 0) {
+      for (const evt of body.events) {
+        const created = mem.trackEvent({
+          userId,
+          guestId: !userId ? evt.guestId : undefined,
+          conversationId: evt.conversationId,
+          eventName: evt.eventName,
+          eventPayloadJson: evt.payload,
+          page: evt.page,
+          traceId: (request as any).traceId,
+        });
+        ids.push(created.id);
+      }
     }
 
     return sendCreated(reply, { ids, count: ids.length });
@@ -142,8 +149,8 @@ export async function registerEventRoutes(app: FastifyInstance) {
           },
         });
         return sendCreated(reply, { id: log.id });
-      } catch {
-        // fallback
+      } catch (err) {
+        app.log.warn({ err }, "DB client error logging failed, falling back to memory");
       }
     }
 

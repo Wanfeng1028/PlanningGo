@@ -5,6 +5,7 @@
 import type { FastifyInstance } from "fastify";
 import type { PrismaClient } from "../../generated/prisma/client.js";
 import { sendOk, sendNoContent } from "../common/response.js";
+import { AppError } from "../common/errors.js";
 
 export async function registerPrivacyRoutes(app: FastifyInstance) {
   if (!app.db) {
@@ -65,30 +66,35 @@ export async function registerPrivacyRoutes(app: FastifyInstance) {
   app.delete("/api/privacy/account", { preHandler: [app.authGuard] }, async (request, reply) => {
     const userId = request.userId!;
 
-    await db.$transaction([
-      db.webhookDelivery.deleteMany({ where: { webhook: { userId } } }),
-      db.webhook.deleteMany({ where: { userId } }),
-      db.apiKey.deleteMany({ where: { userId } }),
-      db.auditLog.deleteMany({ where: { userId } }),
-      db.llmCallLog.deleteMany({ where: { userId } }),
-      db.toolCallLog.deleteMany({ where: { userId } }),
-      db.requestLog.deleteMany({ where: { userId } }),
-      db.developerUsageDaily.deleteMany({ where: { userId } }),
-      db.notification.deleteMany({ where: { userId } }),
-      db.notificationPreference.deleteMany({ where: { userId } }),
-      db.userSession.deleteMany({ where: { userId } }),
-      db.companion.deleteMany({ where: { userId } }),
-      db.memory.deleteMany({ where: { userId } }),
-      db.plan.deleteMany({ where: { userId } }),
-      db.action.deleteMany({ where: { userId } }),
-      db.reservation.deleteMany({ where: { userId } }),
-      db.executionStep.deleteMany({ where: { userId } }),
-      db.shareRoom.deleteMany({ where: { userId } }),
-      db.userProfile.deleteMany({ where: { userId } }),
-      db.userPermission.deleteMany({ where: { userId } }),
-      db.refreshToken.deleteMany({ where: { userId } }),
-      db.user.delete({ where: { id: userId } }),
-    ]);
+    try {
+      await db.$transaction([
+        db.webhookDelivery.deleteMany({ where: { webhook: { userId } } }),
+        db.webhook.deleteMany({ where: { userId } }),
+        db.apiKey.deleteMany({ where: { userId } }),
+        db.auditLog.deleteMany({ where: { userId } }),
+        db.llmCallLog.deleteMany({ where: { userId } }),
+        db.toolCallLog.deleteMany({ where: { userId } }),
+        db.requestLog.deleteMany({ where: { userId } }),
+        db.developerUsageDaily.deleteMany({ where: { userId } }),
+        db.notification.deleteMany({ where: { userId } }),
+        db.notificationPreference.deleteMany({ where: { userId } }),
+        db.userSession.deleteMany({ where: { userId } }),
+        db.companion.deleteMany({ where: { userId } }),
+        db.memory.deleteMany({ where: { userId } }),
+        db.plan.deleteMany({ where: { userId } }),
+        db.action.deleteMany({ where: { userId } }),
+        db.reservation.deleteMany({ where: { userId } }),
+        db.executionStep.deleteMany({ where: { userId } }),
+        db.shareRoom.deleteMany({ where: { userId } }),
+        db.userProfile.deleteMany({ where: { userId } }),
+        db.userPermission.deleteMany({ where: { userId } }),
+        db.refreshToken.deleteMany({ where: { userId } }),
+        db.user.delete({ where: { id: userId } }),
+      ]);
+    } catch (err) {
+      app.log.error({ err, userId }, "Account deletion failed");
+      throw new AppError("账户删除失败，请稍后重试", 500, "DELETION_FAILED");
+    }
 
     // 清除 cookie 使当前会话失效
     reply.clearCookie("refresh_token", { path: "/" });

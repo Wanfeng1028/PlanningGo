@@ -289,13 +289,17 @@ export async function registerAgentRoutes(app: FastifyInstance) {
       } catch (error) {
         app.log.error({ err: error }, "SSE planning stream error");
         if (!clientDisconnected) {
-          if (error instanceof ZodError) {
-            reply.raw.write(`data: ${JSON.stringify({ error: "INVALID_REQUEST", issues: error.issues })}\n\n`);
-          } else {
-            reply.raw.write(`data: ${JSON.stringify({ error: "INTERNAL_SERVER_ERROR" })}\n\n`);
+          try {
+            if (error instanceof ZodError) {
+              reply.raw.write(`data: ${JSON.stringify({ error: "INVALID_REQUEST", issues: error.issues })}\n\n`);
+            } else {
+              reply.raw.write(`data: ${JSON.stringify({ error: "INTERNAL_SERVER_ERROR" })}\n\n`);
+            }
+            reply.raw.write("data: [DONE]\n\n");
+            reply.raw.end();
+          } catch {
+            // Connection already closed, ignore write errors
           }
-          reply.raw.write("data: [DONE]\n\n");
-          reply.raw.end();
         }
       }
     },
