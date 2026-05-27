@@ -1,30 +1,10 @@
 import { createId } from "../../common/id";
-
-// Use a lazy-loaded Prisma client to avoid initialization issues
-let prismaInstance: any = null;
+import { getPrismaClient } from "../../common/prisma";
 
 function getPrisma() {
-  if (!prismaInstance) {
-    try {
-      const { PrismaClient } = require("../../generated/prisma/client.js");
-      prismaInstance = new PrismaClient();
-    } catch (error) {
-      console.warn("Prisma client not available, using mock implementation");
-      prismaInstance = createMockPrisma();
-    }
-  }
-  return prismaInstance;
-}
-
-function createMockPrisma() {
-  return {
-    deviceSession: {
-      findFirst: async () => null,
-      update: async () => ({ id: "mock" }),
-      create: async (data: any) => ({ id: createId("dev"), ...data.data }),
-      updateMany: async () => ({ count: 0 }),
-    },
-  };
+  const prisma = getPrismaClient();
+  if (!prisma) throw new Error("Database not available");
+  return prisma as any; // DeviceSession model not in schema — dead code pending schema migration
 }
 
 /**

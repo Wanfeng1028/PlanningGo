@@ -1,33 +1,13 @@
 import { createId } from "../../common/id";
 import { env } from "../../config/env";
+import { getPrismaClient } from "../../common/prisma";
 import { createHandoffToken, hashToken, type HandoffTokenPayload } from "./handoffToken";
 import type { PermissionScope } from "../agent/middleware/permissionGuard";
 
-// Use a lazy-loaded Prisma client to avoid initialization issues
-let prismaInstance: any = null;
-
 function getPrisma() {
-  if (!prismaInstance) {
-    try {
-      const { PrismaClient } = require("../../generated/prisma/client.js");
-      prismaInstance = new PrismaClient();
-    } catch (error) {
-      console.warn("Prisma client not available, using mock implementation");
-      prismaInstance = createMockPrisma();
-    }
-  }
-  return prismaInstance;
-}
-
-function createMockPrisma() {
-  return {
-    handoffSession: {
-      create: async (data: any) => ({ id: createId("hnd"), ...data.data }),
-      findUnique: async () => null,
-      update: async () => ({ id: "mock" }),
-      updateMany: async () => ({ count: 0 }),
-    },
-  };
+  const prisma = getPrismaClient();
+  if (!prisma) throw new Error("Database not available");
+  return prisma as any; // HandoffSession model not in schema — dead code pending schema migration
 }
 
 /**

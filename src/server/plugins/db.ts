@@ -7,6 +7,7 @@ import type { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
 import { PrismaClient } from "../../generated/prisma/client.js";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { setPrismaInstance } from "../common/prisma.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -23,6 +24,7 @@ async function dbPlugin(app: FastifyInstance) {
     await db.$connect();
     // 验证连接真正可用（$connect 是懒连接，不会真正验证凭据）
     await db.$queryRaw`SELECT 1`;
+    setPrismaInstance(db);
     app.decorate("db", db);
     app.log.info("✅ PostgreSQL connected");
   } catch (err) {

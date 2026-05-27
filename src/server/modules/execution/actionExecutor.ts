@@ -1,35 +1,13 @@
 import { createId, createIdempotencyKey } from "../../common/id";
+import { getPrismaClient } from "../../common/prisma";
 import type { ExecutionAction } from "../planning/schemas";
 import { transitionState, type ActionStatus } from "./stateMachine";
 import type { PermissionScope, UserPermissionSnapshot } from "../agent/middleware/permissionGuard";
 
-// Use a lazy-loaded Prisma client to avoid initialization issues
-let prismaInstance: any = null;
-
 function getPrisma() {
-  if (!prismaInstance) {
-    try {
-      const { PrismaClient } = require("../../generated/prisma/client.js");
-      prismaInstance = new PrismaClient();
-    } catch (error) {
-      console.warn("Prisma client not available, using mock implementation");
-      prismaInstance = createMockPrisma();
-    }
-  }
-  return prismaInstance;
-}
-
-function createMockPrisma() {
-  return {
-    action: {
-      findUnique: async () => null,
-      create: async (data: any) => ({ id: createId("act"), ...data.data }),
-      update: async () => ({ id: "mock" }),
-    },
-    actionEvent: {
-      create: async () => ({ id: "mock" }),
-    },
-  };
+  const prisma = getPrismaClient();
+  if (!prisma) throw new Error("Database not available");
+  return prisma;
 }
 
 /**

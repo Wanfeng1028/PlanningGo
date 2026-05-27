@@ -1,30 +1,6 @@
 import type { ToolExecutionResult, ToolExecutionContext } from "../tools/types";
 import { env } from "../../config/env";
-
-// Use a lazy-loaded Prisma client to avoid initialization issues
-let prismaInstance: any = null;
-
-function getPrisma() {
-  if (!prismaInstance) {
-    try {
-      const { PrismaClient } = require("../../generated/prisma/client.js");
-      prismaInstance = new PrismaClient();
-    } catch (error) {
-      console.warn("Prisma client not available, using mock implementation");
-      prismaInstance = createMockPrisma();
-    }
-  }
-  return prismaInstance;
-}
-
-function createMockPrisma() {
-  return {
-    toolCallLog: {
-      create: async () => ({ id: "mock" }),
-      createMany: async () => ({ count: 0 }),
-    },
-  };
-}
+import { getPrismaClient } from "../../common/prisma";
 
 /**
  * Log a tool call to the database
@@ -43,7 +19,8 @@ export async function logToolCall(params: {
     return;
   }
 
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
+  if (!prisma) return;
 
   try {
     await prisma.toolCallLog.create({
@@ -60,7 +37,6 @@ export async function logToolCall(params: {
     });
   } catch (error) {
     console.error("Failed to log tool call:", error);
-    // Don't throw - logging failures shouldn't break the pipeline
   }
 }
 
@@ -75,14 +51,15 @@ export async function logToolCallsBatch(
     return;
   }
 
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
+  if (!prisma) return;
 
   const logs = results.map((result) => ({
     userId: ctx.userId,
     traceId: ctx.traceId,
     toolName: result.tool,
-    input: {}, // Would need to track input separately
-    output: result.success ? result.output : undefined,
+    input: {} as any,
+    output: (result.success ? result.output : undefined) as any,
     latencyMs: result.latencyMs,
     status: (result.success ? "success" : "error") as "success" | "error",
     errorCode: result.success ? undefined : result.error,

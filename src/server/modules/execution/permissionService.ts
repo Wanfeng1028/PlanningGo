@@ -1,27 +1,10 @@
 import type { PermissionScope, UserPermissionSnapshot } from "../agent/middleware/permissionGuard";
-
-// Use a lazy-loaded Prisma client to avoid initialization issues
-let prismaInstance: any = null;
+import { getPrismaClient } from "../../common/prisma";
 
 function getPrisma() {
-  if (!prismaInstance) {
-    try {
-      const { PrismaClient } = require("../../generated/prisma/client.js");
-      prismaInstance = new PrismaClient();
-    } catch (error) {
-      console.warn("Prisma client not available, using mock implementation");
-      prismaInstance = createMockPrisma();
-    }
-  }
-  return prismaInstance;
-}
-
-function createMockPrisma() {
-  return {
-    userPermission: {
-      findUnique: async () => null,
-    },
-  };
+  const prisma = getPrismaClient();
+  if (!prisma) throw new Error("Database not available");
+  return prisma;
 }
 
 /**

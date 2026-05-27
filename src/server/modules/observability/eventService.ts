@@ -1,32 +1,6 @@
 import type { PermissionScope, UserPermissionSnapshot } from "../agent/middleware/permissionGuard";
 import { env } from "../../config/env";
-
-// Use a lazy-loaded Prisma client to avoid initialization issues
-let prismaInstance: any = null;
-
-function getPrisma() {
-  if (!prismaInstance) {
-    try {
-      const { PrismaClient } = require("../../generated/prisma/client.js");
-      prismaInstance = new PrismaClient();
-    } catch (error) {
-      console.warn("Prisma client not available, using mock implementation");
-      prismaInstance = createMockPrisma();
-    }
-  }
-  return prismaInstance;
-}
-
-function createMockPrisma() {
-  return {
-    userEvent: {
-      create: async () => ({ id: "mock" }),
-    },
-    errorLog: {
-      create: async () => ({ id: "mock" }),
-    },
-  };
-}
+import { getPrismaClient } from "../../common/prisma";
 
 /**
  * Log a user event
@@ -44,7 +18,8 @@ export async function trackEvent(params: {
     return;
   }
 
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
+  if (!prisma) return;
 
   try {
     await prisma.userEvent.create({
@@ -60,7 +35,6 @@ export async function trackEvent(params: {
     });
   } catch (error) {
     console.error("Failed to track event:", error);
-    // Don't throw - event tracking failures shouldn't break the pipeline
   }
 }
 
@@ -80,7 +54,8 @@ export async function reportClientError(params: {
     return;
   }
 
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
+  if (!prisma) return;
 
   try {
     await prisma.errorLog.create({
@@ -96,6 +71,5 @@ export async function reportClientError(params: {
     });
   } catch (error) {
     console.error("Failed to report client error:", error);
-    // Don't throw - error reporting failures shouldn't break the pipeline
   }
 }
