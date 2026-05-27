@@ -6,6 +6,7 @@
 import type { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
 import Redis from "ioredis";
+import { env } from "../config/env.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -14,7 +15,7 @@ declare module "fastify" {
 }
 
 async function redisPlugin(app: FastifyInstance) {
-  const url = process.env.REDIS_URL ?? "redis://localhost:6379/0";
+  const url = env.REDIS_URL;
   let redis: Redis | null = null;
   try {
     redis = new Redis(url, {
@@ -34,7 +35,7 @@ async function redisPlugin(app: FastifyInstance) {
       "Redis connection failed",
     );
 
-    if (process.env.NODE_ENV === "production") {
+    if (env.NODE_ENV === "production") {
       throw err;
     }
 

@@ -1,7 +1,7 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
 import { ZodError } from "zod";
-import { corsOrigins } from "./config/env";
+import { corsOrigins, env } from "./config/env";
 import { createTraceId } from "./common/id";
 import { AppError } from "./common/errors";
 import { sendError } from "./common/response";
@@ -9,7 +9,7 @@ import { registerRoutes } from "./routes";
 
 export async function buildApp() {
   const app = Fastify({
-    logger: process.env.NODE_ENV === "production"
+    logger: env.NODE_ENV === "production"
       ? { level: "info" }
       : { level: "debug", transport: { target: "pino-pretty", options: { colorize: true, translateTime: "SYS:HH:MM:ss", ignore: "pid,hostname" } } },
     bodyLimit: 1024 * 1024,

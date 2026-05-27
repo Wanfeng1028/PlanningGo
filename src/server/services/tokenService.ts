@@ -10,6 +10,7 @@ import {
   type AccessTokenPayload,
 } from "../common/crypto.js";
 import type { UserRepository } from "../repositories/userRepository.js";
+import { env } from "../config/env.js";
 
 export interface TokenPair {
   accessToken: string;
@@ -37,7 +38,7 @@ export class TokenService {
     const accessToken = signAccessToken({ sub: userId, email, role });
     const refreshToken = signRefreshToken({ sub: userId, jti });
 
-    const refreshExpiresIn = process.env.JWT_REFRESH_EXPIRES_IN ?? "7d";
+    const refreshExpiresIn = env.JWT_REFRESH_EXPIRES_IN;
     const expiresAt = this.parseExpiresIn(refreshExpiresIn);
 
     await this.userRepo.createRefreshToken({

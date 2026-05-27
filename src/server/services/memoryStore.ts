@@ -6,6 +6,7 @@
 import { randomUUID } from "node:crypto";
 import { hashPassword, comparePassword, signAccessToken, signRefreshToken, verifyRefreshToken } from "../common/crypto.js";
 import crypto from "node:crypto";
+import { env } from "../config/env.js";
 
 interface MemoryUser {
   id: string;
@@ -264,7 +265,7 @@ export function createRefreshToken(data: {
     id: randomUUID(),
     userId: data.userId,
     tokenHash: hashToken(data.token),
-    expiresAt: parseExpiresIn(process.env.JWT_REFRESH_EXPIRES_IN ?? "7d"),
+    expiresAt: parseExpiresIn(env.JWT_REFRESH_EXPIRES_IN),
     revokedAt: null,
     userAgent: data.userAgent,
     ipAddress: data.ipAddress,

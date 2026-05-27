@@ -8,6 +8,7 @@ import fp from "fastify-plugin";
 import { PrismaClient } from "../../generated/prisma/client.js";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { setPrismaInstance } from "../common/prisma.js";
+import { env } from "../config/env.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -16,7 +17,7 @@ declare module "fastify" {
 }
 
 async function dbPlugin(app: FastifyInstance) {
-  const connectionString = process.env.DATABASE_URL ?? "postgresql://planninggo:planninggo@localhost:5432/planninggo?schema=public";
+  const connectionString = env.DATABASE_URL;
   let db: PrismaClient | null = null;
   try {
     const adapter = new PrismaPg({ connectionString });
@@ -34,7 +35,7 @@ async function dbPlugin(app: FastifyInstance) {
     );
     if (db) { try { await db.$disconnect(); } catch { /* */ } }
 
-    if (process.env.NODE_ENV === "production") {
+    if (env.NODE_ENV === "production") {
       throw err;
     }
 

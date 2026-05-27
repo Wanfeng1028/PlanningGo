@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 import { z } from "zod";
 import { demoProfile, pois, baseToolLogs, planOptions, trafficRoutes, weather } from "./data/mockData";
 import { parseDemand, planningRequestSchema, runPlanningAgent, simulateWhatIf } from "./services/agent";
+import { env } from "./config/env";
 import { runPlanningPipeline } from "./modules/agent/orchestrator";
 import {
   advanceExecution,
@@ -25,7 +26,7 @@ export async function registerRoutes(app: FastifyInstance) {
     description: "「周末有谱」智能出行规划 API",
     docs: "/api/docs",
     health: "/api/health",
-    environment: process.env.NODE_ENV ?? "development",
+    environment: env.NODE_ENV,
   }));
 
   // ── 注册模块化路由 ──

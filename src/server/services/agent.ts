@@ -2,6 +2,7 @@ import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { demoProfile, planOptions, trafficRoutes, weather } from "../data/mockData";
 import type { AgentResult, PlanningRequest } from "../types";
+import { env } from "../config/env";
 import {
   getCurrentContext,
   searchLocalActivities,
@@ -32,9 +33,9 @@ import {
  *   需要修改 baseURL 为对应的 API 地址
  * - API Key 应通过环境变量 OPENAI_API_KEY 配置，不应硬编码
  */
-const openaiApiKey = process.env.OPENAI_API_KEY ?? "demo_key_for_testing";
-const openaiBaseUrl = process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1";
-const defaultModel = process.env.LLM_MODEL ?? "gpt-4o";
+const openaiApiKey = env.OPENAI_API_KEY ?? "demo_key_for_testing";
+const openaiBaseUrl = env.OPENAI_BASE_URL;
+const defaultModel = env.LLM_MODEL;
 
 /**
  * LLM 调用配置接口
