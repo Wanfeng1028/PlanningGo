@@ -22,7 +22,12 @@ export function Modal({ modal, onClose, onPrimary, onSecondary }: ModalProps) {
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", handleEsc);
-    return () => document.removeEventListener("keydown", handleEsc);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleEsc);
+      document.body.style.overflow = prev;
+    };
   }, [modal, onClose]);
 
   if (!modal) {

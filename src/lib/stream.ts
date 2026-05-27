@@ -1,14 +1,7 @@
 import type { PlanningRequestInput, PlanningResult } from "./api";
+import { getAuthToken } from "./api";
 
 const API_BASE: string = import.meta.env.VITE_API_BASE || "http://127.0.0.1:3001";
-
-let _authToken: string | null = localStorage.getItem("pg_token");
-
-export function setAuthToken(token: string | null) {
-  _authToken = token;
-  if (token) localStorage.setItem("pg_token", token);
-  else localStorage.removeItem("pg_token");
-}
 
 export interface StreamOptions {
   onChunk?: (chunk: string) => void;
@@ -115,8 +108,9 @@ export async function streamPlanningRequest(
     "content-type": "application/json",
   };
 
-  if (_authToken) {
-    headers.authorization = `Bearer ${_authToken}`;
+  const token = getAuthToken();
+  if (token) {
+    headers.authorization = `Bearer ${token}`;
   }
 
   return streamFetch(`${API_BASE}/api/agent/plan/stream`, {

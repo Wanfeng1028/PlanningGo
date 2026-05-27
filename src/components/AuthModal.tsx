@@ -126,6 +126,20 @@ export function AuthModal({
     queryPermissionState().then(setLocPermission);
   }, [mode]);
 
+  // Body scroll lock + ESC handler
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleEsc);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleEsc);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
   const handleRequestLocation = useCallback(async () => {
     if (!isGeolocationSupported()) {
       setLocPermission("unavailable");

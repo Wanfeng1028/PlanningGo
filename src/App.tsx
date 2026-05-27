@@ -1,4 +1,4 @@
-import { useState, useCallback, lazy, Suspense } from "react";
+import { useState, useCallback, useMemo, useEffect, lazy, Suspense } from "react";
 import { AuthModal } from "./components/AuthModal";
 import { BottomTabs } from "./components/BottomTabs";
 import { ComingSoonModal } from "./components/ComingSoonModal";
@@ -167,7 +167,7 @@ export function App() {
   }, []);
 
   /** 统一的位置状态，传给子组件 */
-  const locationState = {
+  const locationState = useMemo(() => ({
     city: user?.city || DEFAULT_CITY_LABEL,
     locationLabel: user?.locationLabel || "",
     latitude: user?.latitude,
@@ -177,7 +177,16 @@ export function App() {
     pendingCity: locationConfirmCity,
     onConfirmCity: handleManualCity,
     onDismissConfirm: () => setLocationConfirmCity(null),
-  };
+  }), [user?.city, user?.locationLabel, user?.latitude, user?.longitude, user?.locationSource, locationConfirmCity, handleManualCity]);
+
+  const isFeatureWorkspace = active === "features";
+
+  // 未登录访问 profile 时，延迟到 effect 阶段弹出认证弹窗（避免 render 期间 setState）
+  useEffect(() => {
+    if (active === "profile" && !user) {
+      handleAuthRequiredNavigate("profile");
+    }
+  }, [active, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const page = (() => {
     switch (active) {
@@ -210,8 +219,6 @@ export function App() {
 
       case "profile":
         if (!user) {
-          // 未登录时弹出认证弹窗，不渲染 ProfileGatePage
-          handleAuthRequiredNavigate("profile");
           return null;
         }
         return (
@@ -231,8 +238,6 @@ export function App() {
         return null;
     }
   })();
-
-  const isFeatureWorkspace = active === "features";
 
   return (
     <div
