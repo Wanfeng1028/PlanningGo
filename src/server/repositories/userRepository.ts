@@ -37,6 +37,10 @@ export class UserRepository {
     return this.db.user.update({ where: { id }, data });
   }
 
+  async updatePasswordHash(id: string, passwordHash: string) {
+    return this.db.user.update({ where: { id }, data: { passwordHash } });
+  }
+
   async softDelete(id: string) {
     return this.db.user.update({
       where: { id },

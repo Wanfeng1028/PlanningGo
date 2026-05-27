@@ -69,18 +69,29 @@ export async function registerPrivacyRoutes(app: FastifyInstance) {
       db.webhookDelivery.deleteMany({ where: { webhook: { userId } } }),
       db.webhook.deleteMany({ where: { userId } }),
       db.apiKey.deleteMany({ where: { userId } }),
+      db.auditLog.deleteMany({ where: { userId } }),
+      db.llmCallLog.deleteMany({ where: { userId } }),
+      db.toolCallLog.deleteMany({ where: { userId } }),
+      db.requestLog.deleteMany({ where: { userId } }),
+      db.developerUsageDaily.deleteMany({ where: { userId } }),
       db.notification.deleteMany({ where: { userId } }),
       db.notificationPreference.deleteMany({ where: { userId } }),
       db.userSession.deleteMany({ where: { userId } }),
       db.companion.deleteMany({ where: { userId } }),
       db.memory.deleteMany({ where: { userId } }),
       db.plan.deleteMany({ where: { userId } }),
+      db.action.deleteMany({ where: { userId } }),
+      db.reservation.deleteMany({ where: { userId } }),
+      db.executionStep.deleteMany({ where: { userId } }),
+      db.shareRoom.deleteMany({ where: { userId } }),
       db.userProfile.deleteMany({ where: { userId } }),
       db.userPermission.deleteMany({ where: { userId } }),
       db.refreshToken.deleteMany({ where: { userId } }),
       db.user.delete({ where: { id: userId } }),
     ]);
 
+    // 清除 cookie 使当前会话失效
+    reply.clearCookie("refresh_token", { path: "/" });
     sendNoContent(reply);
   });
 }

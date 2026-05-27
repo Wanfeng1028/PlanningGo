@@ -142,13 +142,7 @@ export class AuthService {
     if (!valid) throw new UnauthorizedError("旧密码错误");
 
     const passwordHash = await hashPassword(newPassword);
-    await this.userRepo.update(userId, {});
-
-    // 用 raw query 更新 passwordHash（因为 update 不暴露该字段）
-    await (this.userRepo as unknown as { db: { user: { update: (args: { where: { id: string }; data: { passwordHash: string } }) => Promise<unknown> } } }).db.user.update({
-      where: { id: userId },
-      data: { passwordHash },
-    });
+    await this.userRepo.updatePasswordHash(userId, passwordHash);
 
     // 吊销所有 refresh token，强制重新登录
     await this.tokenService.revokeAllTokens(userId);
