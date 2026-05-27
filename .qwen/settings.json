@@ -49,7 +49,9 @@
       "Bash(chcp *)",
       "Agent(general-purpose)",
       "Bash(python *)",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Agent(Explore)",
+      "Bash(gh *)"
     ]
   },
   "$version": 4
