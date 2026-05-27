@@ -14,6 +14,7 @@ function optionalUid(request: { userId?: string }): string | null {
 }
 
 export async function registerConversationRoutes(app: FastifyInstance) {
+  const log = app.log;
   // ── 创建会话 ──
   app.post("/api/conversations", { preHandler: [app.optionalAuthGuard] }, async (request, reply) => {
     const body = z
@@ -40,8 +41,8 @@ export async function registerConversationRoutes(app: FastifyInstance) {
           },
         });
         return sendCreated(reply, conv);
-      } catch {
-        // fallback to memory
+      } catch (err) {
+        log.warn({ err }, "DB create conversation failed, falling back to memory");
       }
     }
 
@@ -81,8 +82,8 @@ export async function registerConversationRoutes(app: FastifyInstance) {
           include: { _count: { select: { messages: true, plans: true } } },
         });
         return sendOk(reply, convs);
-      } catch {
-        // fallback
+      } catch (err) {
+        log.warn({ err }, "DB list conversations failed, falling back to memory");
       }
     }
 
@@ -119,8 +120,8 @@ export async function registerConversationRoutes(app: FastifyInstance) {
           return sendError(reply, 403, "FORBIDDEN", "无权访问此会话");
         }
         return sendOk(reply, conv);
-      } catch {
-        // fallback
+      } catch (err) {
+        log.warn({ err }, "DB get conversation failed, falling back to memory");
       }
     }
 
@@ -156,8 +157,8 @@ export async function registerConversationRoutes(app: FastifyInstance) {
         if (conv.userId && conv.userId !== userId) {
           return sendError(reply, 403, "FORBIDDEN", "无权向此会话添加消息");
         }
-      } catch {
-        // fallback — continue to memory path
+      } catch (err) {
+        log.warn({ err }, "DB ownership check failed, continuing to fallback");
       }
     }
 
@@ -177,8 +178,8 @@ export async function registerConversationRoutes(app: FastifyInstance) {
           data: { updatedAt: new Date() },
         });
         return sendCreated(reply, msg);
-      } catch {
-        // fallback
+      } catch (err) {
+        log.warn({ err }, "DB save message failed, falling back to memory");
       }
     }
 
@@ -215,8 +216,8 @@ export async function registerConversationRoutes(app: FastifyInstance) {
           orderBy: { createdAt: "asc" },
         });
         return sendOk(reply, msgs);
-      } catch {
-        // fallback
+      } catch (err) {
+        log.warn({ err }, "DB list messages failed, falling back to memory");
       }
     }
 
@@ -237,8 +238,8 @@ export async function registerConversationRoutes(app: FastifyInstance) {
           data: { favorite: !plan.favorite },
         });
         return sendOk(reply, { id: updated.id, favorite: updated.favorite });
-      } catch {
-        // fallback
+      } catch (err) {
+        log.warn({ err }, "DB toggle favorite failed, falling back to memory");
       }
     }
 
@@ -261,8 +262,8 @@ export async function registerConversationRoutes(app: FastifyInstance) {
           include: { options: { include: { steps: true } } },
         });
         return sendOk(reply, plans);
-      } catch {
-        // fallback
+      } catch (err) {
+        log.warn({ err }, "DB list favorites failed, falling back to memory");
       }
     }
 

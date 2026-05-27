@@ -11,9 +11,8 @@ import { saveActions } from "../services/store.js";
 import * as mem from "../services/memoryStore.js";
 
 export async function registerAgentRoutes(app: FastifyInstance) {
-  // Global per-endpoint guard (kept lenient); strict model-based quota handled below.
   const planningRateLimit = {
-    max: 100, // 100 requests per minute
+    max: 100,
     timeWindow: "1 minute",
     skipOnError: true,
   };
@@ -56,6 +55,62 @@ export async function registerAgentRoutes(app: FastifyInstance) {
     return true;
   };
 
+  // ── 共享：创建或获取会话 ──
+  async function ensureConversation(
+    db: PrismaClient | null,
+    userId: string | undefined,
+    body: { guestId?: string; conversationId?: string; prompt: string; city?: string; modelMode?: string },
+    log: FastifyInstance["log"],
+  ): Promise<string> {
+    if (body.conversationId) return body.conversationId;
+
+    const title = body.prompt.length > 30 ? body.prompt.slice(0, 30) + "…" : body.prompt;
+    const guestId = !userId ? (body.guestId ?? null) : null;
+
+    if (db) {
+      try {
+        const conv = await db.conversation.create({
+          data: {
+            userId: userId ?? undefined,
+            guestId,
+            title,
+            city: body.city ?? "北京",
+            modelMode: (body.modelMode as "flash" | "pro") ?? "flash",
+          },
+        });
+        return conv.id;
+      } catch (err) {
+        log.error({ err }, "Failed to create conversation in DB, falling back to memory");
+      }
+    }
+
+    const conv = mem.createConversation({ userId, guestId, title, city: body.city, modelMode: body.modelMode });
+    return conv.id;
+  }
+
+  // ── 共享：保存消息（带 fallback） ──
+  async function saveMessage(
+    db: PrismaClient | null,
+    conversationId: string,
+    role: "user" | "assistant",
+    content: string,
+    payloadJson?: unknown,
+    log?: FastifyInstance["log"],
+  ): Promise<void> {
+    if (db) {
+      try {
+        await db.message.create({
+          data: { conversationId, role, content, payloadJson: payloadJson ?? undefined },
+        });
+        await db.conversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
+        return;
+      } catch (err) {
+        log?.error({ err, conversationId }, "Failed to save message to DB, falling back to memory");
+      }
+    }
+    mem.addMessage({ conversationId, role, content, payloadJson });
+  }
+
   app.post(
     "/api/agent/parse",
     {
@@ -71,121 +126,91 @@ export async function registerAgentRoutes(app: FastifyInstance) {
           return reply.status(400).send({ error: "INVALID_REQUEST", issues: error.issues });
         throw error;
       }
-    }
+    },
   );
 
   app.post(
     "/api/agent/plan",
     {
       config: { rateLimit: planningRateLimit },
-      preHandler: [app.optionalAuthGuard, (request, reply, done) => {
-        if (!enforcePlanningQuota(request as FastifyRequest<{ Body: PlanningModeBody }>, reply)) return;
-        done();
-      }],
-    },
-    async (request, reply) => {
-    try {
-      const input = planningRequestSchema.parse(request.body);
-      const userId = (request as any).userId as string | undefined;
-      const db: PrismaClient | null = app.db;
-
-      // ── 1. 创建或获取会话 ──
-      let conversationId = (request.body as any).conversationId as string | undefined;
-      if (!conversationId) {
-        if (db) {
-          try {
-            const conv = await db.conversation.create({
-              data: {
-                userId: userId ?? undefined,
-                guestId: !userId ? ((request.body as any).guestId ?? null) : null,
-                title: input.prompt.length > 30 ? input.prompt.slice(0, 30) + "…" : input.prompt,
-                city: input.city ?? "北京",
-                modelMode: (input as any).modelMode ?? "flash",
-              },
-            });
-            conversationId = conv.id;
-          } catch {
-            // fallback
-          }
-        }
-        if (!conversationId) {
-          const conv = mem.createConversation({
-            userId,
-            guestId: !userId ? ((request.body as any).guestId ?? null) : null,
-            title: input.prompt.length > 30 ? input.prompt.slice(0, 30) + "…" : input.prompt,
-            city: input.city,
-            modelMode: (input as any).modelMode,
-          });
-          conversationId = conv.id;
-        }
-      }
-
-      // ── 2. 保存用户消息 ──
-      if (db) {
-        try {
-          await db.message.create({
-            data: { conversationId, role: "user", content: input.prompt },
-          });
-        } catch {
-          mem.addMessage({ conversationId, role: "user", content: input.prompt });
-        }
-      } else {
-        mem.addMessage({ conversationId, role: "user", content: input.prompt });
-      }
-
-      // ── 3. 运行规划管道 ──
-      const result = await runPlanningPipeline({
-        ...input,
-        providers: app.providers ?? undefined,
-        userId,
-      });
-
-      // ── 3.5 保存生成的 actions ──
-      if (result.executableActions?.length) {
-        saveActions(result.executableActions);
-      }
-
-      // ── 4. 保存助手消息 ──
-      const assistantContent = result.summary || "为你找到以下方案：";
-      if (db) {
-        try {
-          await db.message.create({
-            data: {
-              conversationId,
-              role: "assistant",
-              content: assistantContent,
-              payloadJson: { type: "plan", data: { planId: result.planId, options: result.options, summary: result.summary } },
-            },
-          });
-        } catch {
-          mem.addMessage({ conversationId, role: "assistant", content: assistantContent });
-        }
-      } else {
-        mem.addMessage({ conversationId, role: "assistant", content: assistantContent });
-      }
-
-      return { ...result, conversationId };
-    } catch (error) {
-      if (error instanceof ZodError) return reply.status(400).send({ error: "INVALID_REQUEST", issues: error.issues });
-      throw error;
-    }
-  });
-
-  // Streaming endpoint for planning
-  app.post(
-    "/api/agent/plan/stream",
-    {
-      config: { rateLimit: planningRateLimit },
-      preHandler: [app.optionalAuthGuard, (request, reply, done) => {
-        if (!enforcePlanningQuota(request as FastifyRequest<{ Body: PlanningModeBody }>, reply)) return;
-        done();
-      }],
+      preHandler: [
+        app.optionalAuthGuard,
+        (request, reply, done) => {
+          if (!enforcePlanningQuota(request as FastifyRequest<{ Body: PlanningModeBody }>, reply)) return;
+          done();
+        },
+      ],
     },
     async (request, reply) => {
       try {
         const input = planningRequestSchema.parse(request.body);
         const userId = (request as any).userId as string | undefined;
         const db: PrismaClient | null = app.db;
+        const body = request.body as any;
+
+        // ── 1. 创建或获取会话 ──
+        const conversationId = await ensureConversation(db, userId, {
+          guestId: body.guestId,
+          conversationId: body.conversationId,
+          prompt: input.prompt,
+          city: input.city,
+          modelMode: body.modelMode,
+        }, app.log);
+
+        // ── 2. 保存用户消息 ──
+        await saveMessage(db, conversationId, "user", input.prompt, undefined, app.log);
+
+        // ── 3. 运行规划管道 ──
+        const result = await runPlanningPipeline({
+          ...input,
+          providers: app.providers ?? undefined,
+          userId,
+        });
+
+        // ── 3.5 保存生成的 actions ──
+        if (result.executableActions?.length) {
+          saveActions(result.executableActions);
+        }
+
+        // ── 4. 保存助手消息 ──
+        const assistantContent = result.summary || "为你找到以下方案：";
+        await saveMessage(db, conversationId, "assistant", assistantContent, {
+          type: "plan",
+          data: { planId: result.planId, options: result.options, summary: result.summary },
+        }, app.log);
+
+        return { ...result, conversationId };
+      } catch (error) {
+        if (error instanceof ZodError) return reply.status(400).send({ error: "INVALID_REQUEST", issues: error.issues });
+        throw error;
+      }
+    },
+  );
+
+  // Streaming endpoint for planning
+  app.post(
+    "/api/agent/plan/stream",
+    {
+      config: { rateLimit: planningRateLimit },
+      preHandler: [
+        app.optionalAuthGuard,
+        (request, reply, done) => {
+          if (!enforcePlanningQuota(request as FastifyRequest<{ Body: PlanningModeBody }>, reply)) return;
+          done();
+        },
+      ],
+    },
+    async (request, reply) => {
+      let clientDisconnected = false;
+      request.raw.on("close", () => {
+        clientDisconnected = true;
+      });
+
+      try {
+        const input = planningRequestSchema.parse(request.body);
+        const userId = (request as any).userId as string | undefined;
+        const db: PrismaClient | null = app.db;
+        const body = request.body as any;
 
         // Set SSE headers
         reply.header("Content-Type", "text/event-stream");
@@ -193,55 +218,29 @@ export async function registerAgentRoutes(app: FastifyInstance) {
         reply.header("Connection", "keep-alive");
 
         // ── 1. 创建或获取会话 ──
-        let conversationId = (request.body as any).conversationId as string | undefined;
-        if (!conversationId) {
-          if (db) {
-            try {
-              const conv = await db.conversation.create({
-                data: {
-                  userId: userId ?? undefined,
-                  guestId: !userId ? ((request.body as any).guestId ?? null) : null,
-                  title: input.prompt.length > 30 ? input.prompt.slice(0, 30) + "…" : input.prompt,
-                  city: input.city ?? "北京",
-                  modelMode: (input as any).modelMode ?? "flash",
-                },
-              });
-              conversationId = conv.id;
-            } catch {
-              // fallback
-            }
-          }
-          if (!conversationId) {
-            const conv = mem.createConversation({
-              userId,
-              guestId: !userId ? ((request.body as any).guestId ?? null) : null,
-              title: input.prompt.length > 30 ? input.prompt.slice(0, 30) + "…" : input.prompt,
-              city: input.city,
-              modelMode: (input as any).modelMode,
-            });
-            conversationId = conv.id;
-          }
-        }
+        const conversationId = await ensureConversation(db, userId, {
+          guestId: body.guestId,
+          conversationId: body.conversationId,
+          prompt: input.prompt,
+          city: input.city,
+          modelMode: body.modelMode,
+        }, app.log);
 
         // ── 2. 保存用户消息 ──
-        if (db) {
-          try {
-            await db.message.create({
-              data: { conversationId, role: "user", content: input.prompt },
-            });
-          } catch {
-            mem.addMessage({ conversationId, role: "user", content: input.prompt });
-          }
-        } else {
-          mem.addMessage({ conversationId, role: "user", content: input.prompt });
-        }
+        await saveMessage(db, conversationId, "user", input.prompt, undefined, app.log);
 
-        // ── 3. 运行规划管道并流式返回 ──
+        // ── 3. 运行规划管道 ──
         const result = await runPlanningPipeline({
           ...input,
           providers: app.providers ?? undefined,
           userId,
         });
+
+        // 客户端已断连则跳过写入
+        if (clientDisconnected) {
+          app.log.warn({ conversationId }, "Client disconnected during planning pipeline, skipping response write");
+          return;
+        }
 
         // 保存生成的 actions
         if (result.executableActions?.length) {
@@ -251,44 +250,41 @@ export async function registerAgentRoutes(app: FastifyInstance) {
         // Stream the summary
         const summary = result.summary || "为你找到以下方案：";
         for (let i = 0; i < summary.length; i++) {
+          if (clientDisconnected) break;
           reply.raw.write(`data: ${JSON.stringify({ content: summary[i] })}\n\n`);
           await new Promise((resolve) => setTimeout(resolve, 10));
         }
 
-        // Send final structured result for progressive UI hydration
-        const finalResult = { ...result, conversationId };
-        reply.raw.write(`data: [FINAL_RESULT]${JSON.stringify(finalResult)}\n\n`);
-        reply.raw.write(`data: ${JSON.stringify({ done: true, result: finalResult })}\n\n`);
-        reply.raw.write("data: [DONE]\n\n");
+        if (!clientDisconnected) {
+          // Send final structured result for progressive UI hydration
+          const finalResult = { ...result, conversationId };
+          reply.raw.write(`data: [FINAL_RESULT]${JSON.stringify(finalResult)}\n\n`);
+          reply.raw.write(`data: ${JSON.stringify({ done: true, result: finalResult })}\n\n`);
+          reply.raw.write("data: [DONE]\n\n");
+        }
 
         // ── 4. 保存助手消息 ──
-        if (db) {
-          try {
-            await db.message.create({
-              data: {
-                conversationId,
-                role: "assistant",
-                content: summary,
-                payloadJson: { type: "plan", data: { planId: result.planId, options: result.options, summary: result.summary } },
-              },
-            });
-          } catch {
-            mem.addMessage({ conversationId, role: "assistant", content: summary });
-          }
-        } else {
-          mem.addMessage({ conversationId, role: "assistant", content: summary });
+        await saveMessage(db, conversationId, "assistant", summary, {
+          type: "plan",
+          data: { planId: result.planId, options: result.options, summary: result.summary },
+        }, app.log);
+
+        if (!clientDisconnected) {
+          reply.raw.end();
         }
-        reply.raw.end();
       } catch (error) {
-        if (error instanceof ZodError) {
-          reply.raw.write(`data: ${JSON.stringify({ error: "INVALID_REQUEST", issues: error.issues })}\n\n`);
-        } else {
-          reply.raw.write(`data: ${JSON.stringify({ error: "INTERNAL_SERVER_ERROR" })}\n\n`);
+        app.log.error({ err: error }, "SSE planning stream error");
+        if (!clientDisconnected) {
+          if (error instanceof ZodError) {
+            reply.raw.write(`data: ${JSON.stringify({ error: "INVALID_REQUEST", issues: error.issues })}\n\n`);
+          } else {
+            reply.raw.write(`data: ${JSON.stringify({ error: "INTERNAL_SERVER_ERROR" })}\n\n`);
+          }
+          reply.raw.write("data: [DONE]\n\n");
+          reply.raw.end();
         }
-        reply.raw.write("data: [DONE]\n\n");
-        reply.raw.end();
       }
-    }
+    },
   );
 
   app.post("/api/agent/plan/legacy", { preHandler: [app.optionalAuthGuard] }, async (request, reply) => {

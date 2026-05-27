@@ -6,6 +6,20 @@ const reservationStore = new Map(reservations.map((item) => [item.id, item]));
 const shareStore = new Map(shareRooms.map((item) => [item.id, item]));
 const memoryStore = new Map(memories.map((item) => [item.id, item]));
 let selectedPlanId = "plan_a";
+
+// ── 容量限制配置 ──
+const MAX_STORE_ENTRIES = 5000;
+const CLEANUP_BATCH = 500;
+
+function enforceCapacity<T>(store: Map<string, T>, maxEntries = MAX_STORE_ENTRIES): void {
+  if (store.size <= maxEntries) return;
+  const iter = store.keys();
+  for (let i = 0; i < CLEANUP_BATCH; i++) {
+    const next = iter.next();
+    if (next.done) break;
+    store.delete(next.value);
+  }
+}
 const permissionStore = new Map<string, boolean>([
   ["location", true],
   ["reservation", false],
@@ -102,6 +116,7 @@ export function createApiKey(name: string, scopes: string[]) {
     revoked: false,
   };
   apiKeyStore.set(id, record);
+  enforceCapacity(apiKeyStore);
   return { ...record, secret: `pg_live_demo_${Date.now()}` };
 }
 
@@ -144,6 +159,7 @@ export function upsertReservation(input: Omit<Reservation, "id"> & { id?: string
   const id = input.id ?? `res_${Date.now()}`;
   const reservation: Reservation = { ...input, id };
   reservationStore.set(id, reservation);
+  enforceCapacity(reservationStore);
   return reservation;
 }
 
@@ -163,6 +179,7 @@ export function createShareRoom(input: Omit<ShareRoom, "id"> & { id?: string }) 
   const id = input.id ?? `share_${Date.now()}`;
   const room: ShareRoom = { ...input, id };
   shareStore.set(id, room);
+  enforceCapacity(shareStore);
   return room;
 }
 
@@ -185,6 +202,7 @@ export function upsertMemory(input: Omit<MemoryItem, "id"> & { id?: string }) {
   const id = input.id ?? `mem_${Date.now()}`;
   const memory: MemoryItem = { ...input, id };
   memoryStore.set(id, memory);
+  enforceCapacity(memoryStore);
   return memory;
 }
 
@@ -232,6 +250,7 @@ export function saveActions(actions: ExecutionAction[]): void {
   for (const action of actions) {
     actionStore.set(action.id, action);
   }
+  enforceCapacity(actionStore);
 }
 
 export function updateActionStatus(id: string, status: ExecutionAction["status"]): ExecutionAction | null {

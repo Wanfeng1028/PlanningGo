@@ -5,6 +5,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { listActions, quoteAction, confirmAction, cancelAction } from "../services/store.js";
+import { ForbiddenError, NotFoundError, RateLimitError } from "../common/errors.js";
 
 export async function registerActionRoutes(app: FastifyInstance) {
   app.get("/api/actions", { preHandler: [app.authGuard] }, async (request) => {
@@ -20,7 +21,7 @@ export async function registerActionRoutes(app: FastifyInstance) {
       return result;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      if (message.includes("FORBIDDEN")) return reply.status(403).send({ ok: false, error: "FORBIDDEN" });
+      if (message.includes("FORBIDDEN")) throw new ForbiddenError("无权操作此 Action");
       if (message.includes("EXPIRED")) return reply.status(410).send({ ok: false, error: "ACTION_EXPIRED" });
       throw err;
     }
@@ -36,7 +37,7 @@ export async function registerActionRoutes(app: FastifyInstance) {
       return result;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      if (message.includes("FORBIDDEN")) return reply.status(403).send({ ok: false, error: "FORBIDDEN" });
+      if (message.includes("FORBIDDEN")) throw new ForbiddenError("无权操作此 Action");
       if (message.includes("EXPIRED")) return reply.status(410).send({ ok: false, error: "ACTION_EXPIRED" });
       if (message.includes("PAYMENT_DISABLED")) return reply.status(403).send({ ok: false, error: "PAYMENT_DISABLED" });
       throw err;
@@ -51,7 +52,7 @@ export async function registerActionRoutes(app: FastifyInstance) {
       return result;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      if (message.includes("FORBIDDEN")) return reply.status(403).send({ ok: false, error: "FORBIDDEN" });
+      if (message.includes("FORBIDDEN")) throw new ForbiddenError("无权操作此 Action");
       throw err;
     }
   });
