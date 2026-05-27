@@ -13,3 +13,4 @@ pnpm-debug.log*
 *.tsbuildinfo
 
 /src/generated/prisma
+.qwen/
