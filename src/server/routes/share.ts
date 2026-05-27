@@ -5,6 +5,8 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { listShareRooms, createShareRoom, vote } from "../services/store.js";
+import { NotFoundError } from "../common/errors.js";
+import { sendOk } from "../common/response.js";
 
 export async function registerShareRoutes(app: FastifyInstance) {
   app.get("/api/share/rooms", { preHandler: [app.optionalAuthGuard] }, async () => ({
@@ -34,7 +36,7 @@ export async function registerShareRoutes(app: FastifyInstance) {
       .object({ memberName: z.string(), vote: z.enum(["yes", "no"]), comment: z.string().optional() })
       .parse(request.body);
     const next = vote(params.id, body.memberName, body.vote, body.comment);
-    if (!next) return reply.status(404).send({ error: "SHARE_ROOM_NOT_FOUND" });
-    return next;
+    if (!next) throw new NotFoundError("SHARE_ROOM_NOT_FOUND");
+    return sendOk(reply, next);
   });
 }

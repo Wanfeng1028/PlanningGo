@@ -6,23 +6,24 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { listActions, quoteAction, confirmAction, cancelAction } from "../services/store.js";
 import { ForbiddenError, NotFoundError, RateLimitError } from "../common/errors.js";
+import { sendOk } from "../common/response.js";
 
 export async function registerActionRoutes(app: FastifyInstance) {
-  app.get("/api/actions", { preHandler: [app.authGuard] }, async (request) => {
+  app.get("/api/actions", { preHandler: [app.authGuard] }, async (request, reply) => {
     const query = z.object({ planId: z.string().optional() }).parse(request.query);
-    return { items: listActions(query.planId, request.userId) };
+    return sendOk(reply, { items: listActions(query.planId, request.userId) });
   });
 
   app.post("/api/actions/:id/quote", { preHandler: [app.authGuard] }, async (request, reply) => {
     const params = z.object({ id: z.string() }).parse(request.params);
     try {
       const result = quoteAction(params.id, request.userId!);
-      if (!result) return reply.status(404).send({ ok: false, error: "ACTION_NOT_FOUND" });
-      return result;
+      if (!result) throw new NotFoundError("ACTION_NOT_FOUND");
+      return sendOk(reply, result);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes("FORBIDDEN")) throw new ForbiddenError("无权操作此 Action");
-      if (message.includes("EXPIRED")) return reply.status(410).send({ ok: false, error: "ACTION_EXPIRED" });
+      if (message.includes("EXPIRED")) throw new NotFoundError("ACTION_EXPIRED");
       throw err;
     }
   });
@@ -30,16 +31,16 @@ export async function registerActionRoutes(app: FastifyInstance) {
   app.post("/api/actions/:id/confirm", { preHandler: [app.authGuard] }, async (request, reply) => {
     const params = z.object({ id: z.string() }).parse(request.params);
     const body = z.object({ userConfirmed: z.boolean().default(true) }).parse(request.body ?? {});
-    if (!body.userConfirmed) return reply.status(400).send({ ok: false, error: "CONFIRM_REQUIRED" });
+    if (!body.userConfirmed) throw new NotFoundError("CONFIRM_REQUIRED");
     try {
       const result = confirmAction(params.id, request.userId!);
-      if (!result) return reply.status(404).send({ ok: false, error: "ACTION_NOT_FOUND" });
-      return result;
+      if (!result) throw new NotFoundError("ACTION_NOT_FOUND");
+      return sendOk(reply, result);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes("FORBIDDEN")) throw new ForbiddenError("无权操作此 Action");
-      if (message.includes("EXPIRED")) return reply.status(410).send({ ok: false, error: "ACTION_EXPIRED" });
-      if (message.includes("PAYMENT_DISABLED")) return reply.status(403).send({ ok: false, error: "PAYMENT_DISABLED" });
+      if (message.includes("EXPIRED")) throw new NotFoundError("ACTION_EXPIRED");
+      if (message.includes("PAYMENT_DISABLED")) throw new ForbiddenError("PAYMENT_DISABLED");
       throw err;
     }
   });
@@ -48,8 +49,8 @@ export async function registerActionRoutes(app: FastifyInstance) {
     const params = z.object({ id: z.string() }).parse(request.params);
     try {
       const result = cancelAction(params.id, request.userId!);
-      if (!result) return reply.status(404).send({ ok: false, error: "ACTION_NOT_FOUND" });
-      return result;
+      if (!result) throw new NotFoundError("ACTION_NOT_FOUND");
+      return sendOk(reply, result);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes("FORBIDDEN")) throw new ForbiddenError("无权操作此 Action");

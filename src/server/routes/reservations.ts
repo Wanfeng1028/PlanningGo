@@ -5,11 +5,13 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { listReservations, upsertReservation, updateReservationStatus } from "../services/store.js";
+import { NotFoundError } from "../common/errors.js";
+import { sendOk } from "../common/response.js";
 
 export async function registerReservationRoutes(app: FastifyInstance) {
-  app.get("/api/reservations", { preHandler: [app.optionalAuthGuard] }, async () => ({
-    items: listReservations(),
-  }));
+  app.get("/api/reservations", { preHandler: [app.optionalAuthGuard] }, async (request, reply) =>
+    sendOk(reply, { items: listReservations() }),
+  );
 
   app.post("/api/reservations", { preHandler: [app.optionalAuthGuard] }, async (request) => {
     const input = z
@@ -28,7 +30,7 @@ export async function registerReservationRoutes(app: FastifyInstance) {
     const params = z.object({ id: z.string() }).parse(request.params);
     const body = z.object({ status: z.enum(["draft", "holding", "confirmed", "failed"]) }).parse(request.body);
     const next = updateReservationStatus(params.id, body.status);
-    if (!next) return reply.status(404).send({ error: "RESERVATION_NOT_FOUND" });
-    return next;
+    if (!next) throw new NotFoundError("RESERVATION_NOT_FOUND");
+    return sendOk(reply, next);
   });
 }

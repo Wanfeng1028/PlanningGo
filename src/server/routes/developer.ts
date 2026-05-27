@@ -9,17 +9,14 @@ import { sendOk, sendCreated, sendNoContent, sendError } from "../common/respons
 import { UnauthorizedError } from "../common/errors.js";
 import { nullToUndefined, toRecordOrEmpty, toStringArray } from "../common/json.js";
 import { DeveloperRepository } from "../repositories/developerRepository.js";
+import { requireUserId } from "../common/uid.js";
 
 interface AuthenticatedRequest extends FastifyRequest {
   userId?: string;
   traceId?: string;
 }
 
-function uid(req: FastifyRequest): string {
-  const id = (req as AuthenticatedRequest).userId;
-  if (!id) throw new UnauthorizedError("未登录");
-  return id;
-}
+const uid = requireUserId;
 
 /** 脱敏请求体：移除敏感字段 */
 function sanitizePreview(obj: unknown): Record<string, unknown> {

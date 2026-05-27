@@ -8,15 +8,12 @@ import {
   sendError,
 } from "../common/response.js";
 import { NotFoundError, UnauthorizedError } from "../common/errors.js";
+import { requireUserId } from "../common/uid.js";
 import * as mem from "../services/memoryStore.js";
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
-function uid(request: { userId?: string }): string {
-  const id = request.userId;
-  if (!id) throw new UnauthorizedError("未登录");
-  return id;
-}
+const uid = requireUserId;
 
 function parseJsonObject(val: unknown): Record<string, unknown> {
   if (typeof val === "string") {

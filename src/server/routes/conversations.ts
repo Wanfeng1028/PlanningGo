@@ -8,10 +8,9 @@ import { z } from "zod";
 import { sendOk, sendCreated, sendNoContent, sendError } from "../common/response.js";
 import { UnauthorizedError } from "../common/errors.js";
 import * as mem from "../services/memoryStore.js";
+import { optionalUserId } from "../common/uid.js";
 
-function optionalUid(request: { userId?: string }): string | null {
-  return request.userId ?? null;
-}
+const optionalUid = optionalUserId;
 
 export async function registerConversationRoutes(app: FastifyInstance) {
   const log = app.log;

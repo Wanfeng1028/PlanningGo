@@ -6,6 +6,8 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { getSelectedPlanId, selectPlan } from "../services/store.js";
 import { planOptions } from "../data/mockData.js";
+import { NotFoundError } from "../common/errors.js";
+import { sendOk } from "../common/response.js";
 
 export async function registerPlanRoutes(app: FastifyInstance) {
   app.get("/api/plans/demo", { preHandler: [app.optionalAuthGuard] }, async (request) => ({
@@ -16,8 +18,8 @@ export async function registerPlanRoutes(app: FastifyInstance) {
   app.post("/api/plans/select", { preHandler: [app.optionalAuthGuard] }, async (request, reply) => {
     const input = z.object({ planId: z.string() }).parse(request.body);
     if (!planOptions.some((plan) => plan.id === input.planId)) {
-      return reply.status(404).send({ error: "PLAN_NOT_FOUND" });
+      throw new NotFoundError("PLAN_NOT_FOUND");
     }
-    return selectPlan(request.userId ?? "_anon", input.planId);
+    return sendOk(reply, selectPlan(request.userId ?? "_anon", input.planId));
   });
 }

@@ -6,12 +6,9 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { sendOk, sendCreated, sendNoContent, sendError } from "../common/response.js";
 import { UnauthorizedError } from "../common/errors.js";
+import { requireUserId } from "../common/uid.js";
 
-function uid(req: FastifyRequest): string {
-  const id = (req as any).userId;
-  if (!id) throw new UnauthorizedError("未登录");
-  return id;
-}
+const uid = requireUserId;
 
 export async function registerMemoryRoutes(app: FastifyInstance) {
   if (!app.db) {

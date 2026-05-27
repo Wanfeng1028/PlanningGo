@@ -6,6 +6,8 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { listExecutionSteps, advanceExecution, updateExecutionStep } from "../services/store.js";
 import { baseToolLogs } from "../data/mockData.js";
+import { NotFoundError } from "../common/errors.js";
+import { sendOk } from "../common/response.js";
 
 export async function registerExecutionRoutes(app: FastifyInstance) {
   app.get("/api/execution/demo", { preHandler: [app.optionalAuthGuard] }, async () => ({
@@ -22,8 +24,8 @@ export async function registerExecutionRoutes(app: FastifyInstance) {
     const params = z.object({ key: z.string() }).parse(request.params);
     const body = z.object({ status: z.enum(["pending", "running", "done", "failed"]) }).parse(request.body);
     const next = updateExecutionStep(params.key, body.status);
-    if (!next) return reply.status(404).send({ error: "EXECUTION_STEP_NOT_FOUND" });
-    return next;
+    if (!next) throw new NotFoundError("EXECUTION_STEP_NOT_FOUND");
+    return sendOk(reply, next);
   });
 
   app.get("/api/tools/logs", { preHandler: [app.optionalAuthGuard] }, async () => ({
