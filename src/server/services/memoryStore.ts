@@ -68,6 +68,18 @@ const profiles = new Map<string, MemoryProfile>();
 const permissions = new Map<string, MemoryPermission>();
 const notifPrefs = new Map<string, MemoryNotificationPrefs>();
 
+const MAX_ENTRIES = 5000;
+const CLEANUP_BATCH = 500;
+
+function enforceCapacity<K, V>(store: Map<K, V>, max = MAX_ENTRIES): void {
+  if (store.size <= max) return;
+  const it = store.keys();
+  for (let i = 0; i < CLEANUP_BATCH; i++) {
+    const k = it.next().value;
+    if (k !== undefined) store.delete(k);
+  }
+}
+
 // ── 新增：对话/消息/执行动作/事件/错误 日志 ──
 
 interface MemoryGuestSession {
@@ -236,6 +248,7 @@ export function createUser(data: {
     createdAt: new Date(),
   };
   users.set(user.id, user);
+  enforceCapacity(users);
   return user;
 }
 
@@ -257,6 +270,7 @@ export function createRefreshToken(data: {
     ipAddress: data.ipAddress,
   };
   tokens.set(rt.id, rt);
+  enforceCapacity(tokens);
   return rt;
 }
 
@@ -485,6 +499,7 @@ export function upsertGuestSession(guestId: string, city?: string): MemoryGuestS
     expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
   };
   guestSessions.set(guestId, gs);
+  enforceCapacity(guestSessions);
   return gs;
 }
 
@@ -515,6 +530,8 @@ export function createConversation(data: {
   };
   conversations.set(conv.id, conv);
   messages.set(conv.id, []);
+  enforceCapacity(conversations);
+  enforceCapacity(messages);
   return conv;
 }
 
@@ -603,6 +620,7 @@ export function createPlan(data: {
     updatedAt: new Date(),
   };
   memPlans.set(plan.id, plan);
+  enforceCapacity(memPlans);
   return plan;
 }
 

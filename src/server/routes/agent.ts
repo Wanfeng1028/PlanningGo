@@ -22,7 +22,6 @@ const agentChatBodySchema = z.object({
 const agentPlanBodySchema = planningRequestSchema.extend({
   guestId: z.string().max(128).optional(),
   conversationId: z.string().uuid().optional(),
-  planningMode: z.enum(["mock", "llm", "hybrid"]).optional(),
 });
 import * as mem from "../services/memoryStore.js";
 

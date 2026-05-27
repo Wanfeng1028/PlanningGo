@@ -8,8 +8,8 @@ import { getSelectedPlanId, selectPlan } from "../services/store.js";
 import { planOptions } from "../data/mockData.js";
 
 export async function registerPlanRoutes(app: FastifyInstance) {
-  app.get("/api/plans/demo", { preHandler: [app.optionalAuthGuard] }, async () => ({
-    selectedPlanId: getSelectedPlanId(),
+  app.get("/api/plans/demo", { preHandler: [app.optionalAuthGuard] }, async (request) => ({
+    selectedPlanId: getSelectedPlanId(request.userId ?? "_anon"),
     options: planOptions,
   }));
 
@@ -18,6 +18,6 @@ export async function registerPlanRoutes(app: FastifyInstance) {
     if (!planOptions.some((plan) => plan.id === input.planId)) {
       return reply.status(404).send({ error: "PLAN_NOT_FOUND" });
     }
-    return selectPlan(input.planId);
+    return selectPlan(request.userId ?? "_anon", input.planId);
   });
 }

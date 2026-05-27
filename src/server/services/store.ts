@@ -5,7 +5,7 @@ import type { ExecutionAction } from "../modules/planning/schemas";
 const reservationStore = new Map(reservations.map((item) => [item.id, item]));
 const shareStore = new Map(shareRooms.map((item) => [item.id, item]));
 const memoryStore = new Map(memories.map((item) => [item.id, item]));
-let selectedPlanId = "plan_a";
+const selectedPlanStore = new Map<string, string>();
 
 // ── 容量限制配置 ──
 const MAX_STORE_ENTRIES = 5000;
@@ -66,13 +66,14 @@ const webhookStore = new Map<string, WebhookRecord>([
   ],
 ]);
 
-export function getSelectedPlanId() {
-  return selectedPlanId;
+export function getSelectedPlanId(userId: string) {
+  return selectedPlanStore.get(userId) ?? "plan_a";
 }
 
-export function selectPlan(planId: string) {
-  selectedPlanId = planId;
-  return { selectedPlanId };
+export function selectPlan(userId: string, planId: string) {
+  selectedPlanStore.set(userId, planId);
+  enforceCapacity(selectedPlanStore);
+  return { selectedPlanId: planId };
 }
 
 export function listPermissions() {
@@ -81,6 +82,7 @@ export function listPermissions() {
 
 export function setPermission(key: string, allowed: boolean) {
   permissionStore.set(key, allowed);
+  enforceCapacity(permissionStore);
   return listPermissions();
 }
 
@@ -140,6 +142,7 @@ export function upsertWebhook(input: Omit<WebhookRecord, "id" | "lastDelivery"> 
   const id = input.id ?? `wh_${Date.now()}`;
   const record: WebhookRecord = { ...input, id, lastDelivery: "pending" };
   webhookStore.set(id, record);
+  enforceCapacity(webhookStore);
   return record;
 }
 
@@ -210,10 +213,10 @@ export function deleteMemory(id: string) {
   return memoryStore.delete(id);
 }
 
-export function exportPrivacyBundle() {
+export function exportPrivacyBundle(userId?: string) {
   return {
     generatedAt: new Date().toISOString(),
-    selectedPlanId,
+    selectedPlanId: userId ? getSelectedPlanId(userId) : "plan_a",
     permissions: listPermissions(),
     reservations: listReservations(),
     shareRooms: listShareRooms(),

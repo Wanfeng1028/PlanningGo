@@ -7,11 +7,9 @@ import { runPlanningPipeline } from "./modules/agent/orchestrator";
 import {
   advanceExecution,
   createShareRoom,
-  getSelectedPlanId,
   listExecutionSteps,
   listReservations,
   listShareRooms,
-  selectPlan,
   updateExecutionStep,
   updateReservationStatus,
   upsertReservation,
