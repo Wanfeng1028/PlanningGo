@@ -70,7 +70,10 @@ export async function buildApp() {
   });
 
   // ── 健康检查（不需要认证） ──
-  app.get("/api/health", async () => ({ ok: true, status: "ok", timestamp: new Date().toISOString() }));
+  app.get("/api/health", async (_request, reply) => {
+    reply.header("Cache-Control", "public, max-age=5");
+    return { ok: true, status: "ok", timestamp: new Date().toISOString() };
+  });
   app.get("/api/ready", async (request, reply) => {
     try {
       if (app.db) await app.db.$queryRaw`SELECT 1`;

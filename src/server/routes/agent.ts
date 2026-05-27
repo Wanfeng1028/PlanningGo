@@ -242,12 +242,21 @@ export async function registerAgentRoutes(app: FastifyInstance) {
         // ── 2. 保存用户消息 ──
         await saveMessage(db, conversationId, "user", parsed.prompt, undefined, app.log);
 
-        // ── 3. 运行规划管道 ──
-        const result = await runPlanningPipeline({
-          ...parsed,
-          providers: app.providers ?? undefined,
-          userId,
-        });
+        // ── 3. 运行规划管道（带心跳） ──
+        const heartbeat = setInterval(() => {
+          if (!clientDisconnected) reply.raw.write(":heartbeat\n\n");
+        }, 15_000);
+
+        let result: Awaited<ReturnType<typeof runPlanningPipeline>>;
+        try {
+          result = await runPlanningPipeline({
+            ...parsed,
+            providers: app.providers ?? undefined,
+            userId,
+          });
+        } finally {
+          clearInterval(heartbeat);
+        }
 
         // 客户端已断连则跳过写入
         if (clientDisconnected) {

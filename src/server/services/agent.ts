@@ -242,9 +242,11 @@ async function callLlm(
     },
   };
 
+  const MAX_RETRIES = 3;
+  const isRetryable = (status: number) => status === 429 || status >= 500;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
   try {
-    // 调用 OpenAI 兼容 API
-    // 注意：在生产环境中应使用 openai SDK 的官方客户端
     const response = await fetch(`${openaiBaseUrl}/chat/completions`, {
       method: "POST",
       headers: {
@@ -257,6 +259,10 @@ async function callLlm(
 
     if (!response.ok) {
       const errorText = await response.text();
+      if (isRetryable(response.status) && attempt < MAX_RETRIES) {
+        await new Promise((r) => setTimeout(r, 1000 * 2 ** (attempt - 1)));
+        continue;
+      }
       throw new Error(`LLM API 调用失败: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
@@ -273,6 +279,10 @@ async function callLlm(
     return assistantMessage;
   } catch (error) {
     if (error instanceof Error) {
+      if (error.name === "TimeoutError" && attempt < MAX_RETRIES) {
+        await new Promise((r) => setTimeout(r, 1000 * 2 ** (attempt - 1)));
+        continue;
+      }
       if (error.name === "TimeoutError") {
         throw new Error(`LLM 请求超时（${config.timeout}ms）`);
       }
@@ -280,6 +290,8 @@ async function callLlm(
     }
     throw new Error(`LLM 调用失败: ${String(error)}`);
   }
+  }
+  throw new Error("LLM 调用失败：重试次数已耗尽");
 }
 
 /**
