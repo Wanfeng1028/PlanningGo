@@ -284,6 +284,9 @@ export interface DeveloperDashboard {
     errorCode: string | null;
     createdAt: string;
   } | null;
+  metrics: Array<{ label: string; value: string }>;
+  apiKeys: DeveloperApiKey[];
+  webhooks: WebhookInfo[];
 }
 
 export interface DeveloperUsage {

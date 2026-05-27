@@ -461,6 +461,16 @@ export class DeveloperRepository {
       },
       lastSuccess,
       lastError,
+      metrics: [
+        { label: "今日调用", value: String(todayCalls) },
+        { label: "本月调用", value: String(monthCalls) },
+        { label: "平均延迟", value: `${avgLatency}ms` },
+        { label: "P95 延迟", value: `${p95Latency}ms` },
+        { label: "成功率", value: `${successRate}%` },
+        { label: "Webhook 成功率", value: `${webhookSuccessRate}%` },
+      ],
+      apiKeys,
+      webhooks,
     };
   }
 }

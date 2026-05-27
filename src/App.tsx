@@ -1,18 +1,20 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, lazy, Suspense } from "react";
 import { AuthModal } from "./components/AuthModal";
 import { BottomTabs } from "./components/BottomTabs";
 import { ComingSoonModal } from "./components/ComingSoonModal";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Modal } from "./components/Modal";
 import { NavBar } from "./components/NavBar";
 import { PageTransition } from "./components/PageTransition";
 import { setAuthToken, reverseGeocode } from "./lib/api";
 import { requestBrowserLocation } from "./lib/location";
 import type { ModalKey, NavKey, SessionUser } from "./types";
-import { CasesPage } from "./pages/CasesPage";
-import DevelopersPage from "./pages/DevelopersPage";
-import FeaturesPage from "./pages/FeaturesPage";
-import { HomePage } from "./pages/HomePage";
-import { ProfilePage } from "./pages/ProfilePage";
+
+const CasesPage = lazy(() => import("./pages/CasesPage").then(m => ({ default: m.CasesPage })));
+const DevelopersPage = lazy(() => import("./pages/DevelopersPage").then(m => ({ default: m.default })));
+const FeaturesPage = lazy(() => import("./pages/FeaturesPage").then(m => ({ default: m.default })));
+const HomePage = lazy(() => import("./pages/HomePage").then(m => ({ default: m.HomePage })));
+const ProfilePage = lazy(() => import("./pages/ProfilePage").then(m => ({ default: m.ProfilePage })));
 import styles from "./App.module.scss";
 import pageStyles from "./pages/Pages.module.scss";
 
@@ -276,7 +278,11 @@ export function App() {
       <main
         className={isFeatureWorkspace ? styles.workspaceMain : styles.pageMain}
       >
-        {isFeatureWorkspace ? page : <PageTransition pageKey={active}>{page}</PageTransition>}
+        <ErrorBoundary>
+          <Suspense>
+            {isFeatureWorkspace ? page : <PageTransition pageKey={active}>{page}</PageTransition>}
+          </Suspense>
+        </ErrorBoundary>
       </main>
 
       {!isFeatureWorkspace && (

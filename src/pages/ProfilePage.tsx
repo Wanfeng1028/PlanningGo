@@ -65,6 +65,7 @@ import {
   deleteAccount,
   updateAccount,
 } from "../lib/api";
+import { toArray } from "../lib/toArray";
 import type {
   ModalKey,
   SessionUser,
@@ -241,21 +242,16 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
       ]);
 
       if (memData.status === "fulfilled") {
-        const val = memData.value as any;
-        const arr = Array.isArray(val) ? val : val?.items ?? val?.memories ?? [];
-        setMemories(arr);
+        setMemories(toArray<MemoryInsight>(memData.value, "items", "memories"));
       }
       if (compData.status === "fulfilled") {
-        const val = compData.value as any;
-        setCompanions(Array.isArray(val) ? val : val?.items ?? val?.companions ?? []);
+        setCompanions(toArray<CompanionProfile>(compData.value, "items", "companions"));
       }
       if (histData.status === "fulfilled") {
-        const val = histData.value as any;
-        setHistory(Array.isArray(val) ? val : val?.items ?? val?.history ?? []);
+        setHistory(toArray<PlanHistoryItem>(histData.value, "items", "history"));
       }
       if (notifData.status === "fulfilled") {
-        const val = notifData.value as any;
-        setNotifications(Array.isArray(val) ? val : val?.items ?? val?.notifications ?? []);
+        setNotifications(toArray<NotificationItem>(notifData.value, "items", "notifications"));
       }
       if (prefData.status === "fulfilled") setNotifPrefs(prefData.value as NotificationPreferences);
       if (permData.status === "fulfilled") {
@@ -276,8 +272,7 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
         } catch {}
       }
       if (sessData.status === "fulfilled") {
-        const val = sessData.value as any;
-        setSessions(Array.isArray(val) ? val : val?.sessions ?? []);
+        setSessions(toArray<SessionInfo>(sessData.value, "sessions"));
       }
     } catch {
       // partial failure is ok
@@ -295,14 +290,13 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
     try {
       const [dashData, logsData] = await Promise.allSettled([getDeveloperDashboard(), getToolLogs()]);
       if (dashData.status === "fulfilled") {
-        const d = dashData.value as any;
-        setDevMetrics(d?.metrics ?? []);
-        setApiKeys(Array.isArray(d?.apiKeys) ? d.apiKeys : d?.apiKeys?.items ?? []);
-        setWebhooks(Array.isArray(d?.webhooks) ? d.webhooks : d?.webhooks?.items ?? []);
+        const d = dashData.value;
+        setDevMetrics(d.metrics);
+        setApiKeys(toArray<ApiKeyInfo>(d.apiKeys, "items"));
+        setWebhooks(toArray<WebhookInfo>(d.webhooks, "items"));
       }
       if (logsData.status === "fulfilled") {
-        const l = logsData.value as any;
-        setToolLogs(Array.isArray(l) ? l : l?.items ?? []);
+        setToolLogs(toArray<ToolLogItem>(logsData.value, "items"));
       }
     } catch {
       // ok
@@ -350,8 +344,8 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
       await addMemory(memoryForm);
       setShowAddMemory(false);
       setMemoryForm({ category: "family", title: "", detail: "", weight: 0.5 });
-      const val = (await getMemories()) as any;
-      setMemories(Array.isArray(val) ? val : val?.items ?? []);
+      const val = await getMemories();
+      setMemories(toArray<MemoryInsight>(val, "items"));
       show("记忆已添加");
     } catch {
       show("添加失败");
@@ -377,11 +371,11 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
 
   const handleAddCompanion = async () => {
     try {
-      await addCompanion(companionForm as any);
+      await addCompanion({ ...companionForm, isDefault: false });
       setShowAddCompanion(false);
       setCompanionForm({ name: "", type: "adult", relation: "", ageGroup: "adult", preferences: [], avoid: [], mobility: "normal", diet: "", notes: "" });
-      const val = (await getCompanions()) as any;
-      setCompanions(Array.isArray(val) ? val : val?.items ?? []);
+      const val = await getCompanions();
+      setCompanions(toArray<CompanionProfile>(val, "items"));
       show("同行人已添加");
     } catch {
       show("添加失败");
@@ -495,8 +489,10 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
 
   const handleCreateApiKey = async () => {
     try {
-      const res = (await createNewApiKey("New Key")) as any;
-      if (res?.key) setNewKeyReveal(res.key);
+      const res = await createNewApiKey("New Key");
+      // 服务端在创建时额外返回 key 字段（明文，仅此一次）
+      const rawKey = (res as unknown as Record<string, unknown>).key;
+      if (typeof rawKey === "string") setNewKeyReveal(rawKey);
       fetchDevData();
     } catch {
       show("创建失败");

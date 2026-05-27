@@ -162,6 +162,16 @@ const FALLBACK_DASHBOARD: DeveloperDashboard = {
     errorCode: "UPSTREAM_TIMEOUT",
     createdAt: new Date(Date.now() - 3600000).toISOString(),
   },
+  metrics: [
+    { label: "今日调用", value: "128" },
+    { label: "本月调用", value: "3842" },
+    { label: "平均延迟", value: "286ms" },
+    { label: "P95 延迟", value: "512ms" },
+    { label: "成功率", value: "99.2%" },
+    { label: "Webhook 成功率", value: "98.6%" },
+  ],
+  apiKeys: [],
+  webhooks: [],
 };
 
 const FALLBACK_APPS: DeveloperApp[] = [
