@@ -8,6 +8,22 @@ import { ZodError, z } from "zod";
 import { parseDemand, planningRequestSchema, runPlanningAgent, simulateWhatIf } from "../services/agent.js";
 import { runPlanningPipeline } from "../modules/agent/orchestrator.js";
 import { saveActions } from "../services/store.js";
+
+const agentChatBodySchema = z.object({
+  message: z.string().min(1).max(10000),
+  conversationId: z.string().uuid().optional(),
+  guestId: z.string().max(128).optional(),
+  modelMode: z.enum(["flash", "pro"]).optional(),
+  stream: z.boolean().optional(),
+  webSearchResults: z.any().optional(),
+  pendingAction: z.any().optional(),
+});
+
+const agentPlanBodySchema = planningRequestSchema.extend({
+  guestId: z.string().max(128).optional(),
+  conversationId: z.string().uuid().optional(),
+  planningMode: z.enum(["mock", "llm", "hybrid"]).optional(),
+});
 import * as mem from "../services/memoryStore.js";
 
 export async function registerAgentRoutes(app: FastifyInstance) {
@@ -143,26 +159,25 @@ export async function registerAgentRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       try {
-        const input = planningRequestSchema.parse(request.body);
-        const userId = (request as any).userId as string | undefined;
+        const parsed = agentPlanBodySchema.parse(request.body);
+        const userId = request.userId;
         const db: PrismaClient | null = app.db;
-        const body = request.body as any;
 
         // ── 1. 创建或获取会话 ──
         const conversationId = await ensureConversation(db, userId, {
-          guestId: body.guestId,
-          conversationId: body.conversationId,
-          prompt: input.prompt,
-          city: input.city,
-          modelMode: body.modelMode,
+          guestId: parsed.guestId,
+          conversationId: parsed.conversationId,
+          prompt: parsed.prompt,
+          city: parsed.city,
+          modelMode: parsed.modelMode,
         }, app.log);
 
         // ── 2. 保存用户消息 ──
-        await saveMessage(db, conversationId, "user", input.prompt, undefined, app.log);
+        await saveMessage(db, conversationId, "user", parsed.prompt, undefined, app.log);
 
         // ── 3. 运行规划管道 ──
         const result = await runPlanningPipeline({
-          ...input,
+          ...parsed,
           providers: app.providers ?? undefined,
           userId,
         });
@@ -207,10 +222,9 @@ export async function registerAgentRoutes(app: FastifyInstance) {
       });
 
       try {
-        const input = planningRequestSchema.parse(request.body);
-        const userId = (request as any).userId as string | undefined;
+        const parsed = agentPlanBodySchema.parse(request.body);
+        const userId = request.userId;
         const db: PrismaClient | null = app.db;
-        const body = request.body as any;
 
         // Set SSE headers
         reply.header("Content-Type", "text/event-stream");
@@ -219,19 +233,19 @@ export async function registerAgentRoutes(app: FastifyInstance) {
 
         // ── 1. 创建或获取会话 ──
         const conversationId = await ensureConversation(db, userId, {
-          guestId: body.guestId,
-          conversationId: body.conversationId,
-          prompt: input.prompt,
-          city: input.city,
-          modelMode: body.modelMode,
+          guestId: parsed.guestId,
+          conversationId: parsed.conversationId,
+          prompt: parsed.prompt,
+          city: parsed.city,
+          modelMode: parsed.modelMode,
         }, app.log);
 
         // ── 2. 保存用户消息 ──
-        await saveMessage(db, conversationId, "user", input.prompt, undefined, app.log);
+        await saveMessage(db, conversationId, "user", parsed.prompt, undefined, app.log);
 
         // ── 3. 运行规划管道 ──
         const result = await runPlanningPipeline({
-          ...input,
+          ...parsed,
           providers: app.providers ?? undefined,
           userId,
         });

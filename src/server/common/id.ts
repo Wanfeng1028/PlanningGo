@@ -1,9 +1,11 @@
+import { randomBytes } from "node:crypto";
+
 export function createTraceId() {
-  return `trace_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  return `trace_${Date.now()}_${randomBytes(4).toString("hex")}`;
 }
 
 export function createId(prefix: string) {
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  return `${prefix}_${Date.now()}_${randomBytes(3).toString("hex")}`;
 }
 
 export function createIdempotencyKey(parts: Array<string | number | undefined | null>) {

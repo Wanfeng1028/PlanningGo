@@ -198,8 +198,15 @@ export async function registerProfileRoutes(app: FastifyInstance) {
     // PATCH /api/profile/me/persona
     app.patch("/api/profile/me/persona", { preHandler: [app.authGuard] }, async (request, reply) => {
       const userId = uid(request);
-      const body = z.record(z.string(), z.unknown()).parse(request.body);
-      mem.upsertProfile(userId, body as any);
+      const body = z.object({
+        city: z.string().optional(),
+        startPoint: z.string().optional(),
+        budgetMin: z.number().int().optional(),
+        budgetMax: z.number().int().optional(),
+        companions: z.string().optional(),
+        preferences: z.array(z.string()).optional(),
+      }).strict().parse(request.body);
+      mem.upsertProfile(userId, body);
       const profile = mem.getFullProfile(userId);
       sendOk(reply, { city: profile?.city, startPoint: profile?.startPoint, budgetMin: profile?.budgetMin, budgetMax: profile?.budgetMax, personaCompleteness: 20 });
     });

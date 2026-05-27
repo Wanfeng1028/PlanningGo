@@ -140,7 +140,7 @@ export async function registerConversationRoutes(app: FastifyInstance) {
     const params = z.object({ id: z.string().uuid() }).parse(request.params);
     const body = z
       .object({
-        role: z.enum(["user", "assistant", "system"]),
+        role: z.enum(["user", "assistant"]),
         content: z.string().max(10000),
         payloadJson: z.any().optional(),
       })

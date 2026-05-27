@@ -12,7 +12,7 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
    * Create a mobile handoff session
    * POST /api/handoff/mobile
    */
-  fastify.post("/api/handoff/mobile", async (request, reply) => {
+  fastify.post("/api/handoff/mobile", { preHandler: [fastify.authGuard] }, async (request, reply) => {
     const body = request.body as {
       conversationId: string;
       planId: string;
@@ -44,7 +44,7 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
    * Get handoff session by token
    * GET /api/handoff/mobile/:token
    */
-  fastify.get("/api/handoff/mobile/:token", async (request, reply) => {
+  fastify.get("/api/handoff/mobile/:token", { preHandler: [fastify.optionalAuthGuard] }, async (request, reply) => {
     const { token } = request.params as { token: string };
 
     try {
@@ -65,7 +65,7 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
    * Claim a handoff session (mobile device scans QR code)
    * POST /api/handoff/mobile/:token/claim
    */
-  fastify.post("/api/handoff/mobile/:token/claim", async (request, reply) => {
+  fastify.post("/api/handoff/mobile/:token/claim", { preHandler: [fastify.authGuard] }, async (request, reply) => {
     const { token } = request.params as { token: string };
     const body = request.body as {
       deviceId: string;
@@ -98,7 +98,7 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
    * Get handoff status
    * GET /api/handoff/mobile/:handoffId/status
    */
-  fastify.get("/api/handoff/mobile/:handoffId/status", async (request, reply) => {
+  fastify.get("/api/handoff/mobile/:handoffId/status", { preHandler: [fastify.authGuard] }, async (request, reply) => {
     const { handoffId } = request.params as { handoffId: string };
 
     try {
@@ -117,7 +117,7 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
    * Authorize actions for a handoff session
    * POST /api/handoff/mobile/:handoffId/authorize
    */
-  fastify.post("/api/handoff/mobile/:handoffId/authorize", async (request, reply) => {
+  fastify.post("/api/handoff/mobile/:handoffId/authorize", { preHandler: [fastify.authGuard] }, async (request, reply) => {
     const { handoffId } = request.params as { handoffId: string };
     const body = request.body as {
       scopes: PermissionScope[];
