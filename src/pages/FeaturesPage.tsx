@@ -495,13 +495,14 @@ function Composer({
   }, [value, textareaRef]);
 
   /* ── Cleanup preview URLs on unmount ── */
+  const attachmentsRef = useRef(attachments);
+  attachmentsRef.current = attachments;
   useEffect(() => {
     return () => {
-      attachments.forEach((a) => {
+      attachmentsRef.current.forEach((a) => {
         if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
       });
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* ── File pick handler ── */
@@ -1262,8 +1263,6 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
   const [modelMode, setModelMode] = useState<ModelMode>("Flash");
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [showDraftNotice, setShowDraftNotice] = useState(false);
-  const [showModeNotice, setShowModeNotice] = useState(false);
-  const [modeNoticeMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [drafts, setDrafts] = useState<string[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -1421,11 +1420,6 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
   useEffect(() => {
     currentSessionIdRef.current = currentSessionId;
   }, [currentSessionId]);
-
-  /* ── Auto-scroll when messages change ── */
-  useEffect(() => {
-    if (mode === "chat") scrollToBottom();
-  }, [messages, mode, scrollToBottom]);
 
   /* ── Focus textarea on mode switch ── */
   useEffect(() => {
@@ -2226,21 +2220,6 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
           你可以把想去的地方、时间和预算发给我，我会整理成可执行路线。
         </p>
         <Button size="small" onClick={() => setShowDraftNotice(false)}>
-          知道了
-        </Button>
-      </WorkspaceModal>
-
-      {/* 模式切换提示弹窗 */}
-      <WorkspaceModal
-        open={showModeNotice}
-        onClose={() => setShowModeNotice(false)}
-        title="模式切换"
-        width="sm"
-      >
-        <p className={styles.confirmText}>
-          {modeNoticeMessage}
-        </p>
-        <Button size="small" onClick={() => setShowModeNotice(false)}>
           知道了
         </Button>
       </WorkspaceModal>

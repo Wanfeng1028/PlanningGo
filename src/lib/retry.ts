@@ -1,3 +1,5 @@
+import { API_BASE } from "./config";
+
 export interface RetryOptions {
   maxRetries?: number;
   delayMs?: number;
@@ -44,8 +46,6 @@ export async function retryWithBackoff<T>(
 
   throw lastError;
 }
-
-const API_BASE: string = import.meta.env.VITE_API_BASE || "http://127.0.0.1:3001";
 
 export async function refreshToken(): Promise<string | null> {
   try {

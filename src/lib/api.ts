@@ -21,6 +21,7 @@ import type {
   DeveloperSandboxResult,
 } from "../types";
 import { retryWithBackoff, refreshToken } from "./retry";
+import { API_BASE } from "./config";
 
 export interface AgentPlanResponse {
   traceId: string;
@@ -52,8 +53,6 @@ export interface AuthResponse {
   onboardingSteps?: string[];
   expiresInMinutes?: number;
 }
-
-const API_BASE: string = import.meta.env.VITE_API_BASE || "http://127.0.0.1:3001";
 
 // ── Token 管理 ──
 let _authToken: string | null = localStorage.getItem("pg_token");

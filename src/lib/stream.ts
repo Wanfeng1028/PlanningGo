@@ -1,7 +1,6 @@
 import type { PlanningRequestInput, PlanningResult } from "./api";
 import { getAuthToken } from "./api";
-
-const API_BASE: string = import.meta.env.VITE_API_BASE || "http://127.0.0.1:3001";
+import { API_BASE } from "./config";
 
 export interface StreamOptions {
   onChunk?: (chunk: string) => void;
