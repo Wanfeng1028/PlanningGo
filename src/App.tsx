@@ -279,7 +279,7 @@ export function App() {
         className={isFeatureWorkspace ? styles.workspaceMain : styles.pageMain}
       >
         <ErrorBoundary>
-          <Suspense>
+          <Suspense fallback={<div style={{ display: "flex", justifyContent: "center", padding: "4rem 0", color: "#999", fontSize: "0.85rem" }}>加载中…</div>}>
             {isFeatureWorkspace ? page : <PageTransition pageKey={active}>{page}</PageTransition>}
           </Suspense>
         </ErrorBoundary>

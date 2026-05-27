@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { X } from "lucide-react";
 import { modalContent } from "../data/modals";
+import { useFocusTrap } from "../lib/useFocusTrap";
 import type { ModalKey } from "../types";
 import { Button } from "./Button";
 import styles from "./Modal.module.scss";
@@ -12,6 +14,17 @@ interface ModalProps {
 }
 
 export function Modal({ modal, onClose, onPrimary, onSecondary }: ModalProps) {
+  const trapRef = useFocusTrap<HTMLDivElement>(!!modal);
+
+  useEffect(() => {
+    if (!modal) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleEsc);
+    return () => document.removeEventListener("keydown", handleEsc);
+  }, [modal, onClose]);
+
   if (!modal) {
     return null;
   }
@@ -21,6 +34,7 @@ export function Modal({ modal, onClose, onPrimary, onSecondary }: ModalProps) {
   return (
     <div className={styles.backdrop} role="presentation" onMouseDown={onClose}>
       <section
+        ref={trapRef}
         className={styles.modal}
         role="dialog"
         aria-modal="true"
