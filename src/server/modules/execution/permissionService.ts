@@ -103,7 +103,7 @@ export async function getUserPermissionSnapshot(
   // Default permissions for guest
   return {
     locationEnabled: true,
-    memoryEnabled: true,
+    memoryEnabled: false,
     calendarEnabled: false,
     shareEnabled: true,
     developerEnabled: false,

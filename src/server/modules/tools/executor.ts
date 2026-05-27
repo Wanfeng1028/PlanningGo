@@ -150,21 +150,26 @@ export class ToolExecutor {
     ctx: ToolExecutionContext,
   ): Promise<ToolExecutionResult[]> {
     const results: ToolExecutionResult[] = [];
-    const executing: Promise<ToolExecutionResult>[] = [];
+    const executing: { promise: Promise<ToolExecutionResult>; index: number }[] = [];
+    let nextIndex = 0;
 
     for (const plan of plans) {
+      const idx = nextIndex++;
       const promise = this.executeOne(plan, ctx);
-      executing.push(promise);
+      executing.push({ promise, index: idx });
 
       if (executing.length >= limit) {
-        const result = await Promise.race(executing);
-        results.push(result);
-        executing.splice(executing.indexOf(promise), 1);
+        const raced = await Promise.race(
+          executing.map((e) => e.promise.then((result) => ({ result, entry: e }))),
+        );
+        results.push(raced.result);
+        const removeIdx = executing.indexOf(raced.entry);
+        if (removeIdx !== -1) executing.splice(removeIdx, 1);
       }
     }
 
     // Wait for remaining
-    const remaining = await Promise.allSettled(executing);
+    const remaining = await Promise.allSettled(executing.map((e) => e.promise));
     results.push(
       ...remaining.map((r) =>
         r.status === "fulfilled"

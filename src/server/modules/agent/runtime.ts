@@ -215,7 +215,7 @@ export async function runAgentRuntime(input: AgentRunInput): Promise<AgentRunRes
   // 11. Filter actions by permissions
   const permissions = input.permissions || {
     locationEnabled: true,
-    memoryEnabled: true,
+    memoryEnabled: false,
     calendarEnabled: false,
     shareEnabled: true,
     developerEnabled: false,
