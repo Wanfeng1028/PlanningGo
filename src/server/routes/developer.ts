@@ -508,45 +508,11 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
 
 // ── Helpers ──
 
-interface ApiKeyRecord {
-  id: string;
-  name: string;
-  prefix: string;
-  scopes: string[];
-  status: string;
-  environment?: string;
-  appId?: string;
-  expiresAt?: Date;
-  lastUsedAt?: Date;
-  createdAt: Date;
-}
-
-interface WebhookRecord {
-  id: string;
-  url: string;
-  events?: string[];
-  event?: string;
-  enabled: boolean;
-  appId?: string;
-  secretHash?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface RequestLogRecord {
-  id: string;
-  method: string;
-  path: string;
-  statusCode: number;
-  latencyMs: number;
-  traceId?: string;
-  errorCode?: string;
-  apiKeyPrefix?: string;
-  appId?: string;
-  createdAt: Date;
-}
-
-function mapApiKey(key: ApiKeyRecord) {
+function mapApiKey(key: {
+  id: string; name: string; prefix: string; scopes: unknown;
+  status: string; environment: string | null; appId: string | null;
+  expiresAt: Date | null; lastUsedAt: Date | null; createdAt: Date;
+}) {
   return {
     id: key.id,
     name: key.name,
@@ -561,12 +527,15 @@ function mapApiKey(key: ApiKeyRecord) {
   };
 }
 
-function mapWebhook(hook: WebhookRecord) {
+function mapWebhook(hook: {
+  id: string; url: string; events: unknown; enabled: boolean;
+  appId: string | null; secretHash: string; createdAt: Date; updatedAt: Date;
+}) {
   const events = toStringArray(hook.events);
   return {
     id: hook.id,
     url: hook.url,
-    events: events.length > 0 ? events : hook.event ? [hook.event] : [],
+    events: events.length > 0 ? events : [],
     enabled: hook.enabled,
     appId: nullToUndefined(hook.appId),
     secret: hook.secretHash ? "••••••••" : undefined,
@@ -575,7 +544,11 @@ function mapWebhook(hook: WebhookRecord) {
   };
 }
 
-function mapRequestLog(log: RequestLogRecord) {
+function mapRequestLog(log: {
+  id: string; method: string; path: string; statusCode: number; latencyMs: number;
+  traceId: string; errorCode: string | null; apiKeyPrefix: string; appId: string | null;
+  createdAt: Date;
+}) {
   return {
     id: log.id,
     method: log.method,
