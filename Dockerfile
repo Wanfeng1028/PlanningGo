@@ -30,6 +30,9 @@ USER appuser
 
 EXPOSE 3001
 
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD wget -qO- http://localhost:3001/api/health || exit 1
+
 # 安全提示：生产环境必须提供强 JWT 密钥（>=32 字符，且非默认值）
 # 等待 DB 就绪后运行 migrate 并启动服务
 CMD ["sh", "-c", "if [ -z \"$JWT_ACCESS_SECRET\" ] || [ -z \"$JWT_REFRESH_SECRET\" ] || [ \"$JWT_ACCESS_SECRET\" = \"change-me-access-secret\" ] || [ \"$JWT_REFRESH_SECRET\" = \"change-me-refresh-secret\" ] || [ \"$JWT_ACCESS_SECRET\" = \"dev-access-secret-change-me-in-production-32b\" ] || [ \"$JWT_REFRESH_SECRET\" = \"dev-refresh-secret-change-me-in-production-32b\" ]; then echo '❌ Unsafe JWT secrets detected. Please set strong production secrets (e.g. openssl rand -hex 32).'; exit 1; fi; npx prisma migrate deploy && node dist/server/index.js"]
