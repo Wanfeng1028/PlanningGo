@@ -97,6 +97,8 @@ export async function registerConversationRoutes(app: FastifyInstance) {
   // ── 获取单个会话详情 ──
   app.get("/api/conversations/:id", { preHandler: [app.optionalAuthGuard] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const userId = optionalUid(request);
+    const guestId = userId ? null : ((request.query as Record<string, string | undefined>).guestId ?? null);
     const db: PrismaClient | null = app.db;
 
     if (db) {
@@ -109,6 +111,13 @@ export async function registerConversationRoutes(app: FastifyInstance) {
           },
         });
         if (!conv) return sendError(reply, 404, "NOT_FOUND", "会话不存在");
+        // 校验会话所有权
+        if (conv.userId && conv.userId !== userId) {
+          return sendError(reply, 403, "FORBIDDEN", "无权访问此会话");
+        }
+        if (!conv.userId && conv.guestId && conv.guestId !== guestId) {
+          return sendError(reply, 403, "FORBIDDEN", "无权访问此会话");
+        }
         return sendOk(reply, conv);
       } catch {
         // fallback
@@ -117,6 +126,9 @@ export async function registerConversationRoutes(app: FastifyInstance) {
 
     const conv = mem.getConversation(id);
     if (!conv) return sendError(reply, 404, "NOT_FOUND", "会话不存在");
+    if (conv.userId && conv.userId !== userId) {
+      return sendError(reply, 403, "FORBIDDEN", "无权访问此会话");
+    }
     const msgs = mem.listMessages(id);
     const plans = mem.listPlans({ conversationId: id });
     return sendOk(reply, { ...conv, messages: msgs, plans });
@@ -133,7 +145,21 @@ export async function registerConversationRoutes(app: FastifyInstance) {
       })
       .parse(request.body);
 
+    const userId = optionalUid(request);
     const db: PrismaClient | null = app.db;
+
+    // 先校验会话所有权
+    if (db) {
+      try {
+        const conv = await db.conversation.findUnique({ where: { id: params.id }, select: { userId: true, guestId: true } });
+        if (!conv) return sendError(reply, 404, "NOT_FOUND", "会话不存在");
+        if (conv.userId && conv.userId !== userId) {
+          return sendError(reply, 403, "FORBIDDEN", "无权向此会话添加消息");
+        }
+      } catch {
+        // fallback — continue to memory path
+      }
+    }
 
     if (db) {
       try {
@@ -158,6 +184,9 @@ export async function registerConversationRoutes(app: FastifyInstance) {
 
     const conv = mem.getConversation(params.id);
     if (!conv) return sendError(reply, 404, "NOT_FOUND", "会话不存在");
+    if (conv.userId && conv.userId !== userId) {
+      return sendError(reply, 403, "FORBIDDEN", "无权向此会话添加消息");
+    }
     const msg = mem.addMessage({
       conversationId: params.id,
       role: body.role,
@@ -170,10 +199,17 @@ export async function registerConversationRoutes(app: FastifyInstance) {
   // ── 获取消息列表 ──
   app.get("/api/conversations/:id/messages", { preHandler: [app.optionalAuthGuard] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const userId = optionalUid(request);
     const db: PrismaClient | null = app.db;
 
+    // 校验会话所有权
     if (db) {
       try {
+        const conv = await db.conversation.findUnique({ where: { id }, select: { userId: true } });
+        if (!conv) return sendError(reply, 404, "NOT_FOUND", "会话不存在");
+        if (conv.userId && conv.userId !== userId) {
+          return sendError(reply, 403, "FORBIDDEN", "无权访问此会话消息");
+        }
         const msgs = await db.message.findMany({
           where: { conversationId: id },
           orderBy: { createdAt: "asc" },

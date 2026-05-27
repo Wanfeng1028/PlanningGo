@@ -156,7 +156,7 @@ export function validateProductionRuntime(input: typeof env) {
     throw new Error("生产环境必须配置真实 DATABASE_URL，不能使用默认本地数据库");
   }
 
-  if (!input.REDIS_URL || input.REDIS_URL.includes("localhost")) {
+  if (!input.REDIS_URL || input.REDIS_URL.includes("localhost") || input.REDIS_URL.includes("127.0.0.1")) {
     throw new Error("生产环境必须配置真实 REDIS_URL，不能使用默认本地 Redis");
   }
 

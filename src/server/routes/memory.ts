@@ -23,7 +23,7 @@ export async function registerMemoryRoutes(app: FastifyInstance) {
   const db = app.db;
 
   // GET /api/memories — 返回数组（前端直接用）
-  app.get("/api/memories", async (request, reply) => {
+  app.get("/api/memories", { preHandler: [app.authGuard] }, async (request, reply) => {
     const userId = uid(request);
     const memories = await db.memory.findMany({
       where: { userId, deletedAt: null },
@@ -33,7 +33,7 @@ export async function registerMemoryRoutes(app: FastifyInstance) {
   });
 
   // POST /api/memories — 创建记忆
-  app.post("/api/memories", async (request, reply) => {
+  app.post("/api/memories", { preHandler: [app.authGuard] }, async (request, reply) => {
     const userId = uid(request);
     const input = z
       .object({
@@ -51,7 +51,7 @@ export async function registerMemoryRoutes(app: FastifyInstance) {
   });
 
   // PATCH /api/memories/:id — 更新记忆
-  app.patch("/api/memories/:id", async (request, reply) => {
+  app.patch("/api/memories/:id", { preHandler: [app.authGuard] }, async (request, reply) => {
     const userId = uid(request);
     const { id } = z.object({ id: z.string() }).parse(request.params);
     const body = z
@@ -71,7 +71,7 @@ export async function registerMemoryRoutes(app: FastifyInstance) {
   });
 
   // DELETE /api/memories/:id — 软删除记忆
-  app.delete("/api/memories/:id", async (request, reply) => {
+  app.delete("/api/memories/:id", { preHandler: [app.authGuard] }, async (request, reply) => {
     const userId = uid(request);
     const { id } = z.object({ id: z.string() }).parse(request.params);
 

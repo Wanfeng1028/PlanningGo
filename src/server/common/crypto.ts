@@ -7,11 +7,12 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { StringValue } from "ms";
 import crypto from "node:crypto";
+import { env } from "../config/env.js";
 
 // ── 密码哈希 ──
 
 export async function hashPassword(plain: string): Promise<string> {
-  const rounds = parseInt(process.env.BCRYPT_ROUNDS ?? "10", 10);
+  const rounds = env.BCRYPT_ROUNDS;
   return bcrypt.hash(plain, rounds);
 }
 
@@ -33,24 +34,24 @@ export interface RefreshTokenPayload {
 }
 
 export function signAccessToken(payload: AccessTokenPayload): string {
-  const secret = process.env.JWT_ACCESS_SECRET ?? "dev-access-secret";
-  const expiresIn = (process.env.JWT_ACCESS_EXPIRES_IN ?? "15m") as StringValue;
+  const secret = env.JWT_ACCESS_SECRET;
+  const expiresIn = env.JWT_ACCESS_EXPIRES_IN as StringValue;
   return jwt.sign({ ...payload }, secret, { expiresIn });
 }
 
 export function signRefreshToken(payload: RefreshTokenPayload): string {
-  const secret = process.env.JWT_REFRESH_SECRET ?? "dev-refresh-secret";
-  const expiresIn = (process.env.JWT_REFRESH_EXPIRES_IN ?? "7d") as StringValue;
+  const secret = env.JWT_REFRESH_SECRET;
+  const expiresIn = env.JWT_REFRESH_EXPIRES_IN as StringValue;
   return jwt.sign({ ...payload }, secret, { expiresIn });
 }
 
 export function verifyAccessToken(token: string): AccessTokenPayload {
-  const secret = process.env.JWT_ACCESS_SECRET ?? "dev-access-secret";
+  const secret = env.JWT_ACCESS_SECRET;
   return jwt.verify(token, secret) as AccessTokenPayload;
 }
 
 export function verifyRefreshToken(token: string): RefreshTokenPayload {
-  const secret = process.env.JWT_REFRESH_SECRET ?? "dev-refresh-secret";
+  const secret = env.JWT_REFRESH_SECRET;
   return jwt.verify(token, secret) as RefreshTokenPayload;
 }
 

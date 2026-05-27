@@ -389,6 +389,21 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
   });
 
   // ── Sandbox ──
+  const SANDBOX_ALLOWED_ENDPOINTS = new Set([
+    "/api/agent/parse",
+    "/api/agent/plan",
+    "/api/agent/plan/stream",
+    "/api/agent/plan/legacy",
+    "/api/agent/what-if",
+    "/api/mock/pois",
+    "/api/mock/weather",
+    "/api/mock/routes",
+    "/api/plans/demo",
+    "/api/location/search",
+    "/api/location/weather",
+    "/api/location/geocode",
+  ]);
+
   app.post("/api/developer/sandbox/run", { preHandler: [app.authGuard] }, async (request, reply) => {
     const userId = uid(request);
     const input = z.object({
@@ -397,14 +412,14 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
       body: z.record(z.string(), z.unknown()).optional(),
     }).parse(request.body);
 
+    if (!SANDBOX_ALLOWED_ENDPOINTS.has(input.endpoint)) {
+      return sendError(reply, 403, "SANDBOX_ENDPOINT_BLOCKED", `不允许访问端点 ${input.endpoint}，仅支持白名单内的端点`);
+    }
+
     const startTime = Date.now();
     const traceId = (request as AuthenticatedRequest).traceId ?? `sbx_${Date.now()}`;
 
     try {
-      // 转发到实际业务接口
-      let result: unknown;
-      const body = JSON.stringify(input.body ?? {});
-
       const response = await app.inject({
         method: input.method,
         url: input.endpoint,
@@ -531,7 +546,7 @@ interface RequestLogRecord {
   createdAt: Date;
 }
 
-function mapApiKey(key: any) {
+function mapApiKey(key: ApiKeyRecord) {
   return {
     id: key.id,
     name: key.name,
@@ -546,12 +561,11 @@ function mapApiKey(key: any) {
   };
 }
 
-function mapWebhook(hook: any) {
+function mapWebhook(hook: WebhookRecord) {
   const events = toStringArray(hook.events);
   return {
     id: hook.id,
     url: hook.url,
-    // events 优先用新字段；兼容旧字段 event
     events: events.length > 0 ? events : hook.event ? [hook.event] : [],
     enabled: hook.enabled,
     appId: nullToUndefined(hook.appId),
@@ -561,7 +575,7 @@ function mapWebhook(hook: any) {
   };
 }
 
-function mapRequestLog(log: any) {
+function mapRequestLog(log: RequestLogRecord) {
   return {
     id: log.id,
     method: log.method,
