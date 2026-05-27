@@ -496,7 +496,9 @@ function Composer({
 
   /* ── Cleanup preview URLs on unmount ── */
   const attachmentsRef = useRef(attachments);
-  attachmentsRef.current = attachments;
+  useEffect(() => {
+    attachmentsRef.current = attachments;
+  }, [attachments]);
   useEffect(() => {
     return () => {
       attachmentsRef.current.forEach((a) => {
