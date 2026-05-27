@@ -78,7 +78,8 @@ export async function buildApp() {
     try {
       if (app.db) await app.db.$queryRaw`SELECT 1`;
       return { status: "ready", db: app.db ? "ok" : "memory", redis: app.redis?.status ?? "memory" };
-    } catch {
+    } catch (err) {
+      app.log.warn({ err }, "Health check: database not ready");
       return reply.status(503).send({ status: "not_ready", db: "error" });
     }
   });

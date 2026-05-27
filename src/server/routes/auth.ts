@@ -98,8 +98,8 @@ export async function registerAuthRoutes(app: FastifyInstance) {
               budgetMax: body.budgetMax,
             },
           });
-        } catch {
-          // 非阻断：画像创建失败不影响注册
+        } catch (profileErr) {
+          app.log.warn({ err: profileErr }, "注册后画像创建失败（非阻断）");
         }
       }
       return sendCreated(reply, result);

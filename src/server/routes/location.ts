@@ -66,7 +66,8 @@ async function amapReverseGeocode(lat: number, lng: number) {
       address: data.regeocode.addressComponent?.formatted_address ?? "",
       formattedAddress: data.regeocode.addressComponent?.formatted_address ?? "",
     };
-  } catch {
+  } catch (err) {
+    console.warn("高德逆地理编码失败:", err);
     return null;
   }
 }

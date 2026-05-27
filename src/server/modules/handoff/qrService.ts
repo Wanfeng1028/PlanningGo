@@ -1,3 +1,7 @@
+/**
+ * @deprecated 未注册到路由 — HandoffSession 模型未在 Prisma schema 中定义
+ * 保留供未来 QR 码跨设备接力功能参考，当前为死代码
+ */
 import { createId } from "../../common/id";
 import { env } from "../../config/env";
 import { getPrismaClient } from "../../common/prisma";
