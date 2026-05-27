@@ -1,4 +1,6 @@
 import { createId } from "../../common/id";
+import { randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 import { env } from "../../config/env";
 import type { PermissionScope } from "../agent/middleware/permissionGuard";
 
@@ -29,7 +31,7 @@ export function createHandoffToken(params: {
   scopes: PermissionScope[];
 }): HandoffTokenPayload {
   const tokenId = createId("hnd");
-  const nonce = Math.random().toString(36).substring(2, 15);
+  const nonce = randomBytes(16).toString("hex");
   const expiresAt = new Date(Date.now() + env.HANDOFF_TOKEN_TTL_SECONDS * 1000).toISOString();
 
   return {
@@ -66,12 +68,5 @@ export function validateHandoffToken(payload: HandoffTokenPayload): boolean {
  * Generate token hash for storage (don't store the full token)
  */
 export function hashToken(token: string): string {
-  // Simple hash for demonstration - in production use proper crypto
-  let hash = 0;
-  for (let i = 0; i < token.length; i++) {
-    const char = token.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  return hash.toString(16);
+  return createHash("sha256").update(token).digest("hex");
 }
