@@ -737,6 +737,10 @@ export function logClientError(data: {
     createdAt: new Date(),
   };
   errorLogs.push(log);
-  if (errorLogs.length > 2000) errorLogs.splice(0, errorLogs.length - 2000);
+  if (errorLogs.length > 2000) {
+    const trimmed = errorLogs.slice(errorLogs.length - 2000);
+    errorLogs.length = 0;
+    errorLogs.push(...trimmed);
+  }
   return log;
 }

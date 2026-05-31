@@ -2,10 +2,10 @@
  * Memory 路由 — Prisma 版
  */
 
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { sendOk, sendCreated, sendNoContent, sendError } from "../common/response.js";
-import { UnauthorizedError } from "../common/errors.js";
+import {  } from "../common/errors.js";
 import { requireUserId } from "../common/uid.js";
 
 const uid = requireUserId;

@@ -117,5 +117,6 @@ export async function streamPlanningRequest(
     method: "POST",
     headers,
     body: JSON.stringify(input),
+    credentials: "include",
   });
 }

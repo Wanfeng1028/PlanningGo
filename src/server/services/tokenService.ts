@@ -7,7 +7,7 @@ import {
   signAccessToken,
   signRefreshToken,
   verifyRefreshToken,
-  type AccessTokenPayload,
+  
 } from "../common/crypto.js";
 import type { UserRepository } from "../repositories/userRepository.js";
 import { env } from "../config/env.js";

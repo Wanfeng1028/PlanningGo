@@ -5,7 +5,7 @@
 import type { FastifyInstance } from "fastify";
 import type { PrismaClient } from "../../generated/prisma/client.js";
 import { z } from "zod";
-import { sendOk, sendCreated, sendError } from "../common/response.js";
+import {  sendCreated, sendError } from "../common/response.js";
 import * as mem from "../services/memoryStore.js";
 
 interface AuthenticatedRequest {
@@ -55,7 +55,7 @@ export async function registerEventRoutes(app: FastifyInstance) {
       eventName: body.eventName,
       eventPayloadJson: body.payload,
       page: body.page,
-      traceId: (request as any).traceId,
+      traceId: (request as AuthenticatedRequest).traceId,
     });
     return sendCreated(reply, { id: evt.id });
   });
@@ -111,7 +111,7 @@ export async function registerEventRoutes(app: FastifyInstance) {
           eventName: evt.eventName,
           eventPayloadJson: evt.payload,
           page: evt.page,
-          traceId: (request as any).traceId,
+          traceId: (request as AuthenticatedRequest).traceId,
         });
         ids.push(created.id);
       }
@@ -157,7 +157,7 @@ export async function registerEventRoutes(app: FastifyInstance) {
     const log = mem.logClientError({
       userId,
       guestId: !userId ? body.guestId : undefined,
-      traceId: (request as any).traceId,
+      traceId: (request as AuthenticatedRequest).traceId,
       route: body.route,
       message: body.message,
       stack: body.stack,

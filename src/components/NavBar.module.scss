@@ -58,18 +58,7 @@
   height: 36px;
   flex: 0 0 auto;
   border-radius: 50%;
-  background: var(--color-brand);
-}
-
-.brandDot::after {
-  content: "";
-  position: absolute;
-  right: 7px;
-  top: 7px;
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  background: var(--color-text-primary);
+  object-fit: cover;
 }
 
 .links {
@@ -234,10 +223,7 @@
     height: 30px;
   }
 
-  .brandDot::after {
-    width: 9px;
-    height: 9px;
-  }
+  /* brandDot is now an img, no pseudo-element */
 
   .links,
   .actions {

@@ -11,7 +11,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { Button } from "./Button";
-import { enterAsGuest, login, register, reverseGeocode } from "../lib/api";
+import { enterAsGuest, login, register, reverseGeocode, setRefreshToken, forgotPassword } from "../lib/api";
 import {
   isGeolocationSupported,
   queryPermissionState,
@@ -242,6 +242,9 @@ export function AuthModal({
           budgetMax: budget.max,
         });
       }
+
+      if (result.refreshToken) setRefreshToken(result.refreshToken);
+
 
       onSuccess(
         {
@@ -521,6 +524,28 @@ export function AuthModal({
           </button>
         </div>
       </div>
+
+      {mode === "login" && (
+        <div style={{ textAlign: "right", marginTop: "-0.5rem", marginBottom: "0.5rem" }}>
+          <button
+            type="button"
+            className={styles.linkBtn}
+            onClick={async () => {
+              const email = form.email || prompt("请输入注册邮箱:");
+              if (email) {
+                try {
+                  await forgotPassword(email);
+                  alert("如果该邮箱已注册，重置链接将发送到您的邮箱。");
+                } catch {
+                  alert("发送失败，请稍后重试。");
+                }
+              }
+            }}
+          >
+            忘记密码？
+          </button>
+        </div>
+      )}
 
       {mode === "register" ? (
         <div className={styles.field}>

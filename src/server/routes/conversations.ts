@@ -5,8 +5,8 @@
 import type { FastifyInstance } from "fastify";
 import type { PrismaClient } from "../../generated/prisma/client.js";
 import { z } from "zod";
-import { sendOk, sendCreated, sendNoContent, sendError } from "../common/response.js";
-import { UnauthorizedError } from "../common/errors.js";
+import { sendOk, sendCreated,  sendError } from "../common/response.js";
+import {  } from "../common/errors.js";
 import * as mem from "../services/memoryStore.js";
 import { optionalUserId } from "../common/uid.js";
 

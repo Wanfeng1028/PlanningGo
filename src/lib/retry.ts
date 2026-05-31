@@ -47,21 +47,38 @@ export async function retryWithBackoff<T>(
   throw lastError;
 }
 
+interface RefreshApiResponse {
+  ok: boolean;
+  data?: {
+    accessToken?: string;
+    refreshToken?: string;
+  };
+  accessToken?: string;
+  refreshToken?: string;
+}
+
 export async function refreshToken(): Promise<string | null> {
   try {
-    const refreshToken = localStorage.getItem("pg_refresh_token");
-    if (!refreshToken) return null;
+    const currentRefreshToken = localStorage.getItem("pg_refresh_token");
+    if (!currentRefreshToken) return null;
 
     const response = await fetch(`${API_BASE}/api/auth/refresh`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ refreshToken }),
+      body: JSON.stringify({ refreshToken: currentRefreshToken }),
     });
 
     if (response.ok) {
-      const data = (await response.json()) as { accessToken: string };
-      localStorage.setItem("pg_token", data.accessToken);
-      return data.accessToken;
+      const body = (await response.json()) as RefreshApiResponse;
+      // 服务端统一响应格式: { ok: true, data: { accessToken, refreshToken } }
+      const accessToken = body.data?.accessToken ?? body.accessToken;
+      const newRefreshToken = body.data?.refreshToken ?? body.refreshToken;
+      if (!accessToken) return null;
+      localStorage.setItem("pg_token", accessToken);
+      if (newRefreshToken) {
+        localStorage.setItem("pg_refresh_token", newRefreshToken);
+      }
+      return accessToken;
     }
   } catch {
     // Refresh failed, user needs to re-login

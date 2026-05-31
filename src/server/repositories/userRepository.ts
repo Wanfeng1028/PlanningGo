@@ -85,4 +85,27 @@ export class UserRepository {
       where: { expiresAt: { lt: new Date() } },
     });
   }
+
+  // ── Password Reset Token ──
+
+  async createPasswordResetToken(data: {
+    userId: string;
+    tokenHash: string;
+    expiresAt: Date;
+  }) {
+    return this.db.passwordResetToken.create({ data });
+  }
+
+  async findPasswordResetToken(tokenHash: string) {
+    return this.db.passwordResetToken.findFirst({
+      where: { tokenHash, usedAt: null, expiresAt: { gt: new Date() } },
+    });
+  }
+
+  async usePasswordResetToken(id: string) {
+    return this.db.passwordResetToken.update({
+      where: { id },
+      data: { usedAt: new Date() },
+    });
+  }
 }

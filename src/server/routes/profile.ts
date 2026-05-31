@@ -7,7 +7,7 @@ import {
   sendNoContent,
   sendError,
 } from "../common/response.js";
-import { NotFoundError, UnauthorizedError } from "../common/errors.js";
+import { NotFoundError } from "../common/errors.js";
 import { requireUserId } from "../common/uid.js";
 import * as mem from "../services/memoryStore.js";
 

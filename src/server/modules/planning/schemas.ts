@@ -35,6 +35,7 @@ export const userIntentSchema = z.object({
   distanceLimitMinutes: z.number().positive().default(40),
   preferences: z.array(z.string()).default([]),
   mustAsk: z.array(z.string()).default([]),
+  isPlanningRequest: z.boolean().default(true),
 });
 
 export type UserIntent = z.infer<typeof userIntentSchema>;
@@ -181,12 +182,14 @@ export const planningResponseSchema = z.object({
   planId: z.string(),
   mode: z.enum(["mock", "llm", "hybrid"]),
   intent: userIntentSchema,
-  options: z.array(activityPlanSchema).min(1),
+  options: z.array(activityPlanSchema),
   selectedOptionId: z.string().optional(),
   validation: validationReportSchema,
   executableActions: z.array(executionActionSchema).default([]),
   toolLogs: z.array(toolLogSchema).default([]),
   nextActions: z.array(z.string()).default([]),
+  responseType: z.enum(["plan", "chat"]).optional(),
 });
 
 export type PlanningResponse = z.infer<typeof planningResponseSchema>;
+

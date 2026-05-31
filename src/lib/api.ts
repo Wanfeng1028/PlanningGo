@@ -28,6 +28,7 @@ export interface AgentPlanResponse {
   summary: string;
   selectedPlanId: string;
   nextActions: string[];
+  responseType?: "plan" | "chat";
 }
 
 export interface AuthResponse {
@@ -65,6 +66,11 @@ export function setAuthToken(token: string | null) {
 
 export function getAuthToken() {
   return _authToken;
+}
+
+export function setRefreshToken(token: string | null) {
+  if (token) localStorage.setItem("pg_refresh_token", token);
+  else localStorage.removeItem("pg_refresh_token");
 }
 
 export function getApiBase(): string {
@@ -133,6 +139,7 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
         ...init,
         headers,
         signal: AbortSignal.timeout(30000), // 30 second timeout
+        credentials: 'include',
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -153,6 +160,7 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
           ...init,
           headers,
           signal: AbortSignal.timeout(30000),
+          credentials: "include",
         });
       } else {
         setAuthToken(null);
@@ -214,6 +222,20 @@ export async function enterAsGuest(profile: GuestProfileInput): Promise<AuthResp
   return apiJson<AuthResponse>("/api/auth/guest", {
     method: "POST",
     body: JSON.stringify(profile),
+  });
+}
+
+export async function forgotPassword(email: string): Promise<{ message: string }> {
+  return apiJson("/api/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function resetPassword(input: { token: string; newPassword: string }): Promise<{ message: string }> {
+  return apiJson("/api/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify(input),
   });
 }
 
@@ -302,6 +324,7 @@ export interface PlanningResult {
   options: PlanningOption[];
   executableActions: PlanningExecutableAction[];
   nextActions: string[];
+  responseType?: "plan" | "chat";
   input: {
     prompt: string;
     city?: string;

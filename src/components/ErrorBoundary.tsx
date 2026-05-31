@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from "react";
+import { captureError } from "../lib/sentry";
 import styles from "./ErrorBoundary.module.scss";
 
 interface Props {
@@ -17,8 +18,12 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error) {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("[ErrorBoundary]", error);
+    // Report to Sentry if configured
+    try {
+      captureError(error, { componentStack: errorInfo.componentStack });
+    } catch { /* sentry not available */ }
   }
 
   private handleRetry = () => {

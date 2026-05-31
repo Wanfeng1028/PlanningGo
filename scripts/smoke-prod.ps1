@@ -71,6 +71,16 @@ Test-Endpoint -Name "POST /api/auth/demo → 404" -Method POST -Url "$BaseUrl/ap
 Write-Host "`n── Auth (Register Validation) ──" -ForegroundColor Yellow
 Test-Endpoint -Name "POST /api/auth/register (空 body) → 400" -Method POST -Url "$BaseUrl/api/auth/register" -ExpectedStatus 400 -Body '{}'
 
+# ── 3b. Auth — Password Reset ──
+Write-Host "`n── Auth (Password Reset) ──" -ForegroundColor Yellow
+Test-Endpoint -Name "POST /api/auth/forgot-password (no email) → 400" -Method POST -Url "$BaseUrl/api/auth/forgot-password" -ExpectedStatus 400 -Body '{}'
+Test-Endpoint -Name "POST /api/auth/forgot-password (invalid email) → 400" -Method POST -Url "$BaseUrl/api/auth/forgot-password" -ExpectedStatus 400 -Body '{"email":"notanemail"}'
+Test-Endpoint -Name "POST /api/auth/reset-password (no token) → 400" -Method POST -Url "$BaseUrl/api/auth/reset-password" -ExpectedStatus 400 -Body '{}'
+
+# ── 3c. Health — Enhanced Ready Check ──
+Write-Host "`n── Health (Enhanced) ──" -ForegroundColor Yellow
+Test-Endpoint -Name "GET /api/ready → 200 or 503" -Method GET -Url "$BaseUrl/api/ready" -ExpectedStatus 200
+
 # ── 4. Agent — Plan (无 auth 也可用 optionalAuthGuard) ──
 Write-Host "`n── Agent (Planning) ──" -ForegroundColor Yellow
 Test-Endpoint -Name "POST /api/agent/parse" -Method POST -Url "$BaseUrl/api/agent/parse" -ExpectedStatus 400 -Body '{}'

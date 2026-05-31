@@ -18,14 +18,15 @@ export class QwenLlmProvider implements LlmProvider {
     const model = query.model ?? this.options.model;
     const maxTokens = query.maxTokens ?? 2048;
     const temperature = query.temperature ?? 0.7;
+    const start = Date.now();
 
     const res = await fetch(
-      `${this.options.baseUrl}/chat/completions`,
+      this.options.baseUrl.replace(/\/+$/, '') + '/chat/completions',
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${this.options.apiKey}`,
+          Authorization: "Bearer " + this.options.apiKey,
         },
         body: JSON.stringify({
           model,
@@ -38,7 +39,8 @@ export class QwenLlmProvider implements LlmProvider {
     );
 
     if (!res.ok) {
-      throw new Error(`LLM_CHAT_FAILED_${res.status}`);
+      const latencyMs = Date.now() - start;
+      throw new Error("LLM_CHAT_FAILED_" + res.status + " (latency=" + latencyMs + "ms)");
     }
 
     const data = (await res.json()) as {
@@ -60,7 +62,7 @@ export class QwenLlmProvider implements LlmProvider {
         completionTokens: data.usage?.completion_tokens ?? 0,
         totalTokens: data.usage?.total_tokens ?? 0,
       },
-      latencyMs: 0,
+      latencyMs: Date.now() - start,
     };
   }
 }

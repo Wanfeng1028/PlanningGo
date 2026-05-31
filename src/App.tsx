@@ -6,7 +6,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Modal } from "./components/Modal";
 import { NavBar } from "./components/NavBar";
 import { PageTransition } from "./components/PageTransition";
-import { setAuthToken, reverseGeocode } from "./lib/api";
+import { setAuthToken, setRefreshToken, reverseGeocode } from "./lib/api";
 import { requestBrowserLocation } from "./lib/location";
 import type { ModalKey, NavKey, SessionUser } from "./types";
 
@@ -228,6 +228,7 @@ export function App() {
             onLogout={() => {
               setUser(null);
               setAuthToken(null);
+              setRefreshToken(null);
               localStorage.removeItem("pg_user");
               setAuthRedirectTo(null);
             }}

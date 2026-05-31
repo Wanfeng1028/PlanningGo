@@ -6,6 +6,9 @@ import { createTraceId } from "./common/id";
 import { AppError } from "./common/errors";
 import { sendError } from "./common/response";
 import { registerRoutes } from "./routes";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import fs from "node:fs";
 
 export async function buildApp() {
   const app = Fastify({
@@ -19,8 +22,11 @@ export async function buildApp() {
   // ── 安全 + Cookie ──
   await app.register(import("./plugins/security.js"));
 
-  // ── CORS ──
-  await app.register(cors, { origin: corsOrigins });
+  // ── CORS（credentials 支持跨域 Cookie） ──
+  await app.register(cors, {
+    origin: corsOrigins,
+    credentials: true,
+  });
 
   // ── 数据库 + Redis ──
   await app.register(import("./plugins/db.js"));
@@ -86,6 +92,49 @@ export async function buildApp() {
 
   // ── 业务路由 ──
   await registerRoutes(app);
+
+  // ── 前端静态文件服务（仅生产环境） ──
+  if (env.NODE_ENV === "production") {
+    const currentDir = path.dirname(fileURLToPath(import.meta.url));
+    const distDir = path.resolve(currentDir, "..");
+
+    if (fs.existsSync(path.join(distDir, "index.html"))) {
+      const { default: staticPlugin } = await import("@fastify/static");
+
+      // 仅服务 assets 目录（带 hash 的静态资源）
+      await app.register(staticPlugin, {
+        root: path.join(distDir, "assets"),
+        prefix: "/assets/",
+        decorateReply: false,
+        setHeaders(res, filePath) {
+          // 带 hash 的静态资源设置长期缓存
+          if (/\.[a-f0-9]{8,}\.\w+$/.test(filePath)) {
+            res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+          }
+        },
+      });
+
+      // 服务 design 目录（图片资源）
+      await app.register(staticPlugin, {
+        root: path.join(distDir, "design"),
+        prefix: "/design/",
+        decorateReply: false,
+      });
+
+      // SPA fallback：非 /api 请求且文件不存在时返回 index.html
+      app.setNotFoundHandler((request, reply) => {
+        if (request.url.startsWith("/api/")) {
+          return sendError(reply, 404, "NOT_FOUND", "接口不存在");
+        }
+        // 只返回 index.html，不暴露 server/generated 目录
+        return reply.type("text/html").sendFile("index.html", distDir);
+      });
+
+      app.log.info(`? 前端静态文件已挂载: ${distDir}`);
+    } else {
+      app.log.warn("? 未找到 index.html，跳过静态文件服务（请先运行 npm run build:client）");
+    }
+  }
 
   return app;
 }

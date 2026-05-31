@@ -168,6 +168,44 @@ curl "http://127.0.0.1:3001/api/location/reverse-geocode?lat=31.2304&lng=121.473
 curl http://127.0.0.1:3001/api/auth/meituan/start
 ```
 
+## 生产环境功能
+
+### 健康检查
+
+- `GET /api/health` — 基础存活检查（200 OK）
+- `GET /api/ready` — 详细就绪检查，返回各组件状态：
+  - `db` — PostgreSQL 连接状态
+  - `redis` — Redis 连接状态
+  - `llm` — LLM API Key 配置状态
+  - `amap` — 高德地图 Key 配置状态
+  - `mode` — 当前规划模式（mock/llm/hybrid）
+  - `uptime` — 进程运行时间
+
+### 密码重置
+
+- `POST /api/auth/forgot-password` — 请求密码重置（发送重置链接）
+- `POST /api/auth/reset-password` — 使用重置令牌设置新密码
+- 前端登录页有「忘记密码？」入口
+
+### Sentry 错误追踪
+
+前端已集成 Sentry 骨架代码（`src/lib/sentry.ts`），安装即可启用：
+
+```bash
+pnpm add @sentry/react
+```
+
+环境变量：
+- `VITE_SENTRY_DSN` — Sentry DSN
+- `SENTRY_ENVIRONMENT` — 环境名称（production/staging）
+
+### 生产配置模板
+
+```bash
+cp .env.production.template .env.production
+# 填入真实 API Keys 和数据库配置
+```
+
 ## 常见问题
 
 **后端启动报错 "ECONNREFUSED"**

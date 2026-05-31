@@ -1,11 +1,28 @@
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
 import { createMobileHandoff, getHandoffByToken, claimHandoff, getHandoffStatus, consumeHandoff } from "../modules/handoff/qrService";
 import type { PermissionScope } from "../modules/agent/middleware/permissionGuard";
+import { sendOk, sendError } from "../common/response.js";
+import { requireUserId } from "../common/uid.js";
 
-interface AuthenticatedRequest {
-  userId?: string;
-  guestId?: string;
-}
+const uid = requireUserId;
+
+const createHandoffSchema = z.object({
+  conversationId: z.string().uuid(),
+  planId: z.string().min(1),
+  selectedOptionId: z.string().optional(),
+  scopes: z.array(z.string()).default([]),
+});
+
+const claimHandoffSchema = z.object({
+  deviceId: z.string().min(1).max(128),
+  guestId: z.string().max(128).optional(),
+  grantedScopes: z.array(z.string()).default([]),
+});
+
+const authorizeHandoffSchema = z.object({
+  scopes: z.array(z.string()).default([]),
+});
 
 export async function registerHandoffRoutes(fastify: FastifyInstance) {
   /**
@@ -13,30 +30,22 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
    * POST /api/handoff/mobile
    */
   fastify.post("/api/handoff/mobile", { preHandler: [fastify.authGuard] }, async (request, reply) => {
-    const body = request.body as {
-      conversationId: string;
-      planId: string;
-      selectedOptionId?: string;
-      scopes: PermissionScope[];
-    };
+    const body = createHandoffSchema.parse(request.body);
+    const userId = uid(request);
 
     try {
-      const userId = (request as AuthenticatedRequest).userId;
-      const guestId = (request as AuthenticatedRequest).guestId;
-
       const result = await createMobileHandoff({
         conversationId: body.conversationId,
         planId: body.planId,
         selectedOptionId: body.selectedOptionId,
         userId,
-        guestId,
-        scopes: body.scopes,
+        scopes: body.scopes as PermissionScope[],
       });
 
-      return reply.send(result);
+      return sendOk(reply, result);
     } catch (error) {
       fastify.log.error(error);
-      return reply.status(500).send({ error: "Failed to create handoff session" });
+      return sendError(reply, 500, "HANDOFF_CREATE_FAILED", "创建接续会话失败");
     }
   });
 
@@ -45,19 +54,19 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
    * GET /api/handoff/mobile/:token
    */
   fastify.get("/api/handoff/mobile/:token", { preHandler: [fastify.optionalAuthGuard] }, async (request, reply) => {
-    const { token } = request.params as { token: string };
+    const { token } = z.object({ token: z.string() }).parse(request.params);
 
     try {
       const payload = await getHandoffByToken(token);
 
       if (!payload) {
-        return reply.status(404).send({ error: "Handoff session not found or expired" });
+        return sendError(reply, 404, "HANDOFF_NOT_FOUND", "接续会话不存在或已过期");
       }
 
-      return reply.send(payload);
+      return sendOk(reply, payload);
     } catch (error) {
       fastify.log.error(error);
-      return reply.status(500).send({ error: "Failed to get handoff session" });
+      return sendError(reply, 500, "HANDOFF_FETCH_FAILED", "获取接续会话失败");
     }
   });
 
@@ -66,31 +75,27 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
    * POST /api/handoff/mobile/:token/claim
    */
   fastify.post("/api/handoff/mobile/:token/claim", { preHandler: [fastify.authGuard] }, async (request, reply) => {
-    const { token } = request.params as { token: string };
-    const body = request.body as {
-      deviceId: string;
-      guestId?: string;
-      grantedScopes: PermissionScope[];
-    };
+    const { token } = z.object({ token: z.string() }).parse(request.params);
+    const body = claimHandoffSchema.parse(request.body);
 
     try {
       const result = await claimHandoff({
         token,
         deviceId: body.deviceId,
         guestId: body.guestId,
-        grantedScopes: body.grantedScopes,
+        grantedScopes: body.grantedScopes as PermissionScope[],
       });
 
-      return reply.send(result);
+      return sendOk(reply, result);
     } catch (error) {
       fastify.log.error(error);
       if (error instanceof Error && error.message.includes("not found")) {
-        return reply.status(404).send({ error: error.message });
+        return sendError(reply, 404, "HANDOFF_NOT_FOUND", "接续会话不存在");
       }
       if (error instanceof Error && error.message.includes("expired")) {
-        return reply.status(410).send({ error: error.message });
+        return sendError(reply, 410, "HANDOFF_EXPIRED", "接续会话已过期");
       }
-      return reply.status(500).send({ error: "Failed to claim handoff session" });
+      return sendError(reply, 500, "HANDOFF_CLAIM_FAILED", "认领会话失败");
     }
   });
 
@@ -99,17 +104,17 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
    * GET /api/handoff/mobile/:handoffId/status
    */
   fastify.get("/api/handoff/mobile/:handoffId/status", { preHandler: [fastify.authGuard] }, async (request, reply) => {
-    const { handoffId } = request.params as { handoffId: string };
+    const { handoffId } = z.object({ handoffId: z.string() }).parse(request.params);
 
     try {
       const status = await getHandoffStatus(handoffId);
-      return reply.send(status);
+      return sendOk(reply, status);
     } catch (error) {
       fastify.log.error(error);
       if (error instanceof Error && error.message.includes("not found")) {
-        return reply.status(404).send({ error: error.message });
+        return sendError(reply, 404, "HANDOFF_NOT_FOUND", "接续会话不存在");
       }
-      return reply.status(500).send({ error: "Failed to get handoff status" });
+      return sendError(reply, 500, "HANDOFF_STATUS_FAILED", "获取接续状态失败");
     }
   });
 
@@ -118,18 +123,15 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
    * POST /api/handoff/mobile/:handoffId/authorize
    */
   fastify.post("/api/handoff/mobile/:handoffId/authorize", { preHandler: [fastify.authGuard] }, async (request, reply) => {
-    const { handoffId } = request.params as { handoffId: string };
-    const body = request.body as {
-      scopes: PermissionScope[];
-    };
+    const { handoffId } = z.object({ handoffId: z.string() }).parse(request.params);
+    const body = authorizeHandoffSchema.parse(request.body);
 
     try {
       // In production, this would update the handoff session with authorized scopes
-      // For now, just return success
-      return reply.send({ success: true, handoffId });
+      return sendOk(reply, { success: true, handoffId, scopes: body.scopes });
     } catch (error) {
       fastify.log.error(error);
-      return reply.status(500).send({ error: "Failed to authorize handoff session" });
+      return sendError(reply, 500, "HANDOFF_AUTHORIZE_FAILED", "授权接续会话失败");
     }
   });
 }

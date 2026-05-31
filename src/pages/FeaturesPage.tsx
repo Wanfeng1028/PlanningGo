@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect,  useRef, useState } from "react";
 import { v4 as uuid } from "uuid";
 import {
   confirmExecAction,
@@ -379,7 +379,8 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
           {
             prompt,
             city,
-            companions: "family",
+            // 不再硬编码 companions，由后端从 prompt 推断
+            companions: undefined,
             modelMode: toApiModelMode(modelMode),
             conversationId: conversationIdRef.current ?? undefined,
           },
@@ -495,7 +496,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     [inputValue, doSubmit],
   );
 
-  const handleExampleChip = useCallback(
+  const _handleExampleChip = useCallback(
     (prompt: string) => {
       doSubmit(prompt);
     },
@@ -629,7 +630,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     onNavigate?.("home");
   }, [inputValue, messages, city, onNavigate, addMessage]);
 
-  const handleConfirmReturnHome = useCallback(() => {
+  const _handleConfirmReturnHome = useCallback(() => {
     onNavigate?.("home");
   }, [onNavigate]);
 

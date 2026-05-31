@@ -8,6 +8,7 @@ import { ZodError, z } from "zod";
 import { parseDemand, planningRequestSchema, runPlanningAgent, simulateWhatIf } from "../services/agent.js";
 import { runPlanningPipeline } from "../modules/agent/orchestrator.js";
 import { saveActions } from "../services/store.js";
+import { corsOrigins } from "../config/env.js";
 
 const agentChatBodySchema = z.object({
   message: z.string().min(1).max(10000),
@@ -77,7 +78,22 @@ export async function registerAgentRoutes(app: FastifyInstance) {
     body: { guestId?: string; conversationId?: string; prompt: string; city?: string; modelMode?: string },
     log: FastifyInstance["log"],
   ): Promise<string> {
-    if (body.conversationId) return body.conversationId;
+    // 校验 conversationId 是否真实存在，避免前端传入过期 ID 导致 404
+    if (body.conversationId) {
+      if (db) {
+        try {
+          const existing = await db.conversation.findUnique({ where: { id: body.conversationId }, select: { id: true } });
+          if (existing) return body.conversationId;
+          log.warn({ conversationId: body.conversationId }, "conversationId not found in DB, will create new");
+        } catch (err) {
+          log.warn({ err }, "Failed to verify conversationId, will create new");
+        }
+      } else {
+        // Memory store fallback
+        const existing = mem.getConversation(body.conversationId);
+        if (existing) return body.conversationId;
+      }
+    }
 
     const title = body.prompt.length > 30 ? body.prompt.slice(0, 30) + "…" : body.prompt;
     const guestId = !userId ? (body.guestId ?? null) : null;
@@ -230,6 +246,15 @@ export async function registerAgentRoutes(app: FastifyInstance) {
         reply.header("Cache-Control", "no-cache");
         reply.header("Connection", "keep-alive");
 
+        // CORS headers for SSE (reply.raw bypasses @fastify/cors)
+        const origin = request.headers.origin;
+        if (origin && corsOrigins.includes(origin)) {
+          reply.raw.setHeader("Access-Control-Allow-Origin", origin);
+          reply.raw.setHeader("Access-Control-Allow-Credentials", "true");
+          reply.raw.setHeader("Vary", "Origin");
+        }
+
+
         // ── 1. 创建或获取会话 ──
         const conversationId = await ensureConversation(db, userId, {
           guestId: parsed.guestId,
@@ -335,3 +360,5 @@ export async function registerAgentRoutes(app: FastifyInstance) {
     return simulateWhatIf(input.planId, input.scenario);
   });
 }
+
+

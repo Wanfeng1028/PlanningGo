@@ -15,7 +15,6 @@ import type {
   SpeechRecognitionEvent,
   SpeechRecognitionErrorEvent,
 } from "./types";
-import { MODEL_MODES } from "./types";
 import { CITY_DISTRICTS, CITY_LIST } from "./constants";
 import styles from "../../pages/FeaturesPage.module.scss";
 

@@ -47,6 +47,7 @@ export async function registerRoutes(app: FastifyInstance) {
   await import("./routes/meituan.js").then((m) => m.registerMeituanRoutes(app));
   await import("./routes/conversations.js").then((m) => m.registerConversationRoutes(app));
   await import("./routes/events.js").then((m) => m.registerEventRoutes(app));
+  await import("./routes/handoff.js").then((m) => m.registerHandoffRoutes(app));
 
   app.get("/api/docs", async () => ({
     name: "PlanningGo API",
@@ -65,6 +66,7 @@ export async function registerRoutes(app: FastifyInstance) {
       { group: "Developer", endpoints: ["GET /api/developer/dashboard", "GET /api/developer/api-keys", "POST /api/developer/api-keys", "POST /api/developer/api-keys/:id/revoke", "GET /api/developer/webhooks", "POST /api/developer/webhooks", "POST /api/developer/webhooks/:id/replay"] },
       { group: "Privacy", endpoints: ["GET /api/privacy/export", "DELETE /api/privacy/memories"] },
       { group: "Calendar", endpoints: ["POST /api/ics"] },
+      { group: "Handoff", endpoints: ["POST /api/handoff/mobile", "GET /api/handoff/mobile/:token", "POST /api/handoff/mobile/:token/claim"] },
     ],
   }));
 

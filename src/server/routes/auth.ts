@@ -54,6 +54,15 @@ const changePasswordSchema = z.object({
   message: "oldPassword 或 currentPassword 必填其一",
 });
 
+const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  newPassword: z.string().min(6),
+});
+
 function getClientMeta(request: { headers: Record<string, string | string[] | undefined>; ip: string }) {
   return {
     userAgent: typeof request.headers["user-agent"] === "string" ? request.headers["user-agent"] : undefined,
@@ -73,7 +82,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     const tokenService = new TokenService(userRepo);
     const authService = new AuthService(userRepo, profileRepo, tokenService);
 
-    app.post("/api/auth/register", async (request, reply) => {
+    app.post("/api/auth/register", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, reply) => {
       const body = registerSchema.parse(request.body);
       const displayName = body.displayName ?? body.name ?? body.email.split("@")[0];
       const result = await authService.register(body.email, body.password, displayName, getClientMeta(request));
@@ -105,7 +114,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       return sendCreated(reply, result);
     });
 
-    app.post("/api/auth/login", async (request, reply) => {
+    app.post("/api/auth/login", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request, reply) => {
       const body = loginSchema.parse(request.body);
       const result = await authService.login(body.email, body.password, getClientMeta(request));
       return sendOk(reply, result);
@@ -150,13 +159,29 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       return sendNoContent(reply);
     });
 
+    app.post("/api/auth/forgot-password", { config: { rateLimit: { max: 5, timeWindow: "15 minutes" } } }, async (request, reply) => {
+      const body = forgotPasswordSchema.parse(request.body);
+      const result = await authService.requestPasswordReset(body.email);
+      // Always return success to prevent email enumeration
+      if (result && env.NODE_ENV !== "production") {
+        app.log.info({ token: result.token }, "Password reset token (dev only)");
+      }
+      return sendOk(reply, { message: "如果该邮箱已注册，重置链接将发送到您的邮箱" });
+    });
+
+    app.post("/api/auth/reset-password", async (request, reply) => {
+      const body = resetPasswordSchema.parse(request.body);
+      await authService.resetPassword(body.token, body.newPassword);
+      return sendOk(reply, { message: "密码已重置，请使用新密码登录" });
+    });
+
     return;
   }
 
   // ── 内存 fallback 模式 ──
   app.log.info("📝 Auth routes using in-memory store (no PostgreSQL)");
 
-  app.post("/api/auth/register", async (request, reply) => {
+  app.post("/api/auth/register", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, reply) => {
     const body = registerSchema.parse(request.body);
     const displayName = body.displayName ?? body.name ?? body.email.split("@")[0];
     try {
@@ -168,7 +193,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     }
   });
 
-  app.post("/api/auth/login", async (request, reply) => {
+  app.post("/api/auth/login", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request, reply) => {
     const body = loginSchema.parse(request.body);
     try {
       const result = await mem.login(body.email, body.password, getClientMeta(request));

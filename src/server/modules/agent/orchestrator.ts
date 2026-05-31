@@ -25,6 +25,26 @@ export async function runPlanningPipeline(
   // 1. 抽取意图
   const intent = await extractIntent(input);
 
+  // 非规划请求（问候、闲聊等）：跳过方案生成，直接返回对话回复
+  if (!intent.isPlanningRequest) {
+    const chatSummary = `你好！我是出行规划助手，请告诉我你想去哪里、和谁一起、预算多少，我来帮你规划。`;
+    return {
+      traceId,
+      planId,
+      mode,
+      intent,
+      options: [],
+      selectedOptionId: undefined,
+      validation: { status: "pass" as const, score: 100, blockingErrors: [], warnings: [], repairHints: [] },
+      executableActions: [],
+      toolLogs: [],
+      nextActions: [],
+      summary: chatSummary,
+      selectedPlanId: "",
+      responseType: "chat" as const,
+    };
+  }
+
   // 2. 构造上下文（注入 providers）
   const context = await buildPlanningContext({ traceId, planId, intent, providers: input.providers });
 

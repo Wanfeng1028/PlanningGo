@@ -58,6 +58,8 @@ export interface AgentRunResult {
   nextActions: string[];
   modelMode: string;
   llmModel: string;
+  responseType?: "plan" | "chat";
+  summary?: string;
 }
 
 /**
@@ -99,6 +101,29 @@ export async function runAgentRuntime(input: AgentRunInput): Promise<AgentRunRes
   };
 
   const intent = await extractIntent(planningRequest);
+
+  // 非规划请求：跳过方案生成，返回对话式回复
+  if (!intent.isPlanningRequest) {
+    return {
+      traceId,
+      conversationId,
+      userMessageId,
+      assistantMessageId,
+      intent,
+      cityContext,
+      toolSummary: { totalCalls: 0, totalLatencyMs: 0, successfulCalls: 0, failedCalls: 0, toolsUsed: [], errors: [] },
+      options: [],
+      executableActions: [],
+      autoExecutedActions: [],
+      blockedActions: [],
+      validation: { status: "pass" as const, score: 100, blockingErrors: [], warnings: [], repairHints: [] },
+      nextActions: [],
+      modelMode,
+      llmModel,
+      responseType: "chat" as const,
+      summary: `你好！我是出行规划助手，请告诉我你想去哪里、和谁一起、预算多少，我来帮你规划。`,
+    };
+  }
 
   // 3. Build planning context
   const context = await buildPlanningContext({ traceId, planId, intent });

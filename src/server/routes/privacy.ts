@@ -3,7 +3,6 @@
  */
 
 import type { FastifyInstance } from "fastify";
-import type { PrismaClient } from "../../generated/prisma/client.js";
 import { sendOk, sendNoContent } from "../common/response.js";
 import { AppError } from "../common/errors.js";
 

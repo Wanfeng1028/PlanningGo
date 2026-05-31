@@ -64,7 +64,7 @@ export function FeaturesSidebar({
         {/* Header */}
         <div className={styles.sidebarHeader}>
           <div className={styles.sidebarLogoRow}>
-            <div className={styles.sidebarLogo}>谱</div>
+            <img className={styles.sidebarLogo} src="/avatar/planninggo-avatar-512.png" alt="周末有谱" />
             <span className={styles.sidebarBrand}>周末有谱</span>
           </div>
           {onReturnHome && (

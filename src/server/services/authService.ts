@@ -149,6 +149,64 @@ export class AuthService {
   }
 
   /**
+   * 请求密码重置 — 生成重置 token
+   * 返回 token（生产环境应通过邮件发送，开发环境返回给前端）
+   */
+  async requestPasswordReset(
+    email: string,
+  ): Promise<{ token: string; expiresAt: Date } | null> {
+    if (!email) throw new BadRequestError("请提供邮箱");
+
+    const user = await this.userRepo.findByEmail(email);
+    // 安全：不暴露邮箱是否存在
+    if (!user || user.status !== "active") return null;
+
+    const crypto = await import("node:crypto");
+    const token = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    // Store via userRepo if method exists, otherwise skip (memory mode)
+    if ("createPasswordResetToken" in this.userRepo) {
+      await (this.userRepo as any).createPasswordResetToken({
+        userId: user.id,
+        tokenHash,
+        expiresAt,
+      });
+    }
+
+    return { token, expiresAt };
+  }
+
+  /**
+   * 重置密码 — 验证 token 并更新密码
+   */
+  async resetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<void> {
+    if (!token || !newPassword) throw new BadRequestError("请提供重置令牌和新密码");
+    if (newPassword.length < 6) throw new BadRequestError("新密码至少6位");
+
+    const crypto = await import("node:crypto");
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+    // Try DB lookup if method exists
+    if ("findPasswordResetToken" in this.userRepo && "usePasswordResetToken" in this.userRepo) {
+      const record = await (this.userRepo as any).findPasswordResetToken(tokenHash);
+      if (!record) throw new BadRequestError("重置令牌无效或已过期");
+
+      const passwordHash = await hashPassword(newPassword);
+      await this.userRepo.updatePasswordHash(record.userId, passwordHash);
+      await (this.userRepo as any).usePasswordResetToken(record.id);
+      await this.tokenService.revokeAllTokens(record.userId);
+      return;
+    }
+
+    throw new BadRequestError("密码重置功能暂不可用");
+  }
+
+  /**
    * Demo 账号快捷登录（兼容旧 API）
    */
   async demoLogin(meta?: { userAgent?: string; ipAddress?: string }) {

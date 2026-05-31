@@ -2,6 +2,7 @@
  * Calendar ICS 路由
  */
 
+import crypto from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 

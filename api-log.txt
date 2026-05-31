@@ -1,0 +1,1479 @@
+
+> planning-go@0.1.0 dev:api
+> tsx watch src/server/index.ts
+
+[18:33:50] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[18:33:50] [32mINFO[39m: [36m✅ Redis connected[39m
+[18:33:51] [32mINFO[39m: [36m✅ Providers initialized[39m
+[18:33:51] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[18:33:51] [32mINFO[39m: [36mServer listening at http://192.168.1.102:3001[39m
+[18:33:51] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+[18:34:18] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-1"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/agent/plan/stream",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 52645
+    }
+[18:34:19] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-1"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1151.2226000018418
+[18:35:43] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-2"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/health",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 51680
+    }
+[18:35:43] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-2"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1.175900001078844
+[18:35:43] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-3"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/auth/login",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 51681
+    }
+[18:35:43] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-3"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 90.6266999989748
+[18:35:43] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-4"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/agent/plan",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 51685
+    }
+[18:35:43] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-4"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 450.60950000211596
+[18:35:43] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-5"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/conversations",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 49233
+    }
+[18:35:43] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-5"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1.3330000005662441
+[18:35:43] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-6"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/mock/pois",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 49234
+    }
+[18:35:43] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-6"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 0.47369999811053276
+[18:35:43] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-7"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/location/reverse-geocode?lat=39.9042&lng=116.4074",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 49235
+    }
+[18:35:43] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-7"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 0.8247999995946884
+[18:35:43] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-8"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/ics",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 49236
+    }
+[18:35:43] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-8"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1.2332000024616718
+[18:35:43] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-9"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/server/index.js",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 49237
+    }
+[18:35:43] [32mINFO[39m: [36mRoute GET:/server/index.js not found[39m
+    [35mreqId[39m: "req-9"
+[18:35:43] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-9"
+    [35mres[39m: {
+      "statusCode": 404
+    }
+    [35mresponseTime[39m: 0.6058999970555305
+[18:35:43] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-a"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/nonexistent",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 49238
+    }
+[18:35:43] [32mINFO[39m: [36mRoute GET:/api/nonexistent not found[39m
+    [35mreqId[39m: "req-a"
+[18:35:43] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-a"
+    [35mres[39m: {
+      "statusCode": 404
+    }
+    [35mresponseTime[39m: 0.6915000006556511
+[20:26:35] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-b"
+    [35mreq[39m: {
+      "method": "OPTIONS",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 60555
+    }
+[20:26:35] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-b"
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0.6493000015616417
+[20:26:35] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-c"
+    [35mreq[39m: {
+      "method": "OPTIONS",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 60368
+    }
+[20:26:35] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-c"
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0.32519999891519547
+[20:26:35] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-d"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/health",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 64639
+    }
+[20:26:35] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-d"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 0.5383999980986118
+[20:26:35] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-e"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 60916
+    }
+[20:26:35] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-e"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1.3372000008821487
+[20:26:35] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-f"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 60916
+    }
+[20:26:35] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-f"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 0.8681000024080276
+[20:26:39] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-g"
+    [35mreq[39m: {
+      "method": "OPTIONS",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 64639
+    }
+[20:26:39] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-g"
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0.46480000019073486
+[20:26:39] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-h"
+    [35mreq[39m: {
+      "method": "OPTIONS",
+      "url": "/api/agent/plan/stream",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 60368
+    }
+[20:26:39] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-h"
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0.2401999980211258
+[20:26:39] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-i"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 60916
+    }
+[20:26:39] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-j"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/agent/plan/stream",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 58601
+    }
+[20:26:39] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-i"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 24.507500000298023
+[20:26:40] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-k"
+    [35mreq[39m: {
+      "method": "OPTIONS",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 60368
+    }
+[20:26:40] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-k"
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0.357099998742342
+[20:26:40] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-l"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 60916
+    }
+[20:26:40] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-m"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 57807
+    }
+[20:26:40] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-m"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 0.8638999983668327
+[20:26:40] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-l"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 5.6730000004172325
+[20:26:40] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-j"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1082.596700001508
+[20:26:47] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-n"
+    [35mreq[39m: {
+      "method": "OPTIONS",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 60368
+    }
+[20:26:47] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-n"
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0.4181000031530857
+[20:26:47] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-o"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 58601
+    }
+[20:26:47] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-o"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 5.93129999935627
+[20:33:12] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-p"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 58691
+    }
+[20:33:12] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-p"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 2.302200000733137
+[20:33:12] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-q"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/health",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 58692
+    }
+[20:33:12] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-q"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 0.672800000756979
+[20:33:12] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-r"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 58693
+    }
+[20:33:12] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-r"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1.2071000002324581
+[20:33:12] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-s"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/health",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 58694
+    }
+[20:33:12] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-s"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 0.5212000012397766
+[20:33:17] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-t"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 54610
+    }
+[20:33:17] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-u"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/agent/plan/stream",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 54611
+    }
+[20:33:17] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-t"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 25.11830000206828
+[20:33:18] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-u"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 988.9167999997735
+[20:33:18] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-v"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 58508
+    }
+[20:33:18] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-w"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 58509
+    }
+[20:33:18] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-w"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1.3212999999523163
+[20:33:18] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-v"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 5.801600001752377
+20:34:34 [tsx] change in ./src\server\modules\agent\intent.ts Restarting...
+c[20:34:35] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[20:34:36] [32mINFO[39m: [36m✅ Redis connected[39m
+[20:34:36] [32mINFO[39m: [36m✅ Providers initialized[39m
+[20:34:36] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[20:34:36] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[20:34:36] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+20:35:27 [tsx] unlink in ./src\server\modules\agent\orchestrator.ts Restarting...
+c[20:35:28] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[20:35:28] [32mINFO[39m: [36m✅ Redis connected[39m
+[20:35:28] [32mINFO[39m: [36m✅ Providers initialized[39m
+[20:35:28] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[20:35:28] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[20:35:28] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+20:37:59 [tsx] unlink in ./src\server\modules\agent\planner.ts Restarting...
+c[20:38:00] [32mINFO[39m: [36m? PostgreSQL connected[39m
+[20:38:00] [32mINFO[39m: [36m✅ Redis connected[39m
+[20:38:00] [32mINFO[39m: [36m✅ Providers initialized[39m
+E:\code\javascript\project\PlanningGo\src\server\modules\agent\orchestrator.ts:8
+import { generateMockPlans, generateLlmPlans } from "./planner";
+                            ^
+SyntaxError: The requested module './planner' does not provide an export named 'generateLlmPlans'
+    at #asyncInstantiate (node:internal/modules/esm/module_job:319:21)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async ModuleJob.run (node:internal/modules/esm/module_job:422:5)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+    at async registerRoutes (E:\code\javascript\project\PlanningGo\src\server\routes.ts:44:3)
+    at async buildApp (E:\code\javascript\project\PlanningGo\src\server\app.ts:94:3)
+    at async main (E:\code\javascript\project\PlanningGo\src\server\index.ts:5:15)
+
+Node.js v24.14.1
+20:44:12 [tsx] unlink in ./src\server\modules\agent\planner.ts Rerunning...
+c[20:44:14] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[20:44:14] [32mINFO[39m: [36m✅ Redis connected[39m
+[20:44:14] [32mINFO[39m: [36m✅ Providers initialized[39m
+[20:44:14] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[20:44:14] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[20:44:14] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+20:45:13 [tsx] unlink in ./src\server\modules\agent\orchestrator.ts Restarting...
+c[20:45:14] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[20:45:14] [32mINFO[39m: [36m✅ Redis connected[39m
+[20:45:14] [32mINFO[39m: [36m✅ Providers initialized[39m
+[20:45:14] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[20:45:14] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[20:45:14] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+[20:49:53] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-1"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 49668
+    }
+[20:49:54] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-1"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 6.076400000602007
+[20:49:54] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-2"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/",
+      "host": "localhost:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 49675
+    }
+[20:49:54] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-2"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 0.9589000009000301
+[20:49:54] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-3"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/agent/plan/stream",
+      "host": "localhost:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 49675
+    }
+[20:49:54] [32mINFO[39m: [36mRoute GET:/api/agent/plan/stream not found[39m
+    [35mreqId[39m: "req-3"
+[20:49:54] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-3"
+    [35mres[39m: {
+      "statusCode": 404
+    }
+    [35mresponseTime[39m: 0.6590999998152256
+[20:49:54] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-4"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/*",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 49679
+    }
+[20:49:54] [32mINFO[39m: [36mRoute GET:/api/* not found[39m
+    [35mreqId[39m: "req-4"
+[20:49:54] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-4"
+    [35mres[39m: {
+      "statusCode": 404
+    }
+    [35mresponseTime[39m: 0.6757000014185905
+[20:49:54] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-5"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/health",
+      "host": "localhost:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 49685
+    }
+[20:49:54] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-5"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 0.655799999833107
+[20:49:54] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-6"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/*",
+      "host": "localhost:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 49687
+    }
+[20:49:54] [32mINFO[39m: [36mRoute GET:/api/* not found[39m
+    [35mreqId[39m: "req-6"
+[20:49:54] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-6"
+    [35mres[39m: {
+      "statusCode": 404
+    }
+    [35mresponseTime[39m: 0.4583999998867512
+[20:49:54] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-7"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/docs",
+      "host": "localhost:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 49683
+    }
+[20:49:54] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-7"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 0.5139000006020069
+[20:50:43] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-8"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/auth/login",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 64140
+    }
+[20:50:43] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-8"
+    [35mres[39m: {
+      "statusCode": 401
+    }
+    [35mresponseTime[39m: 21.82320000231266
+[20:50:44] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-9"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/auth/login",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 50453
+    }
+[20:50:44] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-9"
+    [35mres[39m: {
+      "statusCode": 401
+    }
+    [35mresponseTime[39m: 4.600699998438358
+[20:50:52] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-a"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/auth/login",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 59148
+    }
+[20:50:52] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-a"
+    [35mres[39m: {
+      "statusCode": 401
+    }
+    [35mresponseTime[39m: 4.193799998611212
+[20:50:53] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-b"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/auth/login",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 54135
+    }
+[20:50:53] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-b"
+    [35mres[39m: {
+      "statusCode": 401
+    }
+    [35mresponseTime[39m: 4.497099999338388
+[20:50:58] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-c"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/auth/login",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 54129
+    }
+[20:50:58] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-c"
+    [35mres[39m: {
+      "statusCode": 401
+    }
+    [35mresponseTime[39m: 3.338799998164177
+[20:51:02] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-d"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/auth/login",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 60487
+    }
+[20:51:02] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-d"
+    [35mres[39m: {
+      "statusCode": 401
+    }
+    [35mresponseTime[39m: 3.904600001871586
+[20:51:04] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-e"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/favicon.ico",
+      "host": "localhost:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 49269
+    }
+[20:51:04] [32mINFO[39m: [36mRoute GET:/favicon.ico not found[39m
+    [35mreqId[39m: "req-e"
+[20:51:04] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-e"
+    [35mres[39m: {
+      "statusCode": 404
+    }
+    [35mresponseTime[39m: 1.1306999996304512
+20:51:49 [tsx] change in ./src\server\routes\agent.ts Restarting...
+c[20:51:50] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[20:51:50] [32mINFO[39m: [36m✅ Redis connected[39m
+[20:51:50] [32mINFO[39m: [36m✅ Providers initialized[39m
+[20:51:51] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[20:51:51] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[20:51:51] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+20:55:55 [tsx] unlink in ./src\server\modules\agent\intent.ts Restarting...
+c[20:55:56] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[20:55:56] [32mINFO[39m: [36m✅ Redis connected[39m
+[20:55:57] [32mINFO[39m: [36m✅ Providers initialized[39m
+[20:55:57] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[20:55:57] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[20:55:57] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+[20:58:16] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-1"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 55793
+    }
+[20:58:16] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-1"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 5.836300000548363
+[20:58:16] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-2"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/health",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 52074
+    }
+[20:58:16] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-2"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 0.7043000012636185
+[20:58:16] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-3"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 52078
+    }
+[20:58:16] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-3"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1.1721000000834465
+20:58:22 [tsx] unlink in ./src\server\modules\agent\intent.ts Restarting...
+c[20:58:23] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[20:58:23] [32mINFO[39m: [36m✅ Redis connected[39m
+[20:58:23] [32mINFO[39m: [36m✅ Providers initialized[39m
+[20:58:23] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[20:58:23] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[20:58:23] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+[20:58:32] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-1"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/agent/plan/stream",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 52534
+    }
+[20:58:32] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-2"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 52536
+    }
+[20:58:32] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-2"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 39.34329999983311
+[20:58:33] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-3"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 51102
+    }
+[20:58:33] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-4"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 51103
+    }
+[20:58:33] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-4"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1.876900002360344
+[20:58:33] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-3"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 8.318399999290705
+[20:58:33] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-1"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 971.103400003165
+[20:58:38] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-5"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 64636
+    }
+[20:58:38] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-5"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 5.587500002235174
+[20:58:39] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-6"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 57090
+    }
+[20:58:39] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-6"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 5.530799999833107
+[20:58:40] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-7"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 62237
+    }
+[20:58:40] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-7"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 4.98030000180006
+[20:59:03] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-8"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 60792
+    }
+[20:59:03] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-9"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/agent/plan/stream",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 51719
+    }
+[20:59:03] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-8"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 6.932100001722574
+[20:59:03] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-a"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 49669
+    }
+[20:59:03] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-9"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 644.3315000012517
+[20:59:03] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-b"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 49670
+    }
+[20:59:03] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-b"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1.0868999995291233
+[20:59:03] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-a"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 4.8581999987363815
+[20:59:10] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-c"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 53013
+    }
+[20:59:10] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-d"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/agent/plan/stream",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 53014
+    }
+[20:59:10] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-c"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 6.019099999219179
+[20:59:10] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-e"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 57895
+    }
+[20:59:10] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-f"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 57896
+    }
+[20:59:10] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-f"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 3.104100000113249
+[20:59:10] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-e"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 12.437100000679493
+[20:59:10] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-d"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 645.3081000000238
+[20:59:16] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-g"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 65165
+    }
+[20:59:16] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-h"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/agent/plan/stream",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 65166
+    }
+[20:59:16] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-g"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 7.3762000016868114
+[20:59:16] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-i"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 57713
+    }
+[20:59:16] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-j"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 57714
+    }
+[20:59:16] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-j"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 2.2551999986171722
+[20:59:16] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-i"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 63.5511000007391
+[20:59:16] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-h"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 690.118900001049
+[20:59:25] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-k"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 63672
+    }
+[20:59:25] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-l"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/agent/plan/stream",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 63673
+    }
+[20:59:25] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-k"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 5.650699999183416
+[20:59:26] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-l"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 870.9252000004053
+[20:59:26] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-m"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 56132
+    }
+[20:59:26] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-n"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 56133
+    }
+[20:59:26] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-n"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1.1979000009596348
+[20:59:26] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-m"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 5.5673000030219555
+[21:04:14] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-o"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 53187
+    }
+[21:04:14] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-o"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 21.91000000014901
+[21:04:17] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-p"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 60996
+    }
+[21:04:17] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-p"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 4.447000000625849
+[21:04:19] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-q"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 65247
+    }
+[21:04:19] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-q"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 5.155200000852346
+[21:04:19] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-r"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 59852
+    }
+[21:04:19] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-r"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 3.9831000007689
+[21:04:19] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-s"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 53485
+    }
+[21:04:19] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-s"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 3.940999999642372
+[21:04:19] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-t"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 59636
+    }
+[21:04:19] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-t"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 3.825600001960993
+[21:04:19] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-u"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 59147
+    }
+[21:04:19] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-u"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 4.348299998790026
+[21:04:19] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-v"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 55804
+    }
+[21:04:19] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-v"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 3.4021000005304813
+[21:04:20] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-w"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 60585
+    }
+[21:04:20] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-w"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 5.220899999141693
+[21:04:20] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-x"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 56644
+    }
+[21:04:20] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-x"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 3.188900001347065
+[21:04:20] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-y"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 57701
+    }
+[21:04:20] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-y"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 4.674300000071526
+[21:04:20] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-z"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 55031
+    }
+[21:04:20] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-z"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 4.020799998193979
+[21:04:20] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-10"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 51537
+    }
+[21:04:20] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-10"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 4.371300000697374
+[21:04:27] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-11"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 58610
+    }
+[21:04:27] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-12"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/agent/plan/stream",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 58611
+    }
+[21:04:27] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-11"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 4.586399998515844
+[21:04:27] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-13"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 49256
+    }
+[21:04:27] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-14"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 49257
+    }
+[21:04:27] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-14"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 0.7197999991476536
+[21:04:27] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-12"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 643.3500999994576
+[21:04:27] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-13"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 3.6884999983012676
