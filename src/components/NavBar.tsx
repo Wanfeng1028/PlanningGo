@@ -45,7 +45,7 @@ export function NavBar({ active, onNavigate, onOpenModal, user, onLogout, onRequ
       <nav className={styles.nav} aria-label="主导航">
         <button className={styles.brand} type="button" onClick={() => handleNavigate("home")}>
           <img className={styles.brandDot} src="/avatar/planninggo-avatar-512.png" alt="" />
-          <span>周末有谱</span>
+          <span>周末去哪儿</span>
         </button>
         <div className={styles.links}>
           {navItems.map((item) => (

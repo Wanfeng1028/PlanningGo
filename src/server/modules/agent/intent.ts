@@ -1,6 +1,5 @@
 import type { PlanningRequest } from "../../types";
 import type { UserIntent } from "../planning/schemas";
-import { demoProfile } from "../../data/mockData";
 
 
 /**
@@ -28,9 +27,9 @@ export async function extractIntent(input: PlanningRequest): Promise<UserIntent>
 
   return {
     raw: prompt,
-    city: input.city ?? demoProfile.city,
+    city: input.city ?? "北京",
     origin: {
-      label: input.startPoint ?? demoProfile.startPoint,
+      label: input.startPoint ?? "",
     },
     departAt: input.departAt,
     timeWindow: inferTimeWindow(prompt),

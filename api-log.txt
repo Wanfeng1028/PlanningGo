@@ -1477,3 +1477,647 @@ Node.js v24.14.1
       "statusCode": 201
     }
     [35mresponseTime[39m: 3.6884999983012676
+[21:32:51] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-15"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 51568
+    }
+[21:32:51] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-15"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 15.073499999940395
+[21:32:51] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-16"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/health",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 51569
+    }
+[21:32:51] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-16"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 4.138000000268221
+[21:32:51] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-17"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 51570
+    }
+[21:32:51] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-17"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1.141100000590086
+21:54:14 [tsx] change in ./src\server\routes.ts Restarting...
+c[21:54:16] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[21:54:16] [32mINFO[39m: [36m✅ Redis connected[39m
+[21:54:16] [32mINFO[39m: [36m✅ Providers initialized[39m
+[21:54:17] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[21:54:17] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[21:54:17] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+21:54:17 [tsx] change in ./src\server\modules\agent\planner.ts Restarting...
+c[21:54:18] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[21:54:18] [32mINFO[39m: [36m✅ Redis connected[39m
+[21:54:18] [32mINFO[39m: [36m✅ Providers initialized[39m
+[21:54:18] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[21:54:18] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[21:54:18] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+21:54:26 [tsx] change in ./src\server\routes.ts Restarting...
+c[21:54:28] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[21:54:28] [32mINFO[39m: [36m✅ Redis connected[39m
+[21:54:28] [32mINFO[39m: [36m✅ Providers initialized[39m
+[21:54:28] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[21:54:28] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[21:54:28] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+21:56:32 [tsx] change in ./src\server\routes.ts Restarting...
+c[21:56:33] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[21:56:33] [32mINFO[39m: [36m✅ Redis connected[39m
+[21:56:34] [32mINFO[39m: [36m✅ Providers initialized[39m
+[21:56:34] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[21:56:34] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[21:56:34] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+21:59:26 [tsx] change in ./src\server\modules\agent\intent.ts Restarting...
+c[21:59:27] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[21:59:27] [32mINFO[39m: [36m✅ Redis connected[39m
+[21:59:27] [32mINFO[39m: [36m✅ Providers initialized[39m
+[21:59:27] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[21:59:27] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[21:59:27] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+22:02:41 [tsx] change in ./src\server\modules\agent\orchestrator.ts Restarting...
+c[22:02:42] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[22:02:43] [32mINFO[39m: [36m✅ Redis connected[39m
+[22:02:43] [32mINFO[39m: [36m✅ Providers initialized[39m
+[22:02:43] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[22:02:43] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[22:02:43] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+22:58:05 [tsx] change in ./src\server\routes.ts Restarting...
+c[22:58:07] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[22:58:07] [32mINFO[39m: [36m✅ Redis connected[39m
+[22:58:07] [32mINFO[39m: [36m✅ Providers initialized[39m
+[22:58:07] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[22:58:07] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[22:58:07] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+23:01:10 [tsx] change in ./src\server\modules\agent\intent.ts Restarting...
+c[23:01:11] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[23:01:11] [32mINFO[39m: [36m✅ Redis connected[39m
+[23:01:11] [32mINFO[39m: [36m✅ Providers initialized[39m
+[23:01:11] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[23:01:11] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[23:01:11] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+23:06:48 [tsx] change in ./src\server\modules\agent\orchestrator.ts Restarting...
+c[23:06:49] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[23:06:50] [32mINFO[39m: [36m✅ Redis connected[39m
+[23:06:50] [32mINFO[39m: [36m✅ Providers initialized[39m
+[23:06:50] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[23:06:50] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[23:06:50] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+23:25:54 [tsx] change in ./src\server\services\memoryStore.ts Restarting...
+c[23:25:55] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[23:25:55] [32mINFO[39m: [36m✅ Redis connected[39m
+[23:25:55] [32mINFO[39m: [36m✅ Providers initialized[39m
+[23:25:55] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[23:25:55] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[23:25:55] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+23:27:35 [tsx] change in ./src\server\services\memoryStore.ts Restarting...
+c[23:27:36] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[23:27:37] [32mINFO[39m: [36m✅ Redis connected[39m
+[23:27:37] [32mINFO[39m: [36m✅ Providers initialized[39m
+[23:27:37] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[23:27:37] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[23:27:37] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+23:27:53 [tsx] change in ./src\server\services\memoryStore.ts Restarting...
+c[23:27:54] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[23:27:54] [32mINFO[39m: [36m✅ Redis connected[39m
+[23:27:54] [32mINFO[39m: [36m✅ Providers initialized[39m
+[23:27:54] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[23:27:54] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[23:27:54] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+23:32:10 [tsx] change in ./src\server\routes.ts Restarting...
+c[23:32:11] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[23:32:11] [32mINFO[39m: [36m✅ Redis connected[39m
+[23:32:11] [32mINFO[39m: [36m✅ Providers initialized[39m
+[23:32:11] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[23:32:11] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[23:32:11] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+23:37:42 [tsx] change in ./src\server\modules\agent\chatRouter.ts Restarting...
+c[23:37:44] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[23:37:44] [32mINFO[39m: [36m✅ Redis connected[39m
+[23:37:44] [32mINFO[39m: [36m✅ Providers initialized[39m
+[23:37:44] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[23:37:44] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[23:37:44] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+23:38:52 [tsx] change in ./src\generated\prisma\enums.ts Restarting...
+c23:38:52 [tsx] unlink in ./src\generated\prisma\internal\prismaNamespace.ts Restarting...
+c[23:38:53] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[23:38:53] [32mINFO[39m: [36m✅ Redis connected[39m
+[23:38:53] [32mINFO[39m: [36m✅ Providers initialized[39m
+[23:38:54] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[23:38:54] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[23:38:54] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+23:40:53 [tsx] change in ./src\server\modules\agent\chatRouter.ts Restarting...
+c[23:40:54] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[23:40:54] [32mINFO[39m: [36m✅ Redis connected[39m
+[23:40:54] [32mINFO[39m: [36m✅ Providers initialized[39m
+[23:40:54] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[23:40:54] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[23:40:54] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+23:42:37 [tsx] change in ./src\server\modules\agent\chatRouter.ts Restarting...
+c[23:42:39] [32mINFO[39m: [36m? PostgreSQL connected[39m
+
+🚀 PlanningGo API Server
+   地址: http://127.0.0.1:3001
+   规划模式: mock
+   CORS: http://localhost:5173, http://127.0.0.1:5173
+   环境: development
+
+[23:42:39] [32mINFO[39m: [36m✅ Redis connected[39m
+[23:42:39] [32mINFO[39m: [36m✅ Providers initialized[39m
+[23:42:39] [32mINFO[39m: [36mServer listening at http://127.0.0.1:3001[39m
+[23:42:39] [32mINFO[39m: [36mServer listening at http://172.20.10.8:3001[39m
+[23:42:39] [32mINFO[39m: [36mServer listening at http://172.22.128.1:3001[39m
+[23:45:09] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-1"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 59264
+    }
+[23:45:09] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-1"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 12.32429999858141
+[23:45:09] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-2"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/health",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 59265
+    }
+[23:45:09] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-2"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1.3008000031113625
+[23:45:09] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-3"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 59266
+    }
+[23:45:09] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-3"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1.8056000024080276
+[23:45:13] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-4"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 59284
+    }
+[23:45:13] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-5"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/agent/chat/stream",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 59285
+    }
+[23:45:13] [31mERROR[39m: [36m[chatRouter] Failed to create conversation in DB[39m
+    err: {
+      "type": "PrismaClientKnownRequestError",
+      "message": "\nInvalid `db.conversation.create()` invocation in\nE:\\code\\javascript\\project\\PlanningGo\\src\\server\\modules\\agent\\chatRouter.ts:569:42\n\n  566 \n  567 if (db) {\n  568   try {\n→ 569     const conv = await db.conversation.create(\nThe column `conversations.agent_state_json` does not exist in the current database.",
+      "stack":
+          PrismaClientKnownRequestError: 
+          Invalid `db.conversation.create()` invocation in
+          E:\code\javascript\project\PlanningGo\src\server\modules\agent\chatRouter.ts:569:42
+          
+            566 
+            567 if (db) {
+            568   try {
+          → 569     const conv = await db.conversation.create(
+          The column `conversations.agent_state_json` does not exist in the current database.
+              at zr.handleRequestError (E:\code\javascript\project\PlanningGo\node_modules\@prisma\client\src\runtime\RequestHandler.ts:237:13)
+              at zr.handleAndLogRequestError (E:\code\javascript\project\PlanningGo\node_modules\@prisma\client\src\runtime\RequestHandler.ts:183:12)
+              at zr.request (E:\code\javascript\project\PlanningGo\node_modules\@prisma\client\src\runtime\RequestHandler.ts:152:12)
+              at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+              at async a (E:\code\javascript\project\PlanningGo\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+              at async ensureConversation (E:\code\javascript\project\PlanningGo\src\server\modules\agent\chatRouter.ts:569:20)
+              at async handleAgentMessage (E:\code\javascript\project\PlanningGo\src\server\modules\agent\chatRouter.ts:206:26)
+              at async Object.<anonymous> (E:\code\javascript\project\PlanningGo\src\server\routes\agentChat.ts:73:27)
+      "code": "P2022",
+      "meta": {
+        "modelName": "Conversation",
+        "driverAdapterError": {
+          "name": "DriverAdapterError",
+          "cause": {
+            "originalCode": "42703",
+            "originalMessage": "column conversations.agent_state_json does not exist",
+            "kind": "ColumnNotFound",
+            "column": "conversations.agent_state_json"
+          }
+        }
+      },
+      "clientVersion": "7.8.0",
+      "name": "PrismaClientKnownRequestError"
+    }
+[23:45:13] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-4"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 100.4514000043273
+[23:45:13] [33mWARN[39m: [36m[chatRouter] Failed to load agent state from DB[39m
+[23:45:13] [33mWARN[39m: [36m[chatRouter] Failed to save message to DB[39m
+[23:45:13] [32mINFO[39m: [36m[chatRouter] classified intent[39m
+    [35mintent[39m: "greeting"
+    [35mconversationId[39m: "03800558-0925-4fd5-a556-63e17660dc53"
+[23:45:13] [33mWARN[39m: [36m[chatRouter] Failed to save message to DB[39m
+[23:45:14] [33mWARN[39m: [36m[chatRouter] Failed to save agent state to DB[39m
+[23:45:14] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-5"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 511.6925999969244
+[23:45:14] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-6"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 62685
+    }
+[23:45:14] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-7"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 62686
+    }
+[23:45:14] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-7"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1.4541000053286552
+[23:45:14] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-6"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 22.038099996745586
+[23:45:20] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-8"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 64222
+    }
+[23:45:20] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-9"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/agent/chat/stream",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 64223
+    }
+[23:45:20] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-8"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 8.142299994826317
+[23:45:20] [31mERROR[39m: [36m[chatRouter] Failed to create conversation in DB[39m
+    err: {
+      "type": "PrismaClientKnownRequestError",
+      "message": "\nInvalid `db.conversation.create()` invocation in\nE:\\code\\javascript\\project\\PlanningGo\\src\\server\\modules\\agent\\chatRouter.ts:569:42\n\n  566 \n  567 if (db) {\n  568   try {\n→ 569     const conv = await db.conversation.create(\nThe column `conversations.agent_state_json` does not exist in the current database.",
+      "stack":
+          PrismaClientKnownRequestError: 
+          Invalid `db.conversation.create()` invocation in
+          E:\code\javascript\project\PlanningGo\src\server\modules\agent\chatRouter.ts:569:42
+          
+            566 
+            567 if (db) {
+            568   try {
+          → 569     const conv = await db.conversation.create(
+          The column `conversations.agent_state_json` does not exist in the current database.
+              at zr.handleRequestError (E:\code\javascript\project\PlanningGo\node_modules\@prisma\client\src\runtime\RequestHandler.ts:237:13)
+              at zr.handleAndLogRequestError (E:\code\javascript\project\PlanningGo\node_modules\@prisma\client\src\runtime\RequestHandler.ts:183:12)
+              at zr.request (E:\code\javascript\project\PlanningGo\node_modules\@prisma\client\src\runtime\RequestHandler.ts:152:12)
+              at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+              at async a (E:\code\javascript\project\PlanningGo\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+              at async ensureConversation (E:\code\javascript\project\PlanningGo\src\server\modules\agent\chatRouter.ts:569:20)
+              at async handleAgentMessage (E:\code\javascript\project\PlanningGo\src\server\modules\agent\chatRouter.ts:206:26)
+              at async Object.<anonymous> (E:\code\javascript\project\PlanningGo\src\server\routes\agentChat.ts:73:27)
+      "code": "P2022",
+      "meta": {
+        "modelName": "Conversation",
+        "driverAdapterError": {
+          "name": "DriverAdapterError",
+          "cause": {
+            "originalCode": "42703",
+            "originalMessage": "column conversations.agent_state_json does not exist",
+            "kind": "ColumnNotFound",
+            "column": "conversations.agent_state_json"
+          }
+        }
+      },
+      "clientVersion": "7.8.0",
+      "name": "PrismaClientKnownRequestError"
+    }
+[23:45:20] [33mWARN[39m: [36m[chatRouter] Failed to load agent state from DB[39m
+[23:45:20] [33mWARN[39m: [36m[chatRouter] Failed to save message to DB[39m
+[23:45:20] [32mINFO[39m: [36m[chatRouter] classified intent[39m
+    [35mintent[39m: "casual_chat"
+    [35mconversationId[39m: "fca9e502-4496-49b6-885a-80913c721fbd"
+[23:45:20] [33mWARN[39m: [36m[chatRouter] Failed to save message to DB[39m
+[23:45:20] [33mWARN[39m: [36m[chatRouter] Failed to save agent state to DB[39m
+[23:45:21] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-9"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 901.4100999981165
+[23:45:21] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-a"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 57135
+    }
+[23:45:21] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-b"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 57136
+    }
+[23:45:21] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-b"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1.742599993944168
+[23:45:21] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-a"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 22.205800004303455
+[23:45:55] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-c"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 57154
+    }
+[23:45:55] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-d"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/agent/chat/stream",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 57155
+    }
+[23:45:55] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-c"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 20.38460000604391
+[23:45:55] [31mERROR[39m: [36m[chatRouter] Failed to create conversation in DB[39m
+    err: {
+      "type": "PrismaClientKnownRequestError",
+      "message": "\nInvalid `db.conversation.create()` invocation in\nE:\\code\\javascript\\project\\PlanningGo\\src\\server\\modules\\agent\\chatRouter.ts:569:42\n\n  566 \n  567 if (db) {\n  568   try {\n→ 569     const conv = await db.conversation.create(\nThe column `conversations.agent_state_json` does not exist in the current database.",
+      "stack":
+          PrismaClientKnownRequestError: 
+          Invalid `db.conversation.create()` invocation in
+          E:\code\javascript\project\PlanningGo\src\server\modules\agent\chatRouter.ts:569:42
+          
+            566 
+            567 if (db) {
+            568   try {
+          → 569     const conv = await db.conversation.create(
+          The column `conversations.agent_state_json` does not exist in the current database.
+              at zr.handleRequestError (E:\code\javascript\project\PlanningGo\node_modules\@prisma\client\src\runtime\RequestHandler.ts:237:13)
+              at zr.handleAndLogRequestError (E:\code\javascript\project\PlanningGo\node_modules\@prisma\client\src\runtime\RequestHandler.ts:183:12)
+              at zr.request (E:\code\javascript\project\PlanningGo\node_modules\@prisma\client\src\runtime\RequestHandler.ts:152:12)
+              at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+              at async a (E:\code\javascript\project\PlanningGo\node_modules\@prisma\client\src\runtime\getPrismaClient.ts:963:24)
+              at async ensureConversation (E:\code\javascript\project\PlanningGo\src\server\modules\agent\chatRouter.ts:569:20)
+              at async handleAgentMessage (E:\code\javascript\project\PlanningGo\src\server\modules\agent\chatRouter.ts:206:26)
+              at async Object.<anonymous> (E:\code\javascript\project\PlanningGo\src\server\routes\agentChat.ts:73:27)
+      "code": "P2022",
+      "meta": {
+        "modelName": "Conversation",
+        "driverAdapterError": {
+          "name": "DriverAdapterError",
+          "cause": {
+            "originalCode": "42703",
+            "originalMessage": "column conversations.agent_state_json does not exist",
+            "kind": "ColumnNotFound",
+            "column": "conversations.agent_state_json"
+          }
+        }
+      },
+      "clientVersion": "7.8.0",
+      "name": "PrismaClientKnownRequestError"
+    }
+[23:45:55] [33mWARN[39m: [36m[chatRouter] Failed to load agent state from DB[39m
+[23:45:55] [33mWARN[39m: [36m[chatRouter] Failed to save message to DB[39m
+[23:45:55] [32mINFO[39m: [36m[chatRouter] classified intent[39m
+    [35mintent[39m: "casual_chat"
+    [35mconversationId[39m: "af75f233-1068-46fd-ade3-13e2c388b4b0"
+[23:45:55] [33mWARN[39m: [36m[chatRouter] Failed to save message to DB[39m
+[23:45:55] [33mWARN[39m: [36m[chatRouter] Failed to save agent state to DB[39m
+[23:45:56] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-d"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 890.4175999984145
+[23:45:56] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-e"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/events",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 58970
+    }
+[23:45:56] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-f"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/conversations?limit=30",
+      "host": "127.0.0.1:3001",
+      "remoteAddress": "127.0.0.1",
+      "remotePort": 58971
+    }
+[23:45:56] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-f"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 1.382200002670288
+[23:45:56] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-e"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 20.77820000052452

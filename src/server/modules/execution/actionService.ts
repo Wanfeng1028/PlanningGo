@@ -127,5 +127,5 @@ function createShareAction(
 
 function buildShareText(option: ActivityPlan): string {
   const lines = option.timeline.map((step) => `${step.startTime}-${step.endTime} ${step.title}`);
-  return [`我让周末有谱排了一个方案：${option.title}`, ...lines, "你看可以吗？"].join("\n");
+  return [`我让周末去哪儿排了一个方案：${option.title}`, ...lines, "你看可以吗？"].join("\n");
 }

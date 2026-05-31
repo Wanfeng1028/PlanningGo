@@ -13,15 +13,17 @@ import {
   type PlanningExecutableAction,
   type PlanningResult,
   type ConversationItem,
+  selectAgentPlan,
+  type AgentPlanSelectResponse,
 } from "../lib/api";
 import { GlassToast, useGlassToast } from "../components/GlassToast";
 import { validateInputLength } from "../lib/tokens";
 import { sanitizeMarkdown } from "../lib/sanitize";
-import { streamPlanningRequest } from "../lib/stream";
+import { streamAgentMessage } from "../lib/stream";
 import { WorkspaceModal } from "../components/WorkspaceModal";
 import { Button } from "../components/Button";
 import type { ModalKey, NavKey, SessionUser } from "../types";
-import type { ChatMessage, ChatSession, AttachmentItem, ModelMode } from "../components/features/types";
+import type { ChatMessage, ChatSession, AttachmentItem, ModelMode, ChatMessageKind, NextActionItem } from "../components/features/types";
 import { MODEL_MODES } from "../components/features/types";
 import { SUGGESTION_PROMPTS } from "../components/features/constants";
 import { AmbientBackground } from "../components/features/AmbientBackground";
@@ -372,17 +374,17 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
       // 3) Call API with streaming
       try {
         setPhase("planning");
+        setPhase("planning");
         let streamedContent = "";
-        let finalResult: PlanningResult | null = null as PlanningResult | null;
+        let agentResponse: unknown = null;
 
-        await streamPlanningRequest(
+        await streamAgentMessage(
           {
-            prompt,
+            message: prompt,
             city,
-            // 不再硬编码 companions，由后端从 prompt 推断
-            companions: undefined,
             modelMode: toApiModelMode(modelMode),
             conversationId: conversationIdRef.current ?? undefined,
+            selectedOptionId: selectedPlanId ?? undefined,
           },
           {
             signal: controller.signal,
@@ -394,57 +396,117 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
                 chips: undefined,
               });
             },
-            onFinalResult: (result: PlanningResult) => {
-              finalResult = result;
+            onFinalResult: (result: unknown) => {
+              agentResponse = result;
             },
           }
         );
 
-        if (!finalResult) {
-          throw new Error("规划流未返回最终结果，请稍后重试");
-        }
-        const result = finalResult as unknown as PlanningResult;
-
-        // Validate session hasn't changed (race condition protection)
+        // Validate session hasn't changed
         if (currentSessionIdRef.current !== targetSessionId) {
           console.warn("[Session] Session changed during request, ignoring response");
           return;
         }
 
-        // Store conversationId from backend
-        if (result.conversationId) {
-          setConversationId(result.conversationId);
-          conversationIdRef.current = result.conversationId;
+        const resp = agentResponse as Record<string, unknown>;
+        const respType = (resp?.type as string) ?? "chat";
+        const respConversationId = resp?.conversationId as string | undefined;
+
+        if (respConversationId) {
+          setConversationId(respConversationId);
+          conversationIdRef.current = respConversationId;
         }
 
-        // Refresh backend sessions list
         listConversations({ limit: 30 }).then(setBackendSessions).catch(() => {});
+        apiTrackEvent({ eventName: "agent_response", payload: { type: respType, conversationId: respConversationId }, page: "features" }).catch(() => {});
 
-        apiTrackEvent({ eventName: "planning_success", payload: { conversationId: result.conversationId, planId: result.planId }, page: "features" }).catch(() => {});
-
-        // 确保 options 数组存在且不为空
-        if (result.options && result.options.length > 0) {
-          // 为每个 option 生成唯一 ID（如果后端没有提供）
-          const optionsWithIds = result.options.map((opt: PlanningOption, idx: number) => ({
-            ...opt,
-            id: opt.id || `plan_${idx}`,
-          }));
-
-          updateLastAssistant(targetSessionId, {
-            status: "success",
-            content: result.summary || "为你找到以下方案：",
-            chips: undefined,
-            plans: optionsWithIds,
-            actions: result.executableActions || [],
-          });
-          setPhase("result");
-        } else {
-          updateLastAssistant(targetSessionId, {
-            status: "success",
-            content: result.summary || "已完成规划。",
-            chips: undefined,
-          });
-          setPhase("done");
+        // Branch by response type
+        switch (respType) {
+          case "chat":
+          case "identity":
+          case "travel_advice": {
+            const suggestions = (resp as { suggestions?: string[] })?.suggestions;
+            updateLastAssistant(targetSessionId, {
+              kind: respType as ChatMessageKind,
+              status: "success",
+              content: (resp?.content as string) ?? "",
+              chips: suggestions,
+            });
+            setPhase("result");
+            break;
+          }
+          case "slot_question": {
+            const missingSlots = ((resp as { missingSlots?: string[] })?.missingSlots ?? []) as string[];
+            const slotLabels: Record<string, string> = { origin: "从哪里出发", budget: "预算多少", partySize: "几个人", date: "什么时候", timeWindow: "时段", preference: "偏好", companions: "同行人" };
+            updateLastAssistant(targetSessionId, {
+              kind: "slot_question",
+              status: "success",
+              content: (resp?.content as string) ?? "",
+              chips: missingSlots.map((s) => slotLabels[s] ?? s),
+            });
+            setPhase("result");
+            break;
+          }
+          case "plan": {
+            const planData = (resp as { data?: { options?: PlanningOption[]; summary?: string; executableActions?: PlanningExecutableAction[] } })?.data;
+            const options = planData?.options ?? [];
+            const optionsWithIds = options.map((opt: PlanningOption, idx: number) => ({
+              ...opt,
+              id: opt.id || "plan_" + idx,
+            }));
+            updateLastAssistant(targetSessionId, {
+              kind: "plan",
+              status: "success",
+              content: planData?.summary ?? (resp?.content as string) ?? "",
+              chips: undefined,
+              plans: optionsWithIds,
+              actions: (planData?.executableActions as PlanningExecutableAction[]) ?? [],
+            });
+            setPhase("result");
+            break;
+          }
+          case "plan_selected": {
+            const nextActions = ((resp as { nextActions?: NextActionItem[] })?.nextActions ?? []) as NextActionItem[];
+            const selOptId = (resp as { selectedOptionId?: string })?.selectedOptionId;
+            const selTitle = (resp as { selectedPlanTitle?: string })?.selectedPlanTitle;
+            updateLastAssistant(targetSessionId, {
+              kind: "plan_selected",
+              status: "success",
+              content: (resp?.content as string) ?? "",
+              chips: nextActions.map((a) => a.label),
+              selectedOptionId: selOptId,
+              selectedPlanTitle: selTitle,
+              nextActions,
+            });
+            setSelectedPlanId(selOptId ?? null);
+            setPhase("selected");
+            break;
+          }
+          case "action_confirm": {
+            updateLastAssistant(targetSessionId, {
+              kind: "action_confirm",
+              status: "success",
+              content: (resp?.content as string) ?? "",
+            });
+            setPhase("result");
+            break;
+          }
+          case "error": {
+            updateLastAssistant(targetSessionId, {
+              kind: "error",
+              status: "error",
+              content: (resp?.content as string) ?? "服务内部错误",
+            });
+            setPhase("error");
+            break;
+          }
+          default: {
+            updateLastAssistant(targetSessionId, {
+              status: "success",
+              content: (resp?.content as string) ?? "",
+            });
+            setPhase("result");
+          }
         }
       } catch (err) {
         // Validate session hasn't changed (race condition protection)
@@ -509,13 +571,43 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
   }, []);
 
   const handleSelectPlan = useCallback(
-    (planId: string) => {
+    async (planId: string) => {
       setSelectedPlanId(planId);
       setPhase("selected");
-      // Plan card auto-expands with action chips — no extra message needed
       apiTrackEvent({ eventName: "select_plan", payload: { planId, conversationId }, page: "features" }).catch(() => {});
+
+      try {
+        if (conversationIdRef.current) {
+          const result = await selectAgentPlan({
+            conversationId: conversationIdRef.current,
+            optionId: planId,
+          });
+
+          const allPlans = messages.flatMap((m) => m.plans ?? []);
+          const selectedPlan = allPlans.find((p) => p.id === planId);
+          const planTitle = selectedPlan?.title ?? result.selectedPlanTitle ?? "已选方案";
+
+          if (currentSessionIdRef.current) {
+            const confirmMsg: ChatMessage = {
+              id: uuid(),
+              role: "assistant",
+              kind: "plan_selected",
+              content: result.content ?? "已选中「" + planTitle + "」。下一步你可以：",
+              status: "success",
+              createdAt: new Date().toISOString(),
+              chips: result.nextActions?.map((a) => a.label),
+              nextActions: result.nextActions,
+              selectedOptionId: planId,
+              selectedPlanTitle: planTitle,
+            };
+            addMessage(currentSessionIdRef.current, confirmMsg);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to select plan:", err);
+      }
     },
-    [conversationId],
+    [conversationId, messages, addMessage],
   );
 
   const handleRetryLast = useCallback(() => {
@@ -542,12 +634,21 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     try {
       const detail = await getConversation(sessionId);
       if (detail && detail.messages.length > 0) {
-        const loadedMessages: ChatMessage[] = detail.messages.map((m) => ({
-          id: m.id,
-          role: m.role as "user" | "assistant",
-          content: m.content,
-          createdAt: m.createdAt,
-        }));
+        const loadedMessages: ChatMessage[] = detail.messages.map((m) => {
+          const payload = m.payloadJson as Record<string, unknown> | undefined;
+          const payloadType = (payload?.type as string) ?? "text";
+          return {
+            id: m.id,
+            role: m.role as "user" | "assistant",
+            content: m.content,
+            createdAt: m.createdAt,
+            status: "success" as const,
+            kind: payloadType as ChatMessageKind,
+            plans: payloadType === "plan" ? ((payload?.data as Record<string, unknown>)?.options as PlanningOption[]) ?? [] : undefined,
+            actions: payloadType === "plan" ? ((payload?.data as Record<string, unknown>)?.executableActions as PlanningExecutableAction[]) ?? [] : undefined,
+            chips: payloadType === "slot_question" ? (payload?.missingSlots as string[]) ?? [] : undefined,
+          };
+        });
         setCurrentSessionId(sessionId);
         currentSessionIdRef.current = sessionId;
         setConversationId(sessionId);
@@ -555,7 +656,16 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
         setSessionMessages(sessionId, loadedMessages);
         setMode("chat");
         setPhase("result");
-        setSelectedPlanId(null);
+        // Restore selectedOptionId from conversation
+        const selPayload = detail.messages.find((m) => {
+          const p = m.payloadJson as Record<string, unknown> | undefined;
+          return p?.type === "plan_selected";
+        })?.payloadJson as Record<string, unknown> | undefined;
+        if (selPayload?.selectedOptionId) {
+          setSelectedPlanId(selPayload.selectedOptionId as string);
+        } else {
+          setSelectedPlanId(null);
+        }
         setSidebarOpen(false);
         setInputValue("");
         return;
@@ -577,7 +687,16 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     } else {
       setPhase("idle");
     }
-    setSelectedPlanId(null);
+        // Restore selectedOptionId from conversation
+        const selPayload = detail.messages.find((m) => {
+          const p = m.payloadJson as Record<string, unknown> | undefined;
+          return p?.type === "plan_selected";
+        })?.payloadJson as Record<string, unknown> | undefined;
+        if (selPayload?.selectedOptionId) {
+          setSelectedPlanId(selPayload.selectedOptionId as string);
+        } else {
+          setSelectedPlanId(null);
+        }
     setSidebarOpen(false);
     setInputValue("");
     requestAnimationFrame(() => textareaRef.current?.focus());
@@ -787,7 +906,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
           const title = plan?.title ?? "周末出行计划";
           const text = plan?.timeline.map((t) => `${t.startTime}–${t.endTime} ${t.title}`).join("\n") || title;
           if (navigator.share) {
-            navigator.share({ title: "周末有谱", text }).catch(() => {});
+            navigator.share({ title: "周末去哪儿", text }).catch(() => {});
           } else {
             navigator.clipboard.writeText(text);
             showToast("已复制到剪贴板", "success");

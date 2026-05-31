@@ -64,8 +64,8 @@ export function FeaturesSidebar({
         {/* Header */}
         <div className={styles.sidebarHeader}>
           <div className={styles.sidebarLogoRow}>
-            <img className={styles.sidebarLogo} src="/avatar/planninggo-avatar-512.png" alt="周末有谱" />
-            <span className={styles.sidebarBrand}>周末有谱</span>
+            <img className={styles.sidebarLogo} src="/avatar/planninggo-avatar-512.png" alt="周末去哪儿" />
+            <span className={styles.sidebarBrand}>周末去哪儿</span>
           </div>
           {onReturnHome && (
             <button className={styles.returnHomeBtn} onClick={onReturnHome}>

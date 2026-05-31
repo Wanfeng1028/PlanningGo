@@ -293,7 +293,7 @@ export function App() {
 
       {!isFeatureWorkspace && (
         <footer className={styles.footer}>
-          <span>周末有谱 · 本地生活规划 Agent</span>
+          <span>周末去哪儿 · 本地生活规划 Agent</span>
           <span></span>
         </footer>
       )}

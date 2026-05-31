@@ -94,7 +94,7 @@ async function seedNotifications(db: PrismaClient, userId: string) {
       {
         userId,
         type: "welcome",
-        title: "欢迎使用周末有谱",
+        title: "欢迎使用周末去哪儿",
         message: "描述你的想法，AI 会为你生成定制方案。",
         read: false,
       },

@@ -125,7 +125,7 @@ export function HomePage({ onNavigate, onOpenModal, user, onAuthRequiredNavigate
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.58, ease: [0.16, 1, 0.3, 1] }}
         >
-          <span className={styles.eyebrow}>周末有谱 · 本地生活规划</span>
+          <span className={styles.eyebrow}>周末去哪儿 · 本地生活规划</span>
           <h1>
             一款本地生活Agent!
             <br />

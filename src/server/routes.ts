@@ -23,7 +23,7 @@ export async function registerRoutes(app: FastifyInstance) {
   app.get("/", async () => ({
     name: "PlanningGo API",
     version: "0.1.0",
-    description: "「周末有谱」智能出行规划 API",
+    description: "「周末去哪儿」智能出行规划 API",
     docs: "/api/docs",
     health: "/api/health",
     environment: env.NODE_ENV,
@@ -42,6 +42,7 @@ export async function registerRoutes(app: FastifyInstance) {
   await import("./routes/privacy.js").then((m) => m.registerPrivacyRoutes(app));
   await import("./routes/calendar.js").then((m) => m.registerCalendarRoutes(app));
   await import("./routes/agent.js").then((m) => m.registerAgentRoutes(app));
+  await import("./routes/agentChat.js").then((m) => m.registerAgentChatRoutes(app));
   await import("./routes/mock.js").then((m) => m.registerMockRoutes(app));
   await import("./routes/location.js").then((m) => m.registerLocationRoutes(app));
   await import("./routes/meituan.js").then((m) => m.registerMeituanRoutes(app));
@@ -55,7 +56,7 @@ export async function registerRoutes(app: FastifyInstance) {
     groups: [
       { group: "Auth", endpoints: ["POST /api/auth/login", "POST /api/auth/register", "POST /api/auth/guest"] },
       { group: "Profile", endpoints: ["GET /api/profile/demo", "PATCH /api/profile/demo", "GET /api/profile/demo/permissions", "PATCH /api/profile/demo/permissions"] },
-      { group: "Planning Agent", endpoints: ["POST /api/agent/parse", "POST /api/agent/plan", "POST /api/agent/plan/legacy", "POST /api/agent/what-if"] },
+      { group: "Planning Agent", endpoints: ["POST /api/agent/parse", "POST /api/agent/plan", "POST /api/agent/plan/legacy", "POST /api/agent/what-if", "POST /api/agent/chat", "POST /api/agent/chat/stream", "POST /api/agent/plans/select"] },
       { group: "Mock Data", endpoints: ["GET /api/mock/pois", "GET /api/mock/weather", "GET /api/mock/routes"] },
       { group: "Plans", endpoints: ["GET /api/plans/demo", "POST /api/plans/select"] },
       { group: "Reservations", endpoints: ["GET /api/reservations", "POST /api/reservations", "PATCH /api/reservations/:id/status"] },

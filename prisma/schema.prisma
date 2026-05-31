@@ -709,6 +709,8 @@ model Conversation {
   title     String   @default("新规划")
   city      String   @default("北京")
   modelMode String   @default("flash") @map("model_mode")
+  agentStateJson    Json?     @map("agent_state_json")
+  selectedOptionId  String?   @map("selected_option_id")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

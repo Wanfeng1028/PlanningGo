@@ -348,6 +348,28 @@ export async function requestWhatIf(planId: string, scenario: "rain" | "late" | 
   );
 }
 
+
+// ─── Agent Chat API (new chat router) ─────────────────────
+
+export interface AgentPlanSelectResponse {
+  type: "plan_selected";
+  content: string;
+  selectedOptionId: string;
+  selectedPlanTitle: string;
+  nextActions: { key: string; label: string }[];
+  conversationId: string;
+}
+
+export async function selectAgentPlan(input: {
+  conversationId: string;
+  optionId: string;
+}): Promise<AgentPlanSelectResponse> {
+  return apiJson<AgentPlanSelectResponse>("/api/agent/plans/select", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 // ── Actions API ──
 
 export interface ActionItem {
@@ -848,8 +870,6 @@ export async function togglePlanFavorite(planId: string): Promise<{ id: string; 
 export async function listFavoritePlans(): Promise<Record<string, unknown>[]> {
   return apiJson<Record<string, unknown>[]>("/api/plans/favorites");
 }
-
-// ═══════════════════════════════════════════════════
 // Execution Actions API (confirm/cancel)
 // ═══════════════════════════════════════════════════
 

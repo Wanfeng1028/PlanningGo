@@ -28,7 +28,7 @@ export class ShareProvider {
     timeline: Array<{ startTime: string; endTime: string; title: string }>;
   }): Promise<{ text: string }> {
     const lines = params.timeline.map((step) => `${step.startTime}-${step.endTime} ${step.title}`);
-    const text = [`我让周末有谱排了一个方案：${params.title}`, ...lines, "你看可以吗？"].join("\n");
+    const text = [`我让周末去哪儿排了一个方案：${params.title}`, ...lines, "你看可以吗？"].join("\n");
 
     return { text };
   }

@@ -1,8 +1,8 @@
 {
   "display": "standalone",
   "start_url": "/",
-  "short_name": "周末有谱",
-  "name": "周末有谱 · 本地生活规划 Agent",
+  "short_name": "周末去哪儿",
+  "name": "周末去哪儿 · 像聊天一样，把半天出行安排明白",
   "theme_color": "#0ea5e9",
   "icons": [
     {
@@ -23,5 +23,5 @@
     }
   ],
   "background_color": "#ffffff",
-  "description": "本地生活活动规划 Agent，从一句话需求到路线、预约、授权、协作和记忆沉淀。"
+  "description": "像聊天一样，把半天出行安排明白。"
 }

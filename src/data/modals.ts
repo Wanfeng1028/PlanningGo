@@ -4,7 +4,7 @@ export const modalContent: Record<ModalContent["key"], ModalContent> = {
   login: {
     key: "login",
     eyebrow: "账号登录",
-    title: "登录周末有谱",
+    title: "登录周末去哪儿",
     body: "登录后可以继续保存你的城市、同行人、预算偏好和历史安排，让下次规划更顺手。",
     primary: "立即登录",
     secondary: "稍后再说",

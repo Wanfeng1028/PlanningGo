@@ -120,3 +120,44 @@ export async function streamPlanningRequest(
     credentials: "include",
   });
 }
+// ─── Agent Chat Stream (new chat router) ────────────────────
+
+export interface AgentStreamOptions {
+  onChunk?: (chunk: string) => void;
+  onFinalResult?: (result: unknown) => void;
+  onError?: (error: Error) => void;
+  onComplete?: () => void;
+  signal?: AbortSignal;
+}
+
+export async function streamAgentMessage(
+  input: {
+    message: string;
+    city?: string;
+    modelMode?: string;
+    conversationId?: string;
+    selectedOptionId?: string;
+  },
+  options: AgentStreamOptions,
+): Promise<void> {
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+  };
+
+  const token = getAuthToken();
+  if (token) {
+    headers.authorization = `Bearer ${token}`;
+  }
+
+  // Reuse streamFetch but with generic onFinalResult
+  const { onFinalResult, ...restOptions } = options;
+
+  return streamFetch(`${API_BASE}/api/agent/chat/stream`, {
+    ...restOptions,
+    onFinalResult: onFinalResult as StreamOptions["onFinalResult"],
+    method: "POST",
+    headers,
+    body: JSON.stringify(input),
+    credentials: "include",
+  });
+}

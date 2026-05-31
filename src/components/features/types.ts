@@ -3,12 +3,29 @@ import type { PlanningOption, PlanningExecutableAction } from "../../lib/api";
 /* ── Re-export API types used by extracted feature components ── */
 export type { PlanningOption, PlanningExecutableAction };
 
+export type ChatMessageKind =
+  | "text"
+  | "identity"
+  | "travel_advice"
+  | "slot_question"
+  | "plan"
+  | "plan_selected"
+  | "action_confirm"
+  | "action_result"
+  | "error";
+
+export interface NextActionItem {
+  key: string;
+  label: string;
+}
+
 export const MODEL_MODES = ["Flash", "Pro"] as const;
 export type ModelMode = typeof MODEL_MODES[number];
 
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
+  kind?: ChatMessageKind;
   content: string;
   createdAt: string;
   status?: "thinking" | "success" | "error";
@@ -17,6 +34,9 @@ export interface ChatMessage {
   actions?: PlanningExecutableAction[];
   actionQuotingId?: string;
   actionQuotedPreview?: string;
+  nextActions?: NextActionItem[];
+  selectedOptionId?: string;
+  selectedPlanTitle?: string;
 }
 
 export interface ChatSession {

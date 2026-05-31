@@ -73,7 +73,7 @@ const llmOutputSchema = z.object({
   plans: z.array(llmPlanItemSchema).min(1).max(3),
 });
 
-const SYSTEM_PROMPT = `你是"周末有谱"的行程规划 AI。用户会告诉你出行需求，你需要生成 1-2 套可执行的行程方案。
+const SYSTEM_PROMPT = `你是"周末去哪儿"的行程规划 AI。用户会告诉你出行需求，你需要生成 1-2 套可执行的行程方案。
 
 要求：
 1. 只输出 JSON，不要输出任何其他文字

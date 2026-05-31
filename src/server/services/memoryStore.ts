@@ -97,6 +97,8 @@ interface MemoryConversation {
   title: string;
   city: string;
   modelMode: string;
+  agentStateJson: unknown | null;
+  selectedOptionId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -526,6 +528,8 @@ export function createConversation(data: {
     title: data.title ?? "新规划",
     city: data.city ?? "北京",
     modelMode: data.modelMode ?? "flash",
+    agentStateJson: null,
+    selectedOptionId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

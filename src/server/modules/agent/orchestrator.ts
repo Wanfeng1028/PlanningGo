@@ -46,6 +46,11 @@ export async function runPlanningPipeline(
   }
 
   // 2. 构造上下文（注入 providers）
+
+  // Guard: if required slots are missing, refuse to plan
+  if (intent.mustAsk && intent.mustAsk.length > 0) {
+    throw new Error(`MISSING_REQUIRED_SLOTS:${intent.mustAsk.join(",")}`);
+  }
   const context = await buildPlanningContext({ traceId, planId, intent, providers: input.providers });
 
   // 3. 生成候选 POI 池（通过 providers.map 获取真实数据）

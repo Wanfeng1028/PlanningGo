@@ -21,7 +21,7 @@ const icsSchema = z.object({
 export async function registerCalendarRoutes(app: FastifyInstance) {
   app.post("/api/ics", { preHandler: [app.optionalAuthGuard] }, async (request, reply) => {
     const body = icsSchema.parse(request.body);
-    const title = icsEscape(body.title ?? "周末有谱行程");
+    const title = icsEscape(body.title ?? "周末去哪儿行程");
     const date = body.date ?? "20260509";
     const ics = [
       "BEGIN:VCALENDAR",
@@ -32,7 +32,7 @@ export async function registerCalendarRoutes(app: FastifyInstance) {
       `DTSTART:${date}T140000`,
       `DTEND:${date}T183000`,
       `SUMMARY:${title}`,
-      "DESCRIPTION:由周末有谱 Agent 生成的本地生活规划。",
+      "DESCRIPTION:由周末去哪儿 Agent 生成的本地生活规划。",
       "END:VEVENT",
       "END:VCALENDAR",
     ].join("\r\n");
