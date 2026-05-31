@@ -741,3 +741,5 @@
       at async loadAndTransform (file:///E:/code/javascript/project/PlanningGo/node_modules/vite/dist/node/chunks/node.js:24512:26)
       at async viteTransformMiddleware (file:///E:/code/javascript/project/PlanningGo/node_modules/vite/dist/node/chunks/node.js:24306:20)
 [2m23:36:00[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/components/AuthModal.tsx, /src/pages/FeaturesPage.tsx[22m
+[2m00:25:05[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/FeaturesPage.tsx[22m
+[2m00:27:09[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/FeaturesPage.tsx[22m

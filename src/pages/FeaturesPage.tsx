@@ -687,16 +687,6 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     } else {
       setPhase("idle");
     }
-        // Restore selectedOptionId from conversation
-        const selPayload = detail.messages.find((m) => {
-          const p = m.payloadJson as Record<string, unknown> | undefined;
-          return p?.type === "plan_selected";
-        })?.payloadJson as Record<string, unknown> | undefined;
-        if (selPayload?.selectedOptionId) {
-          setSelectedPlanId(selPayload.selectedOptionId as string);
-        } else {
-          setSelectedPlanId(null);
-        }
     setSidebarOpen(false);
     setInputValue("");
     requestAnimationFrame(() => textareaRef.current?.focus());
