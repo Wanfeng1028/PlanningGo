@@ -6,6 +6,7 @@ import { createTraceId } from "./common/id";
 import { AppError } from "./common/errors";
 import { sendError } from "./common/response";
 import { registerRoutes } from "./routes";
+import { getChatModel, hasAnyLlmKey } from "./modules/agent/modelClient";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
@@ -80,14 +81,71 @@ export async function buildApp() {
     reply.header("Cache-Control", "public, max-age=5");
     return { ok: true, status: "ok", timestamp: new Date().toISOString() };
   });
+  // 启动时间，用于计算 uptime
+  const startedAt = Date.now();
+
   app.get("/api/ready", async (request, reply) => {
+    // ── DB 检查 ──
+    let dbStatus: string = app.db ? "ok" : "memory";
     try {
       if (app.db) await app.db.$queryRaw`SELECT 1`;
-      return { status: "ready", db: app.db ? "ok" : "memory", redis: app.redis?.status ?? "memory" };
-    } catch (err) {
-      app.log.warn({ err }, "Health check: database not ready");
-      return reply.status(503).send({ status: "not_ready", db: "error" });
+    } catch {
+      dbStatus = "error";
     }
+
+    // ── Redis 检查 ──
+    let redisStatus: string = "memory";
+    if (app.redis) {
+      try {
+        const pong = await app.redis.ping();
+        redisStatus = pong === "PONG" ? "ok" : "error";
+      } catch {
+        redisStatus = "error";
+      }
+    }
+
+    // ── LLM 状态（不泄露 key）──
+    const llmConfigured = hasAnyLlmKey();
+    const llmInfo: Record<string, unknown> = {
+      configured: llmConfigured,
+      mode: env.AGENT_CHAT_MODE,
+    };
+    if (llmConfigured) {
+      const chatModel = getChatModel("flash");
+      llmInfo.provider = chatModel.provider;
+      llmInfo.model = chatModel.model;
+    }
+    if (env.LLM_EXPOSE_DIAGNOSTICS) {
+      llmInfo.priority = env.LLM_PROVIDER_PRIORITY;
+      llmInfo.fallback = env.LLM_PROVIDER_FALLBACK;
+    }
+
+    // ── AMap 状态 ──
+    const amapConfigured = Boolean(env.AMAP_WEB_SERVICE_KEY);
+
+    // ── mock 是否允许 ──
+    const mockAllowed = env.NODE_ENV === "production"
+      ? env.ALLOW_MOCK_PROVIDER_IN_PRODUCTION
+      : true;
+
+    // ── 整体就绪判断 ──
+    const isReady = dbStatus !== "error" && redisStatus !== "error";
+
+    const body = {
+      ok: isReady,
+      db: dbStatus,
+      redis: redisStatus,
+      llm: llmInfo,
+      amap: { configured: amapConfigured },
+      mockAllowed,
+      uptime: Math.floor((Date.now() - startedAt) / 1000),
+      timestamp: new Date().toISOString(),
+    };
+
+    if (!isReady) {
+      return reply.status(503).send(body);
+    }
+    return body;
   });
 
   // ── 业务路由 ──

@@ -12,15 +12,26 @@ import { ClaudeAdapter, GrokAdapter, type LlmAdapter, type LlmMessage, type LlmT
 
 // ─── Provider Definitions ────────────────────────────────────
 
+export interface ProviderCapability {
+  streaming: boolean;
+  toolCalling: boolean;
+  jsonMode: boolean;
+  maxToolRounds: number;
+}
+
 interface ProviderConfig {
   name: string;
   apiKey?: string;
   baseURL: string;
   flashModel: string;
   proModel: string;
+  capability: ProviderCapability;
 }
 
 function buildProviderList(): ProviderConfig[] {
+  const mimoToolCalling = env.MIMO_SUPPORTS_TOOL_CALLING ?? false;
+  const defaultCap: ProviderCapability = { streaming: true, toolCalling: true, jsonMode: true, maxToolRounds: 5 };
+
   return [
     {
       name: "openai",
@@ -28,6 +39,7 @@ function buildProviderList(): ProviderConfig[] {
       baseURL: env.OPENAI_BASE_URL,
       flashModel: env.LLM_FLASH_MODEL ?? env.LLM_MODEL,
       proModel: env.LLM_PRO_MODEL ?? env.LLM_MODEL,
+      capability: defaultCap,
     },
     {
       name: "qwen",
@@ -35,6 +47,7 @@ function buildProviderList(): ProviderConfig[] {
       baseURL: env.QWEN_BASE_URL,
       flashModel: env.QWEN_FLASH_MODEL ?? "qwen-plus",
       proModel: env.QWEN_PRO_MODEL ?? "qwen-max",
+      capability: defaultCap,
     },
     {
       name: "deepseek",
@@ -42,6 +55,7 @@ function buildProviderList(): ProviderConfig[] {
       baseURL: env.DEEPSEEK_BASE_URL,
       flashModel: env.DEEPSEEK_FLASH_MODEL ?? "deepseek-chat",
       proModel: env.DEEPSEEK_PRO_MODEL ?? "deepseek-chat",
+      capability: defaultCap,
     },
     {
       name: "moonshot",
@@ -49,6 +63,7 @@ function buildProviderList(): ProviderConfig[] {
       baseURL: env.MOONSHOT_BASE_URL,
       flashModel: env.MOONSHOT_FLASH_MODEL ?? "moonshot-v1-8k",
       proModel: env.MOONSHOT_PRO_MODEL ?? "moonshot-v1-32k",
+      capability: defaultCap,
     },
     {
       name: "groq",
@@ -56,6 +71,7 @@ function buildProviderList(): ProviderConfig[] {
       baseURL: env.GROQ_BASE_URL,
       flashModel: env.GROQ_FLASH_MODEL ?? "llama-3.3-70b-versatile",
       proModel: env.GROQ_PRO_MODEL ?? "llama-3.3-70b-versatile",
+      capability: defaultCap,
     },
     {
       name: "gemini",
@@ -63,6 +79,7 @@ function buildProviderList(): ProviderConfig[] {
       baseURL: env.GEMINI_BASE_URL,
       flashModel: env.GEMINI_FLASH_MODEL ?? "gemini-2.0-flash",
       proModel: env.GEMINI_PRO_MODEL ?? "gemini-2.5-pro-preview-05-06",
+      capability: defaultCap,
     },
     {
       name: "doubao",
@@ -70,6 +87,7 @@ function buildProviderList(): ProviderConfig[] {
       baseURL: env.DOUBAO_BASE_URL,
       flashModel: env.DOUBAO_FLASH_MODEL ?? "doubao-1.5-pro-32k",
       proModel: env.DOUBAO_PRO_MODEL ?? "doubao-1.5-pro-256k",
+      capability: { streaming: true, toolCalling: false, jsonMode: true, maxToolRounds: 0 },
     },
     {
       name: "mimo",
@@ -77,6 +95,12 @@ function buildProviderList(): ProviderConfig[] {
       baseURL: env.MIMO_BASE_URL,
       flashModel: env.MIMO_FLASH_MODEL ?? "mimo-7b",
       proModel: env.MIMO_PRO_MODEL ?? "mimo-7b",
+      capability: {
+        streaming: true,
+        toolCalling: mimoToolCalling,
+        jsonMode: true,
+        maxToolRounds: mimoToolCalling ? 5 : 0,
+      },
     },
     {
       name: "longcat",
@@ -84,6 +108,7 @@ function buildProviderList(): ProviderConfig[] {
       baseURL: env.LONGCAT_BASE_URL,
       flashModel: env.LONGCAT_FLASH_MODEL ?? "longcat-chat",
       proModel: env.LONGCAT_PRO_MODEL ?? "longcat-chat",
+      capability: { streaming: true, toolCalling: false, jsonMode: true, maxToolRounds: 0 },
     },
   ];
 }
@@ -142,6 +167,34 @@ function getAdapterProviders(): Array<{ name: string; adapter: LlmAdapter; flash
   return result;
 }
 
+// ─── Provider Capability ─────────────────────────────────────
+
+/**
+ * Providers known to support OpenAI-compatible function/tool calling.
+ * MiMo respects MIMO_SUPPORTS_TOOL_CALLING env var.
+ * Others (longcat, doubao) are treated as text-only to be safe.
+ */
+const TOOL_CALLING_PROVIDERS = new Set([
+  "openai", "qwen", "deepseek", "moonshot", "groq", "gemini", "claude", "grok",
+]);
+
+export function getProviderCapability(providerName: string): ProviderCapability {
+  const name = providerName.toLowerCase();
+  let hasToolCalling = TOOL_CALLING_PROVIDERS.has(name);
+
+  // MiMo: 根据环境变量决定是否支持 tool calling
+  if (name === "mimo") {
+    hasToolCalling = env.MIMO_SUPPORTS_TOOL_CALLING ?? false;
+  }
+
+  return {
+    streaming: true,
+    toolCalling: hasToolCalling,
+    jsonMode: hasToolCalling,
+    maxToolRounds: hasToolCalling ? 5 : 0,
+  };
+}
+
 // ─── Public API ──────────────────────────────────────────────
 
 export function hasAnyLlmKey(): boolean {
@@ -189,6 +242,7 @@ export async function chat(
   if (providers.length === 0) throw new Error("No LLM API key configured");
 
   const mode = options?.mode ?? "flash";
+  const allowFallback = env.LLM_PROVIDER_FALLBACK;
   let lastError: Error | null = null;
 
   for (const p of providers) {
@@ -210,6 +264,9 @@ export async function chat(
       };
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
+      if (!allowFallback) {
+        throw lastError;
+      }
       // Try next provider
     }
   }
@@ -232,6 +289,7 @@ export async function chatStream(
   abort: () => void;
 }> {
   const mode = options?.mode ?? "flash";
+  const allowFallback = env.LLM_PROVIDER_FALLBACK;
 
   // Try OpenAI-compatible providers first
   const providers = resolveProviders();
@@ -261,6 +319,9 @@ export async function chatStream(
       };
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
+      if (!allowFallback) {
+        throw lastError;
+      }
     }
   }
 
@@ -310,6 +371,9 @@ export async function chatStream(
       };
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
+      if (!allowFallback) {
+        throw lastError;
+      }
     }
   }
 
@@ -352,6 +416,62 @@ async function* wrapAdapterStream(
         finish_reason: chunk.finishReason as any ?? null,
       }],
     } as unknown as OpenAI.Chat.Completions.ChatCompletionChunk;
+  }
+}
+
+/**
+ * Get diagnostics for the current LLM provider configuration.
+ * Used by the smoke test endpoint.
+ */
+export async function getProviderDiagnostics(): Promise<{
+  ok: boolean;
+  provider: string;
+  model: string;
+  streaming: boolean;
+  toolCalling: boolean;
+  latencyMs: number;
+  error?: string;
+}> {
+  const { provider, model } = getChatModel("flash");
+  const providers = resolveProviders();
+  const current = providers[0];
+
+  if (!current) {
+    return {
+      ok: false,
+      provider: "none",
+      model: "none",
+      streaming: false,
+      toolCalling: false,
+      latencyMs: 0,
+      error: "No LLM API key configured",
+    };
+  }
+
+  const start = Date.now();
+  try {
+    await chat(
+      [{ role: "user", content: "ping" }],
+      { mode: "flash", maxTokens: 16 },
+    );
+    return {
+      ok: true,
+      provider,
+      model,
+      streaming: current.capability.streaming,
+      toolCalling: current.capability.toolCalling,
+      latencyMs: Date.now() - start,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      provider,
+      model,
+      streaming: current.capability.streaming,
+      toolCalling: current.capability.toolCalling,
+      latencyMs: Date.now() - start,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 

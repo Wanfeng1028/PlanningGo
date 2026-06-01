@@ -17,6 +17,7 @@ export function FeaturesSidebar({
   onNewChat,
   onNavItemClick,
   chatSessions,
+  currentSessionId,
   onSessionClick,
   searchQuery,
   onSearchChange,
@@ -32,6 +33,7 @@ export function FeaturesSidebar({
   onNewChat: () => void;
   onNavItemClick: (id: string) => void;
   chatSessions: ChatSession[];
+  currentSessionId?: string | null;
   onSessionClick: (sessionId: string) => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
@@ -108,8 +110,12 @@ export function FeaturesSidebar({
         <div className={styles.sidebarRecent}>
           {filteredSessions.length > 0 ? (
             filteredSessions.map((session) => (
-              <button key={session.id} className={styles.sidebarRecentItem} onClick={() => onSessionClick(session.id)}>
-                <span className={styles.recentDot} />
+              <button
+                key={session.id}
+                className={`${styles.sidebarRecentItem} ${session.id === currentSessionId ? styles.sidebarRecentItemActive : ""}`}
+                onClick={() => onSessionClick(session.id)}
+              >
+                <span className={`${styles.recentDot} ${session.id === currentSessionId ? styles.recentDotActive : ""}`} />
                 <span className={styles.recentItemContent}>
                   <span className={styles.recentItemTitle}>{session.title}</span>
                   <span className={styles.recentItemTime}>{formatRelativeTime(session.updatedAt)}</span>

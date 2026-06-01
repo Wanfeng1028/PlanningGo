@@ -272,8 +272,9 @@ export async function runAgentChatStream(
     agentResponse = classifyResponse(finalContent, currentDraft, state, conversationId);
   }
 
-  // 9. Save assistant message
-  const payloadJson = agentResponse.type === "plan" ? agentResponse.data : undefined;
+  // 9. Save assistant message with full payload for history restoration
+  const { conversationId: _respCid, ...responsePayload } = agentResponse;
+  const payloadJson = { ...responsePayload, content: finalContent };
   await saveMsg(db, conversationId, "assistant", finalContent, payloadJson, log);
 
   // 10. Update agent state

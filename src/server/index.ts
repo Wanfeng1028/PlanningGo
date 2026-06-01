@@ -1,3 +1,6 @@
+import "dotenv/config";
+
+
 import { buildApp } from "./app";
 import { env, corsOrigins } from "./config/env";
 

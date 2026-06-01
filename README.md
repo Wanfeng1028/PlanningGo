@@ -119,19 +119,6 @@ npm run start:api
 - 后端：`dist/server/index.js`
 - 前端：`dist/`（Vite 静态资源）
 
-## Docker 部署
-
-```bash
-# 启动所有服务（PostgreSQL + Redis + API）
-docker compose up -d
-
-# 查看日志
-docker compose logs -f api
-
-# 停止
-docker compose down
-```
-
 ## 端口说明
 
 | 服务 | 地址 |
@@ -139,12 +126,16 @@ docker compose down
 | 前端 | http://127.0.0.1:5173 |
 | 后端 | http://127.0.0.1:3001 |
 | 健康检查 | http://127.0.0.1:3001/api/health |
+| 就绪检查 | http://127.0.0.1:3001/api/ready |
 
 ## 接口测试
 
 ```bash
-# 健康检查
+# 健康检查（存活探针）
 curl http://127.0.0.1:3001/api/health
+
+# 就绪检查（组件状态）
+curl http://127.0.0.1:3001/api/ready
 
 # 登录
 curl -X POST http://127.0.0.1:3001/api/auth/login \
@@ -168,43 +159,332 @@ curl "http://127.0.0.1:3001/api/location/reverse-geocode?lat=31.2304&lng=121.473
 curl http://127.0.0.1:3001/api/auth/meituan/start
 ```
 
-## 生产环境功能
+## 健康检查与就绪检查
 
-### 健康检查
+### `GET /api/health` — 存活探针
 
-- `GET /api/health` — 基础存活检查（200 OK）
-- `GET /api/ready` — 详细就绪检查，返回各组件状态：
-  - `db` — PostgreSQL 连接状态
-  - `redis` — Redis 连接状态
-  - `llm` — LLM API Key 配置状态
-  - `amap` — 高德地图 Key 配置状态
-  - `mode` — 当前规划模式（mock/llm/hybrid）
-  - `uptime` — 进程运行时间
-
-### 密码重置
-
-- `POST /api/auth/forgot-password` — 请求密码重置（发送重置链接）
-- `POST /api/auth/reset-password` — 使用重置令牌设置新密码
-- 前端登录页有「忘记密码？」入口
-
-### Sentry 错误追踪
-
-前端已集成 Sentry 骨架代码（`src/lib/sentry.ts`），安装即可启用：
-
-```bash
-pnpm add @sentry/react
+```json
+{ "ok": true, "status": "ok", "timestamp": "2026-06-01T12:00:00.000Z" }
 ```
 
-环境变量：
-- `VITE_SENTRY_DSN` — Sentry DSN
-- `SENTRY_ENVIRONMENT` — 环境名称（production/staging）
+仅表示进程存活，不检查依赖。适合 K8s liveness probe。
 
-### 生产配置模板
+### `GET /api/ready` — 就绪探针
+
+```json
+{
+  "ok": true,
+  "db": "ok",
+  "redis": "ok",
+  "llm": {
+    "configured": true,
+    "provider": "mimo",
+    "model": "mimo-7b",
+    "mode": "llm"
+  },
+  "amap": { "configured": true },
+  "mockAllowed": false,
+  "uptime": 12345,
+  "timestamp": "2026-06-01T12:00:00.000Z"
+}
+```
+
+- `db` / `redis`：`ok` = 连接正常，`error` = 连接失败，`memory` = 未配置（降级为内存模式）
+- `llm.configured`：是否有任何 LLM API Key 配置
+- `llm.provider` / `llm.model`：当前使用的 Provider 和模型名称
+- `llm.mode`：`AGENT_CHAT_MODE` 的值（`auto` / `llm` / `rule`）
+- `amap.configured`：是否配置了高德地图 Key
+- `mockAllowed`：生产环境下是否允许 mock provider
+- `uptime`：进程运行秒数
+- **不会泄露任何 API Key**
+
+当 `db=error` 或 `redis=error` 时返回 503。适合 K8s readiness probe。
+
+---
+
+## 部署指南
+
+### 一、本地开发
+
+```bash
+npm install
+cp .env.example .env          # 默认 PLANNING_MODE=mock，零配置启动
+npm run dev:api                # 终端 1：后端 :3001
+npm run dev                    # 终端 2：前端 :5173
+```
+
+如需数据库：
+
+```bash
+npm run docker:up              # 启动 PostgreSQL + Redis
+npm run db:generate
+npm run db:migrate
+npm run db:seed                # 导入测试账号
+npm run dev:api
+```
+
+### 二、预发 / Staging 环境
+
+```bash
+# 1. 复制生产模板
+cp .env.production.template .env.staging
+
+# 2. 修改关键值
+#    NODE_ENV=production（或 staging，如果需要区分）
+#    CORS_ORIGINS=https://staging.example.com
+#    DATABASE_URL=指向 staging 数据库
+#    PLANNING_MODE=hybrid（推荐：LLM 优先，失败 fallback 到 mock）
+
+# 3. 构建 & 启动
+npm run build
+NODE_ENV=production npm run start:api
+```
+
+### 三、生产部署
+
+#### 步骤 1：配置环境变量
 
 ```bash
 cp .env.production.template .env.production
-# 填入真实 API Keys 和数据库配置
+
+# 生成强密钥
+openssl rand -hex 32   # 生成 JWT_ACCESS_SECRET
+openssl rand -hex 32   # 生成 JWT_REFRESH_SECRET
+openssl rand -hex 32   # 生成 COOKIE_SECRET
 ```
+
+编辑 `.env.production`，填入：
+- `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` / `COOKIE_SECRET`
+- `DATABASE_URL`（指向生产 PostgreSQL）
+- `REDIS_URL`（指向生产 Redis）
+- `CORS_ORIGINS` / `PUBLIC_APP_URL`（正式域名）
+- `AMAP_WEB_SERVICE_KEY`（高德地图 Key）
+- 至少一个 LLM Provider 的 API Key（推荐 `MIMO_API_KEY`）
+
+#### 步骤 2：构建
+
+```bash
+npm run build
+```
+
+#### 步骤 3：启动
+
+选择以下任一方式启动。
+
+---
+
+### 方案 A：PM2 + Nginx
+
+#### PM2 启动
+
+```bash
+# 安装 PM2
+npm install -g pm2
+
+# 加载 .env.production 并启动
+pm2 start dist/server/index.js --name planninggo-api --env production
+
+# 查看日志
+pm2 logs planninggo-api
+
+# 重启 / 停止
+pm2 restart planninggo-api
+pm2 stop planninggo-api
+
+# 设置开机自启
+pm2 startup
+pm2 save
+```
+
+#### Nginx 反代配置
+
+```nginx
+server {
+    listen 80;
+    server_name example.com;
+
+    # 强制 HTTPS（建议）
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+
+    # 前端静态文件
+    root /path/to/planninggo/dist;
+    index index.html;
+
+    # 带 hash 的静态资源 — 长期缓存
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # API 反代到后端
+    location /api/ {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+    }
+
+    # SPA fallback
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
+
+---
+
+### 方案 B：Docker Compose（推荐）
+
+```bash
+# 1. 创建 .env 文件（Docker Compose 自动读取）
+cat > .env << 'EOF'
+POSTGRES_PASSWORD=your-strong-db-password
+REDIS_PASSWORD=your-strong-redis-password
+JWT_ACCESS_SECRET=$(openssl rand -hex 32)
+JWT_REFRESH_SECRET=$(openssl rand -hex 32)
+COOKIE_SECRET=$(openssl rand -hex 32)
+AMAP_WEB_SERVICE_KEY=your-amap-key
+QWEN_API_KEY=your-qwen-key
+CORS_ORIGINS=https://example.com
+EOF
+
+# 2. 启动
+docker compose -f docker-compose.prod.yml up -d
+
+# 3. 查看日志
+docker compose -f docker-compose.prod.yml logs -f api
+
+# 4. 检查健康状态
+curl http://localhost:3001/api/ready
+
+# 5. 停止
+docker compose -f docker-compose.prod.yml down
+
+# 6. 更新部署（重新构建）
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+---
+
+### 方案 C：简单 Docker
+
+```bash
+# 构建镜像
+docker build -t planninggo .
+
+# 运行
+docker run -d \
+  --name planninggo-api \
+  -p 3001:3001 \
+  --env-file .env.production \
+  planninggo
+```
+
+---
+
+## 确认 MiMo 作为 LLM Provider
+
+1. **检查 /api/ready**：
+
+```bash
+curl -s http://localhost:3001/api/ready | jq '.llm'
+# 期望输出：
+# { "configured": true, "provider": "mimo", "model": "mimo-7b", "mode": "llm" }
+```
+
+2. **设置 `LLM_PROVIDER_PRIORITY=mimo`**：确保 MiMo 优先级最高。
+
+3. **查看启动日志**：
+
+```bash
+# PM2
+pm2 logs planninggo-api --lines 20
+
+# Docker
+docker compose logs api | head -30
+```
+
+4. **查看 LLM 调用日志**（需开启 `ENABLE_TOOL_LOGS=true`）：
+
+```bash
+# 查看最近的 LLM 调用记录
+curl http://localhost:3001/api/developer/request-logs?path=/api/agent
+```
+
+---
+
+## 回滚到 Hybrid / Demo 模式
+
+如果生产环境 LLM 出现问题，可以快速回滚：
+
+### 方式 1：切换到 Hybrid 模式（LLM 优先，失败自动 fallback）
+
+```bash
+# 修改 .env.production
+PLANNING_MODE=hybrid
+ENABLE_LLM_FALLBACK=true
+
+# 重启服务
+pm2 restart planninggo-api
+# 或
+docker compose -f docker-compose.prod.yml restart api
+```
+
+### 方式 2：临时允许 Mock（紧急回退）
+
+```bash
+# 修改 .env.production
+PLANNING_MODE=mock
+ALLOW_MOCK_PROVIDER_IN_PRODUCTION=true
+
+# 重启服务
+pm2 restart planninggo-api
+```
+
+⚠️ **注意**：`ALLOW_MOCK_PROVIDER_IN_PRODUCTION=true` 会使用 mock 数据，仅作为紧急回退手段。问题修复后应尽快切回 `llm` 或 `hybrid`。
+
+### 方式 3：切换到其他 LLM Provider
+
+```bash
+# 修改 .env.production
+LLM_PROVIDER_PRIORITY=deepseek   # 切换到 DeepSeek
+DEEPSEEK_API_KEY=your-key
+
+# 或切换到 Qwen
+LLM_PROVIDER_PRIORITY=qwen
+QWEN_API_KEY=your-key
+
+# 重启
+pm2 restart planninggo-api
+```
+
+---
+
+## 生产安全校验
+
+启动时会自动校验以下规则，不满足则启动失败：
+
+| 条件 | 要求 |
+| --- | --- |
+| `NODE_ENV=production` | `JWT_ACCESS_SECRET` 必须 ≥32 位且非默认值 |
+| `NODE_ENV=production` | `JWT_REFRESH_SECRET` 必须 ≥32 位且非默认值 |
+| `NODE_ENV=production` | `COOKIE_SECRET` 必须 ≥32 位 |
+| `NODE_ENV=production` | `DATABASE_URL` 不能是默认本地地址 |
+| `NODE_ENV=production` | `REDIS_URL` 不能是 localhost |
+| `NODE_ENV=production` | `ENABLE_DEMO_AUTH` 必须为 false |
+| `PLANNING_MODE=llm` | 必须至少配置一个 LLM API Key |
+| `AGENT_CHAT_MODE=llm` | 必须至少配置一个 LLM API Key |
+| `PLANNING_MODE=mock` + production | 需设置 `ALLOW_MOCK_PROVIDER_IN_PRODUCTION=true` |
 
 ## 常见问题
 
@@ -226,39 +506,43 @@ cp .env.production.template .env.production
 **npm run build 失败**
 → 确保 TypeScript 版本 >= 5.9。运行 `npm run typecheck` 查看具体错误。
 
-## 服务器部署建议
+**生产环境启动报 "弱 JWT 密钥"**
+→ 使用 `openssl rand -hex 32` 生成强密钥，填入 `JWT_ACCESS_SECRET` 和 `JWT_REFRESH_SECRET`。
 
-### 方案一：Nginx + PM2
+**生产环境启动报 "未配置任何 LLM API Key"**
+→ `PLANNING_MODE=llm` 或 `AGENT_CHAT_MODE=llm` 时必须配置至少一个 LLM Provider。切换到 `hybrid` 或配置 Key。
+
+**如何确认当前走的是哪个 LLM Provider？**
+→ `curl http://localhost:3001/api/ready | jq '.llm'`，查看 `provider` 和 `model` 字段。
+
+**/api/ready 返回 503**
+→ `db` 或 `redis` 状态为 `error`。检查数据库和 Redis 连接是否正常。
+
+## 密码重置
+
+- `POST /api/auth/forgot-password` — 请求密码重置（发送重置链接）
+- `POST /api/auth/reset-password` — 使用重置令牌设置新密码
+- 前端登录页有「忘记密码？」入口
+
+## Sentry 错误追踪
+
+前端已集成 Sentry 骨架代码（`src/lib/sentry.ts`），安装即可启用：
 
 ```bash
-# 1. 构建
-npm install
-npm run build
-
-# 2. 使用 PM2 启动后端
-pm2 start dist/server/index.js --name planninggo-api
-
-# 3. Nginx 配置
-# 前端静态文件指向 dist/
-# /api/* 反代到 http://127.0.0.1:3001
+npm add @sentry/react
 ```
 
-### 方案二：Docker Compose
+环境变量：
+- `VITE_SENTRY_DSN` — Sentry DSN
+- `SENTRY_DSN` — 后端 Sentry DSN
+- `SENTRY_ENVIRONMENT` — 环境名称（production/staging）
+
+## 生产配置模板
 
 ```bash
-# 配置 .env 中的生产变量
-# JWT_ACCESS_SECRET / JWT_REFRESH_SECRET 必须替换为强密钥
-# 可使用 openssl rand -hex 32 生成
-# CORS_ORIGINS 设置为正式域名
-docker compose up -d
+cp .env.production.template .env.production
+# 填入真实 API Keys 和数据库配置
 ```
-
-### 生产注意事项
-
-- JWT Secret 必须使用强随机字符串，不能使用默认值
-- CORS_ORIGINS 只允许正式域名
-- 数据库和 Redis 不要暴露公网
-- 建议使用 Cloudflare 或 Let's Encrypt 配置 HTTPS
 
 ## 页面模块
 

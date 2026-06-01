@@ -54,6 +54,8 @@ const baseProdEnv = {
   LLM_TIMEOUT_MS: 30000,
   AGENT_CHAT_MODE: "auto" as const,
   LLM_PROVIDER_PRIORITY: "auto",
+  LLM_PROVIDER_FALLBACK: false,
+  LLM_EXPOSE_DIAGNOSTICS: false,
   DEEPSEEK_API_KEY: undefined,
   DEEPSEEK_BASE_URL: "https://api.deepseek.com",
   DEEPSEEK_FLASH_MODEL: undefined,
@@ -78,6 +80,7 @@ const baseProdEnv = {
   MIMO_BASE_URL: "https://api.mimo.ai/v1",
   MIMO_FLASH_MODEL: undefined,
   MIMO_PRO_MODEL: undefined,
+  MIMO_SUPPORTS_TOOL_CALLING: false,
   LONGCAT_API_KEY: undefined,
   LONGCAT_BASE_URL: "https://api.longcat.ai/openai/v1",
   LONGCAT_FLASH_MODEL: undefined,
@@ -187,5 +190,65 @@ describe("validateProductionRuntime", () => {
     expect(() =>
       validateProductionRuntime({ ...baseProdEnv, AUTO_EXECUTION_ALLOW_PAYMENT: true }),
     ).toThrow(/AUTO_EXECUTION_ALLOW_PAYMENT/);
+  });
+
+  it("throws when AGENT_CHAT_MODE=llm and no LLM key configured", () => {
+    expect(() =>
+      validateProductionRuntime({
+        ...baseProdEnv,
+        AGENT_CHAT_MODE: "llm",
+        QWEN_API_KEY: undefined,
+        OPENAI_API_KEY: undefined,
+        DEEPSEEK_API_KEY: undefined,
+        MOONSHOT_API_KEY: undefined,
+        GROQ_API_KEY: undefined,
+        GEMINI_API_KEY: undefined,
+        DOUBAO_API_KEY: undefined,
+        MIMO_API_KEY: undefined,
+        LONGCAT_API_KEY: undefined,
+        CLAUDE_API_KEY: undefined,
+        GROK_API_KEY: undefined,
+      }),
+    ).toThrow(/AGENT_CHAT_MODE=llm/);
+  });
+
+  it("allows AGENT_CHAT_MODE=llm when LLM key is present", () => {
+    expect(() =>
+      validateProductionRuntime({
+        ...baseProdEnv,
+        AGENT_CHAT_MODE: "llm",
+        MIMO_API_KEY: "test-mimo-key",
+      }),
+    ).not.toThrow();
+  });
+
+  it("throws when PLANNING_MODE=llm and no LLM provider configured", () => {
+    expect(() =>
+      validateProductionRuntime({
+        ...baseProdEnv,
+        PLANNING_MODE: "llm",
+        QWEN_API_KEY: undefined,
+        OPENAI_API_KEY: undefined,
+        DEEPSEEK_API_KEY: undefined,
+        MOONSHOT_API_KEY: undefined,
+        GROQ_API_KEY: undefined,
+        GEMINI_API_KEY: undefined,
+        DOUBAO_API_KEY: undefined,
+        MIMO_API_KEY: undefined,
+        LONGCAT_API_KEY: undefined,
+        CLAUDE_API_KEY: undefined,
+        GROK_API_KEY: undefined,
+      }),
+    ).toThrow(/PLANNING_MODE=llm/);
+  });
+
+  it("allows PLANNING_MODE=llm when LLM key is present", () => {
+    expect(() =>
+      validateProductionRuntime({
+        ...baseProdEnv,
+        PLANNING_MODE: "llm",
+        QWEN_API_KEY: "test-qwen-key",
+      }),
+    ).not.toThrow();
   });
 });

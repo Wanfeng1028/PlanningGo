@@ -16,15 +16,44 @@ export function ErrorCardView({
   const isNetworkError =
     message.includes("无法连接") ||
     message.includes("Failed to fetch") ||
-    message.includes("NetworkError");
+    message.includes("NetworkError") ||
+    message.includes("ERR_CONNECTION");
+
+  const isServerError =
+    message.includes("500") ||
+    message.includes("502") ||
+    message.includes("503") ||
+    message.includes("服务") ||
+    message.includes("server");
+
+  const isTimeout =
+    message.includes("超时") ||
+    message.includes("timeout") ||
+    message.includes("TIMEOUT") ||
+    message.includes("abort");
+
+  // Show user-friendly message, never raw error
+  const friendlyTitle = isNetworkError
+    ? "⚠ 规划服务暂时不可用"
+    : isTimeout
+      ? "⚠ 请求超时了"
+      : isServerError
+        ? "⚠ 服务出了点问题"
+        : "⚠ 出了点问题";
+
+  const friendlyMessage = isNetworkError
+    ? "无法连接到规划服务，请确认后端是否已启动。"
+    : isTimeout
+      ? "请求等待时间过长，服务可能正在忙碌，请稍后重试。"
+      : isServerError
+        ? "模型服务暂时不可用，已记录错误，请稍后重试。"
+        : "遇到了一个意外问题，请重试或开始新的规划。";
 
   return (
     <>
       <div className={styles.errorCard}>
-        <div className={styles.errorCardTitle}>
-          {isNetworkError ? "⚠ 规划服务暂时不可用" : "⚠ 出了点问题"}
-        </div>
-        <div className={styles.errorCardMessage}>{message}</div>
+        <div className={styles.errorCardTitle}>{friendlyTitle}</div>
+        <div className={styles.errorCardMessage}>{friendlyMessage}</div>
 
         <div className={styles.errorCardActions}>
           <button

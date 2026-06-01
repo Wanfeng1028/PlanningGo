@@ -5,7 +5,8 @@ describe("slotTools", () => {
   it("records origin and returns missing slots", () => {
     const result = executeUpdatePlanningDraft({}, { origin: "朝阳区" });
     expect(result.knownSlots.origin).toBe("朝阳区");
-    expect(result.missingSlots).toContain("budget");
+    // budget is no longer required (can use default), only partySize/companions is required
+    expect(result.missingSlots).toContain("partySize");
     expect(result.isReady).toBe(false);
   });
 

@@ -27,7 +27,12 @@
     "test:watch": "vitest",
     "load:health": "node scripts/load-plan.js --path /api/health --method GET --duration 10",
     "load:plan": "node scripts/load-plan.js",
-    "load:flow": "node scripts/load-flow.js"
+    "load:flow": "node scripts/load-flow.js",
+    "smoke:health": "node scripts/smoke-health.mjs",
+    "smoke:llm": "node scripts/smoke-llm.mjs",
+    "smoke:chat": "node scripts/smoke-chat.mjs",
+    "smoke:plan": "node scripts/smoke-plan.mjs",
+    "smoke:all": "node scripts/smoke-all.mjs"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

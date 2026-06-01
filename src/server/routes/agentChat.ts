@@ -11,6 +11,7 @@ import { ZodError, z } from "zod";
 import { corsOrigins } from "../config/env.js";
 import { handleAgentMessage } from "../modules/agent/chatRouter.js";
 import { runAgentChatStream } from "../modules/agent/agentRuntime.js";
+import { hasAnyLlmKey } from "../modules/agent/modelClient.js";
 import { env } from "../config/env.js";
 import type { AgentMessageInput, AgentResponse } from "../../shared/agentResponse.js";
 import type { PrismaClient } from "../../generated/prisma/client.js";
@@ -52,10 +53,10 @@ export async function registerAgentChatRoutes(app: FastifyInstance) {
         const userId = request.userId;
         const db: PrismaClient | null = app.db;
 
-        // SSE headers
-        reply.header("Content-Type", "text/event-stream");
-        reply.header("Cache-Control", "no-cache");
-        reply.header("Connection", "keep-alive");
+        // SSE headers (use raw.setHeader for reliable delivery with reply.raw.write)
+        reply.raw.setHeader("Content-Type", "text/event-stream");
+        reply.raw.setHeader("Cache-Control", "no-cache");
+        reply.raw.setHeader("Connection", "keep-alive");
 
         // CORS for SSE
         const origin = request.headers.origin;
@@ -70,21 +71,10 @@ export async function registerAgentChatRoutes(app: FastifyInstance) {
           if (!clientDisconnected) reply.raw.write(":heartbeat\n\n");
         }, 15_000);
 
-        function hasAnyLlmKey(): boolean {
-          return Boolean(
-            env.OPENAI_API_KEY ||
-            env.QWEN_API_KEY ||
-            env.DEEPSEEK_API_KEY ||
-            env.MOONSHOT_API_KEY ||
-            env.GROQ_API_KEY ||
-            env.GEMINI_API_KEY ||
-            env.DOUBAO_API_KEY ||
-            env.MIMO_API_KEY ||
-            env.LONGCAT_API_KEY
-          );
-        }
-
         let agentResponse: AgentResponse | null = null;
+        let fallbackUsed = false;
+        let resolvedProvider: string | undefined;
+        let resolvedModel: string | undefined;
         try {
           const canUseRuntime = env.AGENT_CHAT_MODE !== 'rule' && (env.AGENT_CHAT_MODE === 'llm' || hasAnyLlmKey());
 
@@ -105,13 +95,28 @@ export async function registerAgentChatRoutes(app: FastifyInstance) {
                   },
                 },
               );
+              resolvedProvider = agentResponse.metadata?.provider;
+              resolvedModel = agentResponse.metadata?.model;
             } catch (runtimeErr) {
-              app.log.warn({ err: runtimeErr }, '[agentChat] runtime failed, fallback to rule router');
+              app.log.error({ err: runtimeErr }, "[agentChat] LLM runtime failed");
+
+              // AGENT_CHAT_MODE=llm → 不允许 fallback，直接抛出真实错误
+              if (env.AGENT_CHAT_MODE === "llm") {
+                throw runtimeErr;
+              }
+
+              // auto 模式：只有显式启用 ENABLE_LLM_FALLBACK 时才允许 fallback
+              if (!env.ENABLE_LLM_FALLBACK) {
+                throw runtimeErr;
+              }
+
+              app.log.warn({ err: runtimeErr }, "[agentChat] fallback to rule router");
               agentResponse = null;
             }
           }
 
           if (!agentResponse) {
+            fallbackUsed = canUseRuntime; // 只有尝试过 LLM 后降级才算 fallback
             agentResponse = await handleAgentMessage(
               {
                 message: parsed.message,
@@ -142,7 +147,23 @@ export async function registerAgentChatRoutes(app: FastifyInstance) {
         }
 
         if (agentResponse) {
-          reply.raw.write(`data: [FINAL_RESULT]${JSON.stringify(agentResponse)}\n\n`);
+          // 注入 metadata 到响应
+          const responseWithMeta = {
+            ...agentResponse,
+            metadata: {
+              provider: resolvedProvider,
+              model: resolvedModel,
+              mode: (fallbackUsed ? "rule" : env.AGENT_CHAT_MODE === "llm" ? "llm" : "auto") as "llm" | "rule" | "mock" | "hybrid",
+              fallbackUsed,
+            },
+          };
+          reply.raw.write(`data: [FINAL_RESULT]${JSON.stringify(responseWithMeta)}\n\n`);
+          reply.raw.write('data: [DONE]\n\n');
+          reply.raw.end();
+        } else {
+          // 确保始终发送 [FINAL_RESULT] + [DONE]，避免客户端挂起
+          const errorPayload = { type: "error", content: "服务内部错误，请稍后重试", error: "INTERNAL_SERVER_ERROR" };
+          reply.raw.write(`data: [FINAL_RESULT]${JSON.stringify(errorPayload)}\n\n`);
           reply.raw.write('data: [DONE]\n\n');
           reply.raw.end();
         }
@@ -150,11 +171,12 @@ export async function registerAgentChatRoutes(app: FastifyInstance) {
         app.log.error({ err: error }, "[agentChat] SSE stream error");
         if (!clientDisconnected) {
           try {
-            if (error instanceof ZodError) {
-              reply.raw.write(`data: ${JSON.stringify({ error: "INVALID_REQUEST", issues: error.issues })}\n\n`);
-            } else {
-              reply.raw.write(`data: ${JSON.stringify({ type: "error", content: "服务内部错误，请稍后重试", error: "INTERNAL_SERVER_ERROR" })}\n\n`);
-            }
+            const errorPayload = error instanceof ZodError
+              ? { error: "INVALID_REQUEST", issues: error.issues }
+              : { type: "error", content: "服务内部错误，请稍后重试", error: "INTERNAL_SERVER_ERROR" };
+            // Send a content frame so clients know data was received
+            reply.raw.write(`data: ${JSON.stringify({ content: "服务内部错误，请稍后重试" })}\n\n`);
+            reply.raw.write(`data: [FINAL_RESULT]${JSON.stringify(errorPayload)}\n\n`);
             reply.raw.write("data: [DONE]\n\n");
             reply.raw.end();
           } catch {

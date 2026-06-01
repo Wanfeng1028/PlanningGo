@@ -10,6 +10,8 @@ import { UnauthorizedError } from "../common/errors.js";
 import { nullToUndefined, toRecordOrEmpty, toStringArray } from "../common/json.js";
 import { DeveloperRepository } from "../repositories/developerRepository.js";
 import { requireUserId } from "../common/uid.js";
+import { env } from "../config/env.js";
+import { getProviderDiagnostics } from "../modules/agent/modelClient.js";
 
 interface AuthenticatedRequest extends FastifyRequest {
   userId?: string;
@@ -500,6 +502,18 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
       ipAllowlist: null,
       ipAllowlistEnabled: false,
     });
+  });
+
+  // ── LLM Smoke Test ──
+  // 生产环境需要 LLM_EXPOSE_DIAGNOSTICS=true；开发环境始终可用
+  app.get("/api/developer/llm-smoke", async (request, reply) => {
+    const isProd = env.NODE_ENV === "production";
+    if (isProd && !env.LLM_EXPOSE_DIAGNOSTICS) {
+      return sendError(reply, 403, "DIAGNOSTICS_DISABLED", "生产环境需设置 LLM_EXPOSE_DIAGNOSTICS=true 才能使用此接口");
+    }
+
+    const result = await getProviderDiagnostics();
+    return sendOk(reply, result);
   });
 }
 

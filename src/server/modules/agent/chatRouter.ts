@@ -29,12 +29,12 @@ import * as mem from "../../services/memoryStore.js";
 // ─── Constants ──────────────────────────────────────────────
 
 const IDENTITY_ANSWER =
-  "我是周末去哪儿，一个懂本地生活和周末安排的规划 Agent。你可以像和 ChatGPT 一样正常和我聊天；当你想出门玩、带娃、约朋友、约会、吃饭、看展或安排半天行程时，我会先问清楚时间、预算、出发地、同行人和偏好，再帮你生成可执行的方案。需要预约、导航、写入日历或分享给别人时，我会先让你确认，不会直接替你下单或付款。";
+  "我是周末去哪儿，帮你搞定本地出行规划的助手——告诉我时间、预算和同行人，我来安排可执行的方案。";
 
 const GREETING_REPLIES = [
-  "你好！我是周末去哪儿，有什么出行安排需要帮忙？",
-  "嗨！想出门玩的话告诉我你的想法，我来帮你规划。",
-  "你好呀！周末有计划吗？说说看，我帮你安排。",
+  "嗨！有什么出行计划需要帮忙？",
+  "你好呀，想出门逛逛吗？说说你的想法。",
+  "嘿～周末有安排吗？需要帮忙规划的话随时说。",
 ];
 
 const NEXT_ACTIONS: NextAction[] = [
@@ -187,8 +187,8 @@ export function mergeSlots(existing: PlanningSlots, incoming: PlanningSlots): Pl
 
 export function getMissingSlots(slots: PlanningSlots): PlanningSlotKey[] {
   const missing: PlanningSlotKey[] = [];
-  if (!slots.origin) missing.push("origin");
-  if (!slots.budget) missing.push("budget");
+  // Only companions/partySize is truly required for a basic plan.
+  // origin and budget can use defaults — don't block planning for them.
   if (!slots.partySize && !slots.companions) missing.push("partySize");
   return missing;
 }
@@ -286,19 +286,17 @@ function replyIdentity(conversationId: string): AgentResponse {
 
 function replyCapabilities(conversationId: string): AgentResponse {
   const content =
-    "我可以帮你做这些事：\n\n" +
-    "1. **周末出行规划** — 告诉我时间、预算、出发地和同行人，我帮你安排路线\n" +
-    "2. **地点推荐** — 按你的偏好推荐适合的去处\n" +
-    "3. **预约建议** — 需要预约的地方帮你查库存和建议\n" +
-    "4. **日历写入** — 把方案写进你的日程\n" +
-    "5. **分享协作** — 把方案发给同行人一起确认\n\n" +
-    "直接用自然语言告诉我你的需求就行！";
+    "我主要帮你规划本地出行，比如：\n\n" +
+    "“周末带娃半天，预算300” → 我帮你排路线\n" +
+    "“情侣约会，晚上，想拍照” → 推荐适合的去处\n" +
+    "“和朋友吃饭，别太贵” → 选地点 + 预估花费\n\n" +
+    "方案做好后还能帮你导航、写日历、分享给同行人。直接说需求就行！";
   return { type: "chat", content, conversationId };
 }
 
 function replyCasual(conversationId: string, _message: string): AgentResponse {
   const content =
-    "我主要擅长出行规划和本地生活安排。如果你想出门玩、带娃、约朋友或者安排周末行程，随时告诉我，我来帮你规划！";
+    "有出行计划的话随时告诉我，帮你安排～";
   return { type: "chat", content, conversationId };
 }
 
@@ -308,17 +306,17 @@ function replyTravelAdvice(conversationId: string, message: string): AgentRespon
   if (/交通方便|地铁/.test(message)) preferences.push("交通方便");
   if (/室内|雨天/.test(message)) preferences.push("室内优先");
 
-  const prefText = preferences.length > 0 ? `，按「${preferences.join("、")}」筛选` : "";
+  const prefText = preferences.length > 0 ? `，偏好「${preferences.join("、")}」` : "";
 
   const content =
-    `可以，我先按「周末半日」${prefText}来推荐方向。你可以考虑这几类：\n\n` +
-    "1. **城市公园 / 植物园类**：节奏轻，适合散步，排队风险低。\n" +
-    "2. **小型博物馆 / 展览类**：适合雨天，但要看预约库存。\n" +
-    "3. **商圈里的轻体验项目**：交通方便，餐饮选择多。\n" +
-    "4. **城市周边古镇 / 绿道**：适合半日，但要控制车程。\n\n" +
-    "如果你想让我直接排成路线，还需要告诉我：**从哪里出发**、**预算多少**、**几个人同行**。";
+    `按周末半日${prefText}来推荐，可以考虑这几类：\n\n` +
+    "1. **公园/植物园** — 节奏轻，适合散步\n" +
+    "2. **小型展览/博物馆** — 雨天友好\n" +
+    "3. **商圈轻体验** — 交通方便，吃喝选择多\n" +
+    "4. **周边古镇/绿道** — 适合半日，控制车程\n\n" +
+    "想让我排成具体路线的话，告诉我**从哪出发**、**预算**、**几个人**就行。";
 
-  const suggestions = ["帮我安排路线", "从北京出发", "两个人，预算300"];
+  const suggestions = ["帮我安排路线", "从市中心出发", "两个人，预算300"];
   return { type: "travel_advice", content, suggestions, conversationId };
 }
 
@@ -402,13 +400,17 @@ async function handlePlanningIntent(
   const newSlots = extractPlanningSlots(input.message);
   const mergedSlots = mergeSlots(state?.planningDraft ?? {}, newSlots);
 
-  // Check completeness
+  // Check completeness — only ask when truly missing core info
   const missing = getMissingSlots(mergedSlots);
 
   if (missing.length > 0) {
-    // Update state to collecting_slots
+    // If we only need partySize/companions, ask concisely
     return askMissingSlots(conversationId, mergedSlots, missing);
   }
+
+  // Apply defaults for optional fields that are missing
+  if (!mergedSlots.origin) mergedSlots.origin = "市中心";
+  if (!mergedSlots.budget) mergedSlots.budget = 300;
 
   // Slots are complete — generate plan
   return generatePlanFromSlots(conversationId, input, mergedSlots, providers, userId, log);
@@ -421,16 +423,18 @@ function askMissingSlots(
 ): AgentResponse {
   const slotLabels: Record<PlanningSlotKey, string> = {
     origin: "从哪里出发",
-    budget: "预算多少",
-    partySize: "几个人同行",
+    budget: "预算大概多少",
+    partySize: "几个人、和谁一起去",
     date: "什么时候去",
     timeWindow: "上午还是下午",
     preference: "有什么偏好",
     companions: "和谁一起去",
   };
 
-  const questions = missing.map((s) => slotLabels[s]).join("、");
-  const content = `好的，我来帮你安排！还需要知道：${questions}。`;
+  // Only ask up to 2 questions to keep it conversational
+  const questions = missing.slice(0, 2).map((s) => slotLabels[s]).join("？");
+  const suffix = missing.length > 2 ? "，其他我来安排" : "";
+  const content = `好的！${questions}？${suffix}`;
 
   return {
     type: "slot_question",
@@ -480,7 +484,19 @@ async function generatePlanFromSlots(
 
     if (message.startsWith("MISSING_REQUIRED_SLOTS:")) {
       const missingKeys = message.replace("MISSING_REQUIRED_SLOTS:", "").split(",") as PlanningSlotKey[];
-      return askMissingSlots(conversationId, slots, missingKeys);
+      // Don't block — try again with defaults applied
+      const withDefaults = { ...slots };
+      for (const key of missingKeys) {
+        if (key === "origin" && !withDefaults.origin) withDefaults.origin = "市中心";
+        if (key === "budget" && !withDefaults.budget) withDefaults.budget = 300;
+        if (key === "partySize" && !withDefaults.partySize && !withDefaults.companions) withDefaults.partySize = 2;
+      }
+      // If we already had defaults and it still failed, ask user
+      if (missingKeys.every((k) => withDefaults[k])) {
+        return askMissingSlots(conversationId, slots, missingKeys);
+      }
+      // Otherwise retry with defaults
+      return generatePlanFromSlots(conversationId, input, withDefaults, providers, userId, log);
     }
 
     log.error({ err }, "[chatRouter] plan generation failed");

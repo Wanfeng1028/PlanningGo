@@ -176,19 +176,34 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
     }
 
     if (!response.ok) {
-      // Extract error message from backend
+      // Extract error message from backend envelope { ok, error: { code, message } }
       let msg: string | undefined;
       if (body && typeof body === "object") {
         const obj = body as Record<string, unknown>;
-        if (typeof obj.message === "string") {
+        // Unified envelope: { error: { message } }
+        if (obj.error && typeof obj.error === "object") {
+          const err = obj.error as Record<string, unknown>;
+          if (typeof err.message === "string") msg = err.message;
+        }
+        // Fallback: { message } or { error: "string" }
+        if (!msg && typeof obj.message === "string") {
           msg = obj.message;
-        } else if (typeof obj.error === "string") {
+        } else if (!msg && typeof obj.error === "string") {
           msg = obj.error;
         }
       }
       throw new Error(msg || `HTTP ${response.status}`);
     }
 
+    // Unwrap backend envelope { ok, data, traceId } → return data directly
+    if (body && typeof body === "object") {
+      const obj = body as Record<string, unknown>;
+      if (obj.ok === true && "data" in obj) {
+        return obj.data as T;
+      }
+    }
+
+    // Non-envelope response: return as-is for backward compatibility
     return body as T;
   });
 }

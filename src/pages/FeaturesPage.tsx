@@ -12,8 +12,7 @@ import {
   type PlanningOption,
   type PlanningExecutableAction,
   type PlanningResult,
-  type ConversationItem,
-  selectAgentPlan,
+    selectAgentPlan,
   type AgentPlanSelectResponse,
 } from "../lib/api";
 import { GlassToast, useGlassToast } from "../components/GlassToast";
@@ -23,8 +22,8 @@ import { streamAgentMessage } from "../lib/stream";
 import { WorkspaceModal } from "../components/WorkspaceModal";
 import { Button } from "../components/Button";
 import type { ModalKey, NavKey, SessionUser } from "../types";
-import type { ChatMessage, ChatSession, AttachmentItem, ModelMode, ChatMessageKind, NextActionItem } from "../components/features/types";
-import { MODEL_MODES } from "../components/features/types";
+import type { ChatMessage, ChatSession, AttachmentItem, ModelMode, ChatMessageKind, NextActionItem, MessageStatus } from "../components/features/types";
+import { MODEL_MODES, isDev } from "../components/features/types";
 import { SUGGESTION_PROMPTS } from "../components/features/constants";
 import { AmbientBackground } from "../components/features/AmbientBackground";
 import { FeaturesSidebar } from "../components/features/FeaturesSidebar";
@@ -70,6 +69,22 @@ function toApiModelMode(mode: ModelMode): "flash" | "pro" {
   return mode.toLowerCase() as "flash" | "pro";
 }
 
+/** Generate a meaningful session title from the first user message */
+function generateSessionTitle(prompt: string): string {
+  const trimmed = prompt.trim();
+  // If too short or generic, use a descriptive fallback
+  const genericGreetings = ["你好", "hi", "hello", "嗨", "在吗", "在不在"];
+  if (trimmed.length <= 2 || genericGreetings.includes(trimmed.toLowerCase())) {
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const day = now.getDate();
+    const hour = now.getHours();
+    const period = hour < 12 ? "上午" : hour < 18 ? "下午" : "晚上";
+    return `${month}月${day}日${period}规划`;
+  }
+  return trimmed.length > 20 ? trimmed.slice(0, 20) + "…" : trimmed;
+}
+
 /* ═══════════════════════════════════════════════
    Main Component
    ═══════════════════════════════════════════════ */
@@ -102,7 +117,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
   const [conversationId, setConversationId] = useState<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
   const messagesBySessionRef = useRef<Map<string, ChatMessage[]>>(new Map());
-  const [, setBackendSessions] = useState<ConversationItem[]>([]);
+  // Backend conversations populated from DB for logged-in users
   const [busyActionId, setBusyActionId] = useState<string | null>(null);
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [typedText, setTypedText] = useState("");
@@ -172,39 +187,68 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
         setFavorites(JSON.parse(savedFavorites));
       } catch {}
     }
-    // Load sessions from localStorage as fallback
-    const savedSessions = localStorage.getItem("pg_chat_sessions");
-    if (savedSessions) {
-      try {
-        const parsed = JSON.parse(savedSessions) as ChatSession[];
-        setChatSessions(parsed);
-        const map = new Map<string, ChatMessage[]>();
-        parsed.forEach((session) => {
-          map.set(session.id, session.messages ?? []);
-        });
-        messagesBySessionRef.current = map;
-      } catch {}
+    // Load conversations: backend DB for logged-in users, localStorage for guests
+    if (user?.id) {
+      listConversations({ limit: 50 })
+        .then((convs) => {
+          if (convs.length > 0) {
+            const sessions: ChatSession[] = convs.map((cv) => ({
+              id: cv.id,
+              title: cv.title,
+              messages: [],
+              city: cv.city,
+              createdAt: cv.createdAt,
+              updatedAt: cv.updatedAt,
+            }));
+            setChatSessions(sessions);
+            // Restore last active conversation if it exists in the list
+            const savedConvId = localStorage.getItem("pg_active_conversation_id");
+            if (savedConvId && convs.some((cv) => cv.id === savedConvId)) {
+              setConversationId(savedConvId);
+              conversationIdRef.current = savedConvId;
+              setCurrentSessionId(savedConvId);
+              currentSessionIdRef.current = savedConvId;
+            }
+          }
+        })
+        .catch(() => {});
+    } else {
+      // Guest: load from localStorage
+      const savedSessions = localStorage.getItem("pg_chat_sessions");
+      if (savedSessions) {
+        try {
+          const parsed = JSON.parse(savedSessions) as ChatSession[];
+          setChatSessions(parsed);
+          const map = new Map<string, ChatMessage[]>();
+          parsed.forEach((session) => {
+            map.set(session.id, session.messages ?? []);
+          });
+          messagesBySessionRef.current = map;
+        } catch {}
+      }
     }
-
-    // Load conversations from backend
-    listConversations({ limit: 30 })
-      .then((convs) => {
-        if (convs.length > 0) setBackendSessions(convs);
-      })
-      .catch(() => {});
-  }, []);
+  }, [user?.id]);
 
   // Save modelMode to localStorage when changed
   useEffect(() => {
     localStorage.setItem("pg_model_mode", modelMode);
   }, [modelMode]);
 
-  // Save chat sessions to localStorage when changed
+  // Persist current conversationId for logged-in users (for page refresh)
   useEffect(() => {
-    if (chatSessions.length > 0) {
+    if (user?.id && conversationId) {
+      localStorage.setItem("pg_active_conversation_id", conversationId);
+    } else if (!user?.id) {
+      localStorage.removeItem("pg_active_conversation_id");
+    }
+  }, [conversationId, user?.id]);
+
+  // Save chat sessions to localStorage (guest only; logged-in users use DB)
+  useEffect(() => {
+    if (!user?.id && chatSessions.length > 0) {
       localStorage.setItem("pg_chat_sessions", JSON.stringify(chatSessions));
     }
-  }, [chatSessions]);
+  }, [chatSessions, user?.id]);
 
   /* ── Scroll to bottom helper with user intent detection ── */
   const handleMessagesScroll = useCallback(
@@ -240,6 +284,20 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     checkHealth()
       .then((r) => setHealthOk(r.ok))
       .catch(() => setHealthOk(false));
+  }, []);
+
+  /* ── Mobile viewport height fix (100vh bug) ── */
+  useEffect(() => {
+    const setVh = () => {
+      document.documentElement.style.setProperty("--vh", `${window.innerHeight * 0.01}px`);
+    };
+    setVh();
+    window.addEventListener("resize", setVh);
+    window.addEventListener("orientationchange", setVh);
+    return () => {
+      window.removeEventListener("resize", setVh);
+      window.removeEventListener("orientationchange", setVh);
+    };
   }, []);
 
   /* ── Sync conversationId ref ── */
@@ -333,7 +391,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
         targetSessionId = uuid();
         const newSession: ChatSession = {
           id: targetSessionId,
-          title: prompt.length > 20 ? prompt.slice(0, 20) + "…" : prompt,
+          title: generateSessionTitle(prompt),
           messages: [],
           city,
           createdAt: new Date().toISOString(),
@@ -374,7 +432,6 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
       // 3) Call API with streaming
       try {
         setPhase("planning");
-        setPhase("planning");
         let streamedContent = "";
         let agentResponse: unknown = null;
 
@@ -391,7 +448,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
             onChunk: (chunk) => {
               streamedContent += chunk;
               updateLastAssistant(targetSessionId, {
-                status: "success",
+                status: "streaming" as MessageStatus,
                 content: streamedContent,
                 chips: undefined,
               });
@@ -412,12 +469,47 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
         const respType = (resp?.type as string) ?? "chat";
         const respConversationId = resp?.conversationId as string | undefined;
 
+        // Extract metadata (provider, model, fallbackUsed)
+        const metadata = resp?.metadata as Record<string, unknown> | undefined;
+        const msgMetadata = metadata ? {
+          provider: metadata.provider as string | undefined,
+          model: metadata.model as string | undefined,
+          fallbackUsed: metadata.fallbackUsed as boolean | undefined,
+        } : undefined;
+
+        // Determine if this was a fallback response
+        const isFallback = metadata?.fallbackUsed === true;
+        const finalStatus: MessageStatus = isFallback ? "fallback" : "done";
+
         if (respConversationId) {
           setConversationId(respConversationId);
           conversationIdRef.current = respConversationId;
+          // Sync session ID to backend conversation ID for cross-browser consistency
+          if (respConversationId !== targetSessionId) {
+            setCurrentSessionId(respConversationId);
+            currentSessionIdRef.current = respConversationId;
+            const existingMessages = messagesBySessionRef.current.get(targetSessionId);
+            if (existingMessages) {
+              messagesBySessionRef.current.set(respConversationId, existingMessages);
+              messagesBySessionRef.current.delete(targetSessionId);
+            }
+          }
         }
 
-        listConversations({ limit: 30 }).then(setBackendSessions).catch(() => {});
+        // Refresh sidebar from backend for logged-in users
+        if (user?.id) {
+          listConversations({ limit: 50 }).then((convs) => {
+            const sessions: ChatSession[] = convs.map((cv) => ({
+              id: cv.id,
+              title: cv.title,
+              messages: messagesBySessionRef.current.get(cv.id) ?? [],
+              city: cv.city,
+              createdAt: cv.createdAt,
+              updatedAt: cv.updatedAt,
+            }));
+            setChatSessions(sessions);
+          }).catch(() => {});
+        }
         apiTrackEvent({ eventName: "agent_response", payload: { type: respType, conversationId: respConversationId }, page: "features" }).catch(() => {});
 
         // Branch by response type
@@ -428,9 +520,10 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
             const suggestions = (resp as { suggestions?: string[] })?.suggestions;
             updateLastAssistant(targetSessionId, {
               kind: respType as ChatMessageKind,
-              status: "success",
+              status: finalStatus,
               content: (resp?.content as string) ?? "",
               chips: suggestions,
+              metadata: msgMetadata,
             });
             setPhase("result");
             break;
@@ -440,9 +533,10 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
             const slotLabels: Record<string, string> = { origin: "从哪里出发", budget: "预算多少", partySize: "几个人", date: "什么时候", timeWindow: "时段", preference: "偏好", companions: "同行人" };
             updateLastAssistant(targetSessionId, {
               kind: "slot_question",
-              status: "success",
+              status: finalStatus,
               content: (resp?.content as string) ?? "",
               chips: missingSlots.map((s) => slotLabels[s] ?? s),
+              metadata: msgMetadata,
             });
             setPhase("result");
             break;
@@ -456,11 +550,12 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
             }));
             updateLastAssistant(targetSessionId, {
               kind: "plan",
-              status: "success",
+              status: finalStatus,
               content: planData?.summary ?? (resp?.content as string) ?? "",
               chips: undefined,
               plans: optionsWithIds,
               actions: (planData?.executableActions as PlanningExecutableAction[]) ?? [],
+              metadata: msgMetadata,
             });
             setPhase("result");
             break;
@@ -471,12 +566,13 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
             const selTitle = (resp as { selectedPlanTitle?: string })?.selectedPlanTitle;
             updateLastAssistant(targetSessionId, {
               kind: "plan_selected",
-              status: "success",
+              status: finalStatus,
               content: (resp?.content as string) ?? "",
               chips: nextActions.map((a) => a.label),
               selectedOptionId: selOptId,
               selectedPlanTitle: selTitle,
               nextActions,
+              metadata: msgMetadata,
             });
             setSelectedPlanId(selOptId ?? null);
             setPhase("selected");
@@ -485,25 +581,33 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
           case "action_confirm": {
             updateLastAssistant(targetSessionId, {
               kind: "action_confirm",
-              status: "success",
+              status: finalStatus,
               content: (resp?.content as string) ?? "",
+              metadata: msgMetadata,
             });
             setPhase("result");
             break;
           }
           case "error": {
+            // Show friendly error, not raw backend message
+            const rawError = (resp?.content as string) ?? "";
+            const friendlyError = rawError.includes("fallback") || rawError.includes("基础")
+              ? rawError
+              : "模型服务暂时不可用，已记录错误，请稍后重试";
             updateLastAssistant(targetSessionId, {
               kind: "error",
               status: "error",
-              content: (resp?.content as string) ?? "服务内部错误",
+              content: friendlyError,
+              metadata: msgMetadata,
             });
             setPhase("error");
             break;
           }
           default: {
             updateLastAssistant(targetSessionId, {
-              status: "success",
+              status: finalStatus,
               content: (resp?.content as string) ?? "",
+              metadata: msgMetadata,
             });
             setPhase("result");
           }
@@ -515,16 +619,25 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
           return;
         }
 
-        const errorMsg =
-          err instanceof Error ? err.message : "规划服务暂时不可用";
+        // Show friendly error to user, log technical details to console
+        const rawError = err instanceof Error ? err.message : String(err);
+        console.error("[AgentStream]", rawError);
+        const friendlyError =
+          rawError.includes("abort") || rawError.includes("AbortError")
+            ? "已停止生成"
+            : rawError.includes("超时") || rawError.includes("timeout")
+              ? "请求超时，请稍后重试"
+              : rawError.includes("Failed to fetch") || rawError.includes("NetworkError")
+                ? "无法连接到服务，请检查网络"
+                : "模型服务暂时不可用，已记录错误，请稍后重试";
         updateLastAssistant(targetSessionId, {
           status: "error",
-          content: errorMsg,
+          content: friendlyError,
           chips: undefined,
         });
         setPhase("error");
-        apiTrackEvent({ eventName: "planning_failed", payload: { error: errorMsg }, page: "features" }).catch(() => {});
-        reportClientError({ message: errorMsg, route: "/api/agent/plan" }).catch(() => {});
+        apiTrackEvent({ eventName: "planning_failed", payload: { error: rawError }, page: "features" }).catch(() => {});
+        reportClientError({ message: rawError, route: "/api/agent/plan" }).catch(() => {});
       } finally {
         setIsBusy(false);
         setAbortController(null);
@@ -538,9 +651,9 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     setAbortController(null);
     setIsBusy(false);
     if (!currentSessionIdRef.current) return;
+    // Keep whatever content was streamed so far, mark as done
     updateLastAssistant(currentSessionIdRef.current, {
-      status: "error",
-      content: "已停止生成",
+      status: "done",
       chips: undefined,
     });
   }, [abortController, updateLastAssistant]);
@@ -637,16 +750,27 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
         const loadedMessages: ChatMessage[] = detail.messages.map((m) => {
           const payload = m.payloadJson as Record<string, unknown> | undefined;
           const payloadType = (payload?.type as string) ?? "text";
+          const metadata = payload?.metadata as Record<string, unknown> | undefined;
           return {
             id: m.id,
             role: m.role as "user" | "assistant",
             content: m.content,
             createdAt: m.createdAt,
-            status: "success" as const,
+            status: "done" as const,
             kind: payloadType as ChatMessageKind,
+            metadata: metadata ? {
+              provider: metadata.provider as string | undefined,
+              model: metadata.model as string | undefined,
+              fallbackUsed: metadata.fallbackUsed as boolean | undefined,
+            } : undefined,
             plans: payloadType === "plan" ? ((payload?.data as Record<string, unknown>)?.options as PlanningOption[]) ?? [] : undefined,
             actions: payloadType === "plan" ? ((payload?.data as Record<string, unknown>)?.executableActions as PlanningExecutableAction[]) ?? [] : undefined,
-            chips: payloadType === "slot_question" ? (payload?.missingSlots as string[]) ?? [] : undefined,
+            chips: payloadType === "slot_question" ? ((payload?.missingSlots as string[]) ?? [])
+              : payloadType === "plan_selected" ? ((payload?.nextActions as NextActionItem[])?.map((a: NextActionItem) => a.label) ?? [])
+              : ((payload?.suggestions as string[]) ?? undefined),
+            nextActions: payloadType === "plan_selected" ? (payload?.nextActions as NextActionItem[]) : undefined,
+            selectedOptionId: payloadType === "plan_selected" ? (payload?.selectedOptionId as string) : undefined,
+            selectedPlanTitle: payloadType === "plan_selected" ? (payload?.selectedPlanTitle as string) : undefined,
           };
         });
         setCurrentSessionId(sessionId);
@@ -701,7 +825,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
         targetSessionId = uuid();
         const newSession: ChatSession = {
           id: targetSessionId,
-          title: messages[0].content.length > 20 ? messages[0].content.slice(0, 20) + "…" : messages[0].content,
+          title: generateSessionTitle(messages[0].content),
           messages,
           city,
           createdAt: new Date().toISOString(),
@@ -930,6 +1054,11 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
       }
 
       // Assistant message
+      const isStreaming = msg.status === "streaming" || msg.status === "thinking";
+      const isDone = msg.status === "done" || msg.status === "success";
+      const isError = msg.status === "error";
+      const isFallback = msg.status === "fallback";
+
       return (
         <div className={styles.messageAssistant}>
           <div className={styles.messageAssistantBubble}>
@@ -954,8 +1083,30 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
               </div>
             )}
 
+            {/* Streaming state — show content with cursor */}
+            {msg.status === "streaming" && (
+              <>
+                {msg.content && (
+                  <div className={styles.resultSummary}>
+                    <span dangerouslySetInnerHTML={{ __html: sanitizeMarkdown(msg.content) }} />
+                    <span className={styles.streamingCursor} />
+                  </div>
+                )}
+                {!msg.content && (
+                  <div className={styles.thinkingContent}>
+                    <div>正在思考…</div>
+                    <div className={styles.thinkingDots}>
+                      <span />
+                      <span />
+                      <span />
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
             {/* Error state */}
-            {msg.status === "error" && (
+            {isError && (
               <ErrorCardView
                 message={msg.content}
                 onRetry={handleRetryLast}
@@ -963,14 +1114,21 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
               />
             )}
 
-            {/* Success state */}
-            {msg.status === "success" && (
+            {/* Done / Fallback state */}
+            {(isDone || isFallback) && (
               <>
                 {msg.content && (
                   <div
                     className={styles.resultSummary}
                     dangerouslySetInnerHTML={{ __html: sanitizeMarkdown(msg.content) }}
                   />
+                )}
+
+                {/* Fallback badge */}
+                {isFallback && (
+                  <div className={styles.fallbackBadge}>
+                    ⚡ 当前使用基础模式回答
+                  </div>
                 )}
 
                 {/* Plan cards with embedded action chips */}
@@ -993,6 +1151,17 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
                         />
                       );
                     })}
+                  </div>
+                )}
+
+                {/* Dev-only metadata badge */}
+                {isDev && msg.metadata && (
+                  <div className={styles.devMetaBadge}>
+                    {msg.metadata.provider && <span>provider: {msg.metadata.provider}</span>}
+                    {msg.metadata.model && <span>model: {msg.metadata.model}</span>}
+                    {msg.metadata.fallbackUsed !== undefined && (
+                      <span>fallback: {msg.metadata.fallbackUsed ? "yes" : "no"}</span>
+                    )}
                   </div>
                 )}
               </>
@@ -1027,6 +1196,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
         onNewChat={handleNewChat}
         onNavItemClick={handleNavItemClick}
         chatSessions={chatSessions}
+        currentSessionId={currentSessionId}
         onSessionClick={handleSessionClick}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}

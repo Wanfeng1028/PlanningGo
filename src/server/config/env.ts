@@ -33,6 +33,14 @@ const envSchema = z.object({
   // ── Agent Chat / Runtime ──
   AGENT_CHAT_MODE: z.enum(["auto","llm","rule"]).default("auto"),
   LLM_PROVIDER_PRIORITY: z.string().default("auto"),
+  LLM_PROVIDER_FALLBACK: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true"),
+  LLM_EXPOSE_DIAGNOSTICS: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true"),
 
   // ── DeepSeek（可选）──
   DEEPSEEK_API_KEY: z.string().optional(),
@@ -69,6 +77,10 @@ const envSchema = z.object({
   MIMO_BASE_URL: z.string().url().default("https://api.mimo.ai/v1"),
   MIMO_FLASH_MODEL: z.string().optional(),
   MIMO_PRO_MODEL: z.string().optional(),
+  MIMO_SUPPORTS_TOOL_CALLING: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true"),
 
   // ── LongCat（可选，美团大模型 OpenAI 兼容）──
   LONGCAT_API_KEY: z.string().optional(),
@@ -201,6 +213,23 @@ export function validateProductionJwtSecrets(input: {
 
 const insecureDefaultDatabaseUrl = "postgresql://planninggo:planninggo@localhost:5432/planninggo?schema=public";
 
+/** 检查是否有任何 LLM API Key 配置 */
+function hasAnyLlmKeyLocal(input: typeof env): boolean {
+  return Boolean(
+    input.OPENAI_API_KEY ||
+    input.QWEN_API_KEY ||
+    input.DEEPSEEK_API_KEY ||
+    input.MOONSHOT_API_KEY ||
+    input.GROQ_API_KEY ||
+    input.GEMINI_API_KEY ||
+    input.DOUBAO_API_KEY ||
+    input.MIMO_API_KEY ||
+    input.LONGCAT_API_KEY ||
+    input.CLAUDE_API_KEY ||
+    input.GROK_API_KEY,
+  );
+}
+
 export function validateProductionRuntime(input: typeof env) {
   if (input.NODE_ENV !== "production") return;
 
@@ -226,6 +255,15 @@ export function validateProductionRuntime(input: typeof env) {
 
   if (input.AUTO_EXECUTION_ALLOW_PAYMENT) {
     throw new Error("第一版生产环境禁止开启 AUTO_EXECUTION_ALLOW_PAYMENT");
+  }
+
+  // ── LLM 模式下必须有可用的 LLM Key ──
+  if (input.AGENT_CHAT_MODE === "llm" && !hasAnyLlmKeyLocal(input)) {
+    throw new Error("AGENT_CHAT_MODE=llm 但未配置任何 LLM API Key，请设置至少一个 Provider 的 Key");
+  }
+
+  if (input.PLANNING_MODE === "llm" && !hasAnyLlmKeyLocal(input)) {
+    throw new Error("PLANNING_MODE=llm 但未配置任何 LLM Provider，请设置至少一个 Provider 的 Key");
   }
 }
 

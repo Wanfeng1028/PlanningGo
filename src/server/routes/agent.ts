@@ -212,6 +212,19 @@ export async function registerAgentRoutes(app: FastifyInstance) {
         return { ...result, conversationId };
       } catch (error) {
         if (error instanceof ZodError) return reply.status(400).send({ error: "INVALID_REQUEST", issues: error.issues });
+        if (error instanceof Error && error.message.startsWith("MISSING_REQUIRED_SLOTS:")) {
+          const missingSlots = error.message.replace("MISSING_REQUIRED_SLOTS:", "").split(",");
+          const traceId = `trace_${Date.now().toString(36)}`;
+          return reply.status(400).send({
+            ok: false,
+            error: {
+              code: "MISSING_REQUIRED_SLOTS",
+              message: `缺少必要规划信息：${missingSlots.join("、")}`,
+              missingSlots,
+            },
+            traceId,
+          });
+        }
         throw error;
       }
     },
@@ -241,10 +254,10 @@ export async function registerAgentRoutes(app: FastifyInstance) {
         const userId = request.userId;
         const db: PrismaClient | null = app.db;
 
-        // Set SSE headers
-        reply.header("Content-Type", "text/event-stream");
-        reply.header("Cache-Control", "no-cache");
-        reply.header("Connection", "keep-alive");
+        // Set SSE headers (use raw.setHeader for reliable delivery with reply.raw.write)
+        reply.raw.setHeader("Content-Type", "text/event-stream");
+        reply.raw.setHeader("Cache-Control", "no-cache");
+        reply.raw.setHeader("Connection", "keep-alive");
 
         // CORS headers for SSE (reply.raw bypasses @fastify/cors)
         const origin = request.headers.origin;
@@ -325,6 +338,13 @@ export async function registerAgentRoutes(app: FastifyInstance) {
           try {
             if (error instanceof ZodError) {
               reply.raw.write(`data: ${JSON.stringify({ error: "INVALID_REQUEST", issues: error.issues })}\n\n`);
+            } else if (error instanceof Error && error.message.startsWith("MISSING_REQUIRED_SLOTS:")) {
+              const missingSlots = error.message.replace("MISSING_REQUIRED_SLOTS:", "").split(",");
+              reply.raw.write(`data: ${JSON.stringify({
+                error: "MISSING_REQUIRED_SLOTS",
+                message: `缺少必要规划信息：${missingSlots.join("、")}`,
+                missingSlots,
+              })}\n\n`);
             } else {
               reply.raw.write(`data: ${JSON.stringify({ error: "INTERNAL_SERVER_ERROR" })}\n\n`);
             }

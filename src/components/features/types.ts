@@ -22,13 +22,21 @@ export interface NextActionItem {
 export const MODEL_MODES = ["Flash", "Pro"] as const;
 export type ModelMode = typeof MODEL_MODES[number];
 
+export type MessageStatus = "streaming" | "done" | "error" | "fallback";
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   kind?: ChatMessageKind;
   content: string;
   createdAt: string;
-  status?: "thinking" | "success" | "error";
+  status?: "thinking" | "success" | "error" | MessageStatus;
+  /** Metadata from backend (provider, model, fallbackUsed) — dev-only display */
+  metadata?: {
+    provider?: string;
+    model?: string;
+    fallbackUsed?: boolean;
+  };
   chips?: string[];
   plans?: PlanningOption[];
   actions?: PlanningExecutableAction[];
@@ -47,6 +55,9 @@ export interface ChatSession {
   createdAt: string;
   updatedAt: string;
 }
+
+/** Whether we're in development mode (Vite sets this) */
+export const isDev = import.meta.env.DEV;
 
 export type AttachmentItem = {
   id: string;

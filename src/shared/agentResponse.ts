@@ -90,22 +90,33 @@ export interface AgentState {
 
 // ─── Agent Response (backend → frontend) ────────────────────
 
+export interface AgentResponseMetadata {
+  provider?: string;
+  model?: string;
+  mode?: "llm" | "rule" | "mock" | "hybrid";
+  fallbackUsed?: boolean;
+  traceId?: string;
+}
+
 export type AgentResponse =
   | {
       type: "chat";
       content: string;
       conversationId: string;
+      metadata?: AgentResponseMetadata;
     }
   | {
       type: "identity";
       content: string;
       conversationId: string;
+      metadata?: AgentResponseMetadata;
     }
   | {
       type: "travel_advice";
       content: string;
       suggestions: string[];
       conversationId: string;
+      metadata?: AgentResponseMetadata;
     }
   | {
       type: "slot_question";
@@ -113,6 +124,7 @@ export type AgentResponse =
       missingSlots: PlanningSlotKey[];
       knownSlots: PlanningSlots;
       conversationId: string;
+      metadata?: AgentResponseMetadata;
     }
   | {
       type: "plan";
@@ -125,6 +137,7 @@ export type AgentResponse =
         conversationId?: string;
       };
       conversationId: string;
+      metadata?: AgentResponseMetadata;
     }
   | {
       type: "plan_selected";
@@ -133,16 +146,19 @@ export type AgentResponse =
       selectedPlanTitle: string;
       nextActions: NextAction[];
       conversationId: string;
+      metadata?: AgentResponseMetadata;
     }
   | {
       type: "action_confirm";
       content: string;
       action: PendingAction;
       conversationId: string;
+      metadata?: AgentResponseMetadata;
     }
   | {
       type: "error";
       content: string;
       code?: string;
       conversationId?: string;
+      metadata?: AgentResponseMetadata;
     };

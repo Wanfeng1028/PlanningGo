@@ -23,7 +23,14 @@
       "Bash(head -n 386 src/server/modules/agent/planner.ts)",
       "Bash(echo \"// --- Mock 方案构建（仅开发环境 fallback）---\")",
       "Bash(mv temp.ts src/server/modules/agent/planner.ts)",
-      "Bash(docker compose *)"
+      "Bash(docker compose *)",
+      "Bash(node *)",
+      "Bash(findstr \":3001\")",
+      "Bash(findstr \"LISTEN\")",
+      "Bash(Start-Sleep -Seconds 3)",
+      "Bash(cmd.exe *)",
+      "Bash(npx tsx *)",
+      "Bash(npx vitest *)"
     ]
   }
 }

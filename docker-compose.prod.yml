@@ -3,7 +3,8 @@
 #
 # 必须通过 .env 或环境变量提供以下值：
 #   POSTGRES_PASSWORD, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET,
-#   COOKIE_SECRET, AMAP_WEB_SERVICE_KEY, QWEN_API_KEY
+#   COOKIE_SECRET, AMAP_WEB_SERVICE_KEY
+# 至少一个 LLM Key（推荐 MIMO_API_KEY 或 QWEN_API_KEY）
 
 services:
   postgres:
@@ -73,6 +74,17 @@ services:
       QWEN_PRO_MODEL: ${QWEN_PRO_MODEL:-qwen-plus}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      LLM_PROVIDER_PRIORITY: ${LLM_PROVIDER_PRIORITY:-auto}
+      LLM_EXPOSE_DIAGNOSTICS: ${LLM_EXPOSE_DIAGNOSTICS:-false}
+      MIMO_API_KEY: ${MIMO_API_KEY:-}
+      MIMO_BASE_URL: ${MIMO_BASE_URL:-https://api.mimo.ai/v1}
+      MIMO_FLASH_MODEL: ${MIMO_FLASH_MODEL:-}
+      MIMO_PRO_MODEL: ${MIMO_PRO_MODEL:-}
+      MIMO_SUPPORTS_TOOL_CALLING: ${MIMO_SUPPORTS_TOOL_CALLING:-false}
+      PLANNING_MODE: ${PLANNING_MODE:-llm}
+      AGENT_CHAT_MODE: ${AGENT_CHAT_MODE:-llm}
+      ALLOW_MOCK_PROVIDER_IN_PRODUCTION: ${ALLOW_MOCK_PROVIDER_IN_PRODUCTION:-false}
+      AMAP_BASE_URL: ${AMAP_BASE_URL:-https://restapi.amap.com}
     depends_on:
       postgres:
         condition: service_healthy
