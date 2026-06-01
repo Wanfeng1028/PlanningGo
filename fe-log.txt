@@ -743,3 +743,138 @@
 [2m23:36:00[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/components/AuthModal.tsx, /src/pages/FeaturesPage.tsx[22m
 [2m00:25:05[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/FeaturesPage.tsx[22m
 [2m00:27:09[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/FeaturesPage.tsx[22m
+[2m01:14:00[22m [36m[1m[vite][22m[39m [32m.env changed, restarting server...[39m
+[2m01:14:00[22m [36m[1m[vite][22m[39m server restarted.
+[2m01:15:30[22m [36m[1m[vite][22m[39m [32m.env changed, restarting server...[39m
+[2m01:15:30[22m [36m[1m[vite][22m[39m server restarted.
+[2m01:21:58[22m [36m[1m[vite][22m[39m [32m.env changed, restarting server...[39m
+[2m01:21:58[22m [36m[1m[vite][22m[39m server restarted.
+[2m01:27:53[22m [36m[1m[vite][22m[39m [32m.env changed, restarting server...[39m
+[2m01:27:53[22m [36m[1m[vite][22m[39m server restarted.
+[2m01:28:12[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/conversations?limit=30[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:28:12[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/health[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:28:12[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/conversations?limit=30[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:28:12[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/health[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:28:14[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/conversations/0841425d-0b93-46e7-92d3-4d5b857e9a0b[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:28:21[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/events[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:28:21[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/agent/chat/stream[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:28:21[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/events[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:28:21[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/client-errors[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:28:22[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/events[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:28:22[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/agent/chat/stream[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:28:22[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/events[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:28:22[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/client-errors[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:29:20[22m [36m[1m[vite][22m[39m [32m.env changed, restarting server...[39m
+[2m01:29:21[22m [36m[1m[vite][22m[39m server restarted.
+[2m01:47:04[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/health[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:04[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/conversations?limit=30[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:04[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/health[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:04[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/conversations?limit=30[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:21[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/conversations?limit=30[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:21[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/health[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:21[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/conversations?limit=30[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:21[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/health[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:24[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/profile/me[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:24[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/profile/me[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:24[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/memories[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:24[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/profile/me/companions[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:24[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/profile/me/history?page=1&pageSize=20[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:24[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications?page=1&pageSize=20[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:24[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/preferences[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:24[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/profile/me/permissions[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:24[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/auth/sessions[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:24[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/memories[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:24[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/profile/me/companions[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:24[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/profile/me/history?page=1&pageSize=20[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:24[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications?page=1&pageSize=20[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:24[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/preferences[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:24[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/profile/me/permissions[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:24[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/auth/sessions[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:30[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/conversations?limit=30[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:30[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/health[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:30[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/conversations?limit=30[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m01:47:30[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/health[39m
+Error: connect ECONNREFUSED 127.0.0.1:3001
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1645:16)
+[2m03:12:46[22m [36m[1m[vite][22m[39m [32m.env changed, restarting server...[39m
+[2m03:12:47[22m [36m[1m[vite][22m[39m server restarted.

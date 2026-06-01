@@ -31,7 +31,9 @@ export type PlanningSlotKey =
   | "preference"
   | "companions";
 
-export type PlanningSlots = Partial<Record<PlanningSlotKey, string | number | string[]>>;
+export type PlanningSlots = Partial<Record<PlanningSlotKey, string | number | string[]>> & {
+  destinationCity?: string;
+};
 
 // ─── Next Action & Pending Action ───────────────────────────
 
@@ -44,6 +46,7 @@ export interface PendingAction {
   id: string;
   title: string;
   description: string;
+  actionKey?: string;
 }
 
 // ─── Agent Message Input (frontend → backend) ───────────────
@@ -78,6 +81,11 @@ export interface AgentState {
   selectedPlanTitle?: string;
   pendingAction?: PendingAction;
   lastAssistantType?: AgentResponse["type"];
+  lastToolCalls?: Array<{
+    name: string;
+    status: string;
+    latencyMs?: number;
+  }>;
 }
 
 // ─── Agent Response (backend → frontend) ────────────────────

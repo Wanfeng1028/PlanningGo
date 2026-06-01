@@ -30,6 +30,62 @@ const envSchema = z.object({
   LLM_PRO_MODEL: z.string().optional(),
   LLM_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
 
+  // ── Agent Chat / Runtime ──
+  AGENT_CHAT_MODE: z.enum(["auto","llm","rule"]).default("auto"),
+  LLM_PROVIDER_PRIORITY: z.string().default("auto"),
+
+  // ── DeepSeek（可选）──
+  DEEPSEEK_API_KEY: z.string().optional(),
+  DEEPSEEK_BASE_URL: z.string().url().default("https://api.deepseek.com"),
+  DEEPSEEK_FLASH_MODEL: z.string().optional(),
+  DEEPSEEK_PRO_MODEL: z.string().optional(),
+
+  // ── Moonshot（可选）──
+  MOONSHOT_API_KEY: z.string().optional(),
+  MOONSHOT_BASE_URL: z.string().url().default("https://api.moonshot.cn/v1"),
+  MOONSHOT_FLASH_MODEL: z.string().optional(),
+  MOONSHOT_PRO_MODEL: z.string().optional(),
+
+  // ── Groq（可选）──
+  GROQ_API_KEY: z.string().optional(),
+  GROQ_BASE_URL: z.string().url().default("https://api.groq.com/openai/v1"),
+  GROQ_FLASH_MODEL: z.string().optional(),
+  GROQ_PRO_MODEL: z.string().optional(),
+
+  // ── Gemini（可选，OpenAI 兼容入口或 adapter）──
+  GEMINI_API_KEY: z.string().optional(),
+  GEMINI_BASE_URL: z.string().url().default("https://generativelanguage.googleapis.com/v1beta/openai"),
+  GEMINI_FLASH_MODEL: z.string().optional(),
+  GEMINI_PRO_MODEL: z.string().optional(),
+
+  // ── 豆包/Doubao（可选，Volcengine OpenAI 兼容）──
+  DOUBAO_API_KEY: z.string().optional(),
+  DOUBAO_BASE_URL: z.string().url().default("https://ark.cn-beijing.volces.com/api/v3"),
+  DOUBAO_FLASH_MODEL: z.string().optional(),
+  DOUBAO_PRO_MODEL: z.string().optional(),
+
+  // ── MiMo（可选，小米大模型 OpenAI 兼容）──
+  MIMO_API_KEY: z.string().optional(),
+  MIMO_BASE_URL: z.string().url().default("https://api.mimo.ai/v1"),
+  MIMO_FLASH_MODEL: z.string().optional(),
+  MIMO_PRO_MODEL: z.string().optional(),
+
+  // ── LongCat（可选，美团大模型 OpenAI 兼容）──
+  LONGCAT_API_KEY: z.string().optional(),
+  LONGCAT_BASE_URL: z.string().url().default("https://api.longcat.ai/openai/v1"),
+  LONGCAT_FLASH_MODEL: z.string().optional(),
+  LONGCAT_PRO_MODEL: z.string().optional(),
+
+  // ── Claude（可选，Anthropic API，需要 adapter）──
+  CLAUDE_API_KEY: z.string().optional(),
+  CLAUDE_BASE_URL: z.string().url().default("https://api.anthropic.com"),
+  CLAUDE_MODEL: z.string().optional(),
+
+  // ── Grok（可选，xAI API，需要 adapter）──
+  GROK_API_KEY: z.string().optional(),
+  GROK_BASE_URL: z.string().url().default("https://api.x.ai"),
+  GROK_MODEL: z.string().optional(),
+
   // ── 外部工具 ──
   AMAP_WEB_SERVICE_KEY: z.string().optional(),
   AMAP_BASE_URL: z.string().url().default("https://restapi.amap.com"),
@@ -180,3 +236,4 @@ validateProductionRuntime(env);
 export const corsOrigins = env.CORS_ORIGINS.split(",")
   .map((item) => item.trim())
   .filter(Boolean);
+

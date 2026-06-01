@@ -15,7 +15,15 @@
       "Bash(npx tsc *)",
       "Bash(curl *)",
       "Bash(pkill -f \"tsx watch\")",
-      "Bash(PORT=3004 npm run dev:api)"
+      "Bash(PORT=3004 npm run dev:api)",
+      "Bash(docker compose up *)",
+      "Bash(docker compose ps *)",
+      "Bash(timeout 10)",
+      "Bash(npm test *)",
+      "Bash(head -n 386 src/server/modules/agent/planner.ts)",
+      "Bash(echo \"// --- Mock 方案构建（仅开发环境 fallback）---\")",
+      "Bash(mv temp.ts src/server/modules/agent/planner.ts)",
+      "Bash(docker compose *)"
     ]
   }
 }

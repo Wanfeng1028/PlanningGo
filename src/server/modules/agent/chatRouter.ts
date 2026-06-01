@@ -1,9 +1,15 @@
 /**
- * Chat Router — 周末去哪儿 Agent
+ * Chat Router — 周末去哪儿 Agent (Fallback / Legacy)
  *
- * 核心意图识别 + 路由分发层。
- * 在 /api/agent/chat/stream 入口处调用，先判断用户意图，
- * 再决定走普通聊天、身份回答、追问补槽还是生成方案。
+ * ⚠️ 此模块已降级为 fallback：当 LLM Agent Runtime 不可用时（无 API Key 或运行时异常），
+ * 才会使用此规则模板进行意图识别和路由分发。
+ *
+ * 正式主链路请使用 agentRuntime.ts（LLM streaming + tool_calls）。
+ *
+ * 保留此模块的原因：
+ * 1. 无 API Key 时仍可提供基础对话能力
+ * 2. LLM 服务临时不可用时的降级方案
+ * 3. 作为意图分类的参考实现
  */
 
 import type { PrismaClient } from "../../../generated/prisma/client.js";

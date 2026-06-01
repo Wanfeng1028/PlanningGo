@@ -266,9 +266,9 @@ export async function generateLlmPlans(input: PlannerInput): Promise<ActivityPla
   const llmProvider = input.providers?.llm;
   if (!llmProvider) {
     if (env.NODE_ENV === "production") {
-      throw new Error("[planner] 鐢熶骇鐜蹇呴』鎻愪緵 llm provider");
+      throw new Error("[planner] 生产环境必须提供 llm provider");
     }
-    console.warn("[planner] 鏃?llm provider锛宖allback 鍒?mock");
+    console.warn("[planner] 无 llm provider，fallback 到 mock");
     return generateMockPlans(input);
   }
 
@@ -295,17 +295,17 @@ export async function generateLlmPlans(input: PlannerInput): Promise<ActivityPla
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
       if (attempt < maxRetries) {
-        console.warn(`[planner] LLM 杈撳嚭鏍￠獙澶辫触锛岄噸璇?(${attempt + 1}/${maxRetries}): ${lastError.message}`);
+        console.warn(`[planner] LLM 输出校验失败，重试 (${attempt + 1}/${maxRetries}): ${lastError.message}`);
       }
     }
   }
 
   if (env.NODE_ENV !== "production") {
-    console.warn(`[planner] LLM 鐢熸垚澶辫触锛宖allback 鍒?mock: ${lastError?.message}`);
+    console.warn(`[planner] LLM 生成失败，fallback 到 mock: ${lastError?.message}`);
     return generateMockPlans(input);
   }
 
-  throw new Error(`[planner] LLM 鏂规鐢熸垚澶辫触: ${lastError?.message}`);
+  throw new Error(`[planner] LLM 方案生成失败: ${lastError?.message}`);
 }
 
 function buildLlmPrompt(input: PlannerInput): string {
@@ -316,22 +316,24 @@ function buildLlmPrompt(input: PlannerInput): string {
     ...candidates.activities,
     ...candidates.restaurants,
     ...candidates.events,
-  ].map((c) => `- ${c.name} (${c.category}, ${c.address}, 璇勫垎${c.rating ?? "?"}, 浜哄潎${c.avgPrice ?? "?"}鍏?`).join("\n");
+  ].map((c) => `- ${c.name} (${c.category}, ${c.address}, 评分${c.rating ?? "?"}, 人均${c.avgPrice ?? "?"}元)`).join("\n");
 
-  return `鐢ㄦ埛闇€姹傦細
-- 鍩庡競锛?{intent.city}
-- 鍑哄彂鍦帮細${intent.origin.label}
-- 鏃ユ湡锛?{intent.date ?? "鏈懆鍏?}
-- 鍑哄彂鏃堕棿锛?{intent.departAt ?? "14:00"}
-- 鍙備笌鑰咃細${intent.participantMode}锛?{intent.partySize}浜?- 鏃堕暱锛?{intent.durationHours[0]}-${intent.durationHours[1]}灏忔椂
-- 棰勭畻涓婇檺锛?{intent.budgetMax ?? "涓嶉檺"}鍏?- 鍋忓ソ锛?{intent.preferences.length > 0 ? intent.preferences.join("銆?) : "鏃犵壒娈婂亸濂?}
+  return `用户需求：
+- 城市：${intent.city}
+- 出发地：${intent.origin.label}
+- 日期：${intent.date ?? "本周末"}
+- 出发时间：${intent.departAt ?? "14:00"}
+- 参与者：${intent.participantMode}，${intent.partySize}人
+- 时长：${intent.durationHours[0]}-${intent.durationHours[1]}小时
+- 预算上限：${intent.budgetMax ?? "不限"}元
+- 偏好：${intent.preferences.length > 0 ? intent.preferences.join("、") : "无特殊偏好"}
 
-澶╂皵锛?{weather.condition}锛?{weather.temperature}锛?{weather.suggestion}
+天气：${weather.condition}，${weather.temperature}，${weather.suggestion}
 
-鍊欓€夊湴鐐癸細
-${candidateList || "锛堟棤鍊欓€夊湴鐐癸紝璇锋牴鎹煄甯傚拰闇€姹傛帹鑽愶級"}
+候选地点：
+${candidateList || "（无候选地点，请根据城市和需求推荐）"}
 
-璇疯緭鍑?JSON锛屾牸寮忥細
+请输出 JSON，格式：
 ${PLAN_JSON_SCHEMA_DESC}`;
 }
 
@@ -382,5 +384,4 @@ function parseAndValidateLlmOutput(content: string, planId: string): ActivityPla
   }));
 }
 
-// 鈹€鈹€ Mock 鏂规鏋勫缓锛堜粎寮€鍙戠幆澧?fallback锛?鈹€鈹€
-
+// --- Mock 方案构建（仅开发环境 fallback）---
