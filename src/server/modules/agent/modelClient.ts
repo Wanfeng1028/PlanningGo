@@ -276,14 +276,20 @@ export async function chatStream(
     }));
 
     // Convert OpenAI tool format to adapter format
-    const adapterTools: LlmTool[] | undefined = options?.tools?.map((t) => ({
-      type: "function" as const,
-      function: {
-        name: t.function.name,
-        description: t.function.description ?? "",
-        parameters: t.function.parameters as Record<string, unknown>,
-      },
-    }));
+    const adapterTools: LlmTool[] | undefined = options?.tools?.map((t) => {
+      if ("function" in t) {
+        return {
+          type: "function" as const,
+          function: {
+            name: t.function.name,
+            description: t.function.description ?? "",
+            parameters: t.function.parameters as Record<string, unknown>,
+          },
+        };
+      }
+      // ChatCompletionCustomTool – skip
+      return undefined;
+    }).filter(Boolean) as LlmTool[] | undefined;
 
     try {
       const result = await ap.adapter.chatStream(adapterMessages, {
