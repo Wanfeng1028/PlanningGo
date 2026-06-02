@@ -104,22 +104,35 @@ function minutesToTime(minutes: number): string {
  * 优先使用 departAt（用户明确给的时间），其次按 timeWindow 给出合理默认。
  */
 function resolveStartTime(intent: UserIntent): string {
-  // 1. 如果用户给了明确时间（如 "09:00" 或 "明天上午9点" 被解析为 "09:00"）
-  if (intent.departAt) {
-    // departAt 可能是 "09:00"、"9:00"、"14:00" 等
-    const m = String(intent.departAt).match(/(\d{1,2})[：:](\d{2})/);
-    if (m) {
-      const h = m[1]!.padStart(2, "0");
-      return `${h}:${m[2]}`;
-    }
-    // 也可能只有小时 "9点"
-    const hm = String(intent.departAt).match(/(\d{1,2})\s*[点时]/);
-    if (hm) {
-      return `${hm[1]!.padStart(2, "0")}:00`;
-    }
+  // Combine departAt and raw prompt for better time extraction
+  const timeSources = [intent.departAt, intent.raw].filter(Boolean).join(" ");
+
+  // 1. HH:MM or HH：MM format (e.g. "09:00", "14:30")
+  const hm = timeSources.match(/(\d{1,2})[：:](\d{2})/);
+  if (hm) {
+    let hour = parseInt(hm[1]!, 10);
+    if (/(下午|晚上|evening)/.test(timeSources) && hour < 12) hour += 12;
+    return `${String(hour).padStart(2, "0")}:${hm[2]}`;
   }
 
-  // 2. 按 timeWindow 给出合理默认
+  // 2. Chinese format "X点Y分" or "X点半" or "X点"
+  const cnTime = timeSources.match(/(\d{1,2})\s*点\s*(半|(\d{1,2})分?)?/);
+  if (cnTime) {
+    let hour = parseInt(cnTime[1]!, 10);
+    let minute = 0;
+    if (cnTime[2] === "半") {
+      minute = 30;
+    } else if (cnTime[3]) {
+      minute = parseInt(cnTime[3], 10);
+    }
+    // Adjust hour based on time window context
+    if (/(下午|晚上|evening)/.test(timeSources) && hour < 12) {
+      hour += 12;
+    }
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  }
+
+  // 3. 按 timeWindow 给出合理默认
   switch (intent.timeWindow) {
     case "morning":   return "09:00";
     case "afternoon": return "14:00";

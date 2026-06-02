@@ -16,7 +16,7 @@ import {
     selectAgentPlan,
   type AgentPlanSelectResponse,
 } from "../lib/api";
-import type { AgentVisibleEvent } from "../shared/agentResponse";
+import type { AgentTraceEvent } from "../shared/agentResponse";
 import { GlassToast, useGlassToast } from "../components/GlassToast";
 import { validateInputLength } from "../lib/tokens";
 import { sanitizeMarkdown } from "../lib/sanitize";
@@ -116,6 +116,7 @@ function safeMapDbMessages(
         nextActions: payloadType === "plan_selected" ? (payload?.nextActions as NextActionItem[]) : undefined,
         selectedOptionId: payloadType === "plan_selected" ? (payload?.selectedOptionId as string) : undefined,
         selectedPlanTitle: payloadType === "plan_selected" ? (payload?.selectedPlanTitle as string) : undefined,
+        traceEvents: (payload?.events as AgentTraceEvent[]) ?? undefined,
       };
     } catch (mapErr) {
       // payloadJson parse error — degrade to plain text, never blank the whole conversation
@@ -187,7 +188,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [typedText, setTypedText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
-  const [agentEvents, setAgentEvents] = useState<AgentVisibleEvent[]>([]);
+  const [agentEvents, setAgentEvents] = useState<AgentTraceEvent[]>([]);
   const [agentEventsCollapsed, setAgentEventsCollapsed] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -345,6 +346,13 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
                   const selPayload = selMsg?.payloadJson as Record<string, unknown> | undefined;
                   if (selPayload?.selectedOptionId) {
                     setSelectedPlanId(selPayload.selectedOptionId as string);
+                  }
+                  // Restore trace events from last assistant message
+                  const lastWithEvents = [...loadedMessages].reverse().find(
+                    (m) => m.role === "assistant" && m.traceEvents && m.traceEvents.length > 0
+                  );
+                  if (lastWithEvents?.traceEvents) {
+                    setAgentEvents(lastWithEvents.traceEvents);
                   }
                   // Auto-scroll to bottom after loading
                   forceScrollToBottom("auto");
@@ -610,7 +618,19 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
               });
             },
             onAgentEvent: (event) => {
-              setAgentEvents((prev) => [...prev, event as AgentVisibleEvent]);
+              const traceEvent = event as AgentTraceEvent;
+              setAgentEvents((prev) => {
+                // Upsert by id: if same id exists, update it; otherwise append
+                if (traceEvent.id) {
+                  const idx = prev.findIndex((e) => e.id === traceEvent.id);
+                  if (idx >= 0) {
+                    const next = [...prev];
+                    next[idx] = traceEvent;
+                    return next;
+                  }
+                }
+                return [...prev, traceEvent];
+              });
             },
             onFinalResult: (result: unknown) => {
               agentResponse = result;
@@ -1003,6 +1023,16 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
           const selPayload = selMsg?.payloadJson as Record<string, unknown> | undefined;
           setSelectedPlanId(selPayload?.selectedOptionId ? (selPayload.selectedOptionId as string) : null);
 
+          // Restore trace events from last assistant message
+          const lastAssistantWithEvents = [...loadedMessages].reverse().find(
+            (m) => m.role === "assistant" && m.traceEvents && m.traceEvents.length > 0
+          );
+          if (lastAssistantWithEvents?.traceEvents) {
+            setAgentEvents(lastAssistantWithEvents.traceEvents);
+          } else {
+            setAgentEvents([]);
+          }
+
           setSidebarOpen(false);
           setInputValue("");
 
@@ -1337,7 +1367,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
 
   /* ── Render: agent execution events panel ── */
   const renderAgentEvent = useCallback(
-    (evt: AgentVisibleEvent, _index: number) => {
+    (evt: AgentTraceEvent, _index: number) => {
       let icon = "•";
       let statusClass = styles.eventRunning;
 
@@ -1345,42 +1375,90 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
         if (evt.status === "running") {
           icon = "◌";
           statusClass = styles.eventRunning;
-        } else if (evt.status === "success") {
+        } else if (evt.status === "done") {
           icon = "✓";
           statusClass = styles.eventSuccess;
         } else if (evt.status === "error") {
           icon = "✗";
           statusClass = styles.eventError;
+        } else if (evt.status === "warning") {
+          icon = "!";
+          statusClass = styles.eventWarning;
         } else if (evt.status === "skipped") {
           icon = "–";
-          statusClass = styles.eventRunning;
+          statusClass = styles.eventSkipped;
         }
       } else if (evt.type === "tool") {
         if (evt.status === "running") {
           icon = "⟳";
           statusClass = styles.eventRunning;
-        } else if (evt.status === "success") {
+        } else if (evt.status === "done") {
           icon = "✓";
           statusClass = styles.eventSuccess;
         } else if (evt.status === "error") {
           icon = "✗";
           statusClass = styles.eventError;
-        } else if (evt.status === "fallback") {
+        } else if (evt.status === "fallback" || evt.fallbackUsed) {
           icon = "↻";
-          statusClass = styles.eventRunning;
+          statusClass = styles.eventWarning;
         }
-      } else if (evt.type === "slot_update") {
+      } else if (evt.type === "slot") {
         icon = "▸";
-        statusClass = styles.eventSuccess;
+        statusClass = evt.status === "warning" ? styles.eventWarning : styles.eventSuccess;
+      } else if (evt.type === "action_guard") {
+        icon = "–";
+        statusClass = styles.eventSkipped;
       } else if (evt.type === "warning") {
         icon = "!";
-        statusClass = styles.eventError;
+        statusClass = styles.eventWarning;
       }
 
       return (
-        <div key={`${evt.type}-${evt.timestamp}-${_index}`} className={`${styles.agentEventItem} ${statusClass}`}>
+        <div key={evt.id ?? `${evt.type}-${_index}`} className={`${styles.agentEventItem} ${statusClass}`}>
           <span className={styles.agentEventIcon}>{icon}</span>
-          <span className={styles.agentEventTitle}>{evt.title}</span>
+          <div className={styles.agentEventBody}>
+            <span className={styles.agentEventTitle}>{evt.label}</span>
+
+            {/* Slot details: known slots + missing slots */}
+            {evt.type === "slot" && (
+              <div className={styles.agentEventSlotDetails}>
+                {Object.keys(evt.knownSlots).length > 0 && (
+                  <div className={styles.agentEventSlotKnown}>
+                    {Object.entries(evt.knownSlots).map(([k, v]) => (
+                      <span key={k} className={styles.agentEventSlotChip}>
+                        {k}：{String(v)}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {evt.missingSlots.length > 0 && (
+                  <div className={styles.agentEventSlotMissing}>
+                    缺少：{evt.missingSlots.join("、")}
+                  </div>
+                )}
+                {evt.defaults && Object.keys(evt.defaults).length > 0 && (
+                  <div className={styles.agentEventSlotDefaults}>
+                    默认：{Object.entries(evt.defaults).map(([k, v]) => `${k} ${v}`).join("；")}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tool output summary */}
+            {evt.type === "tool" && evt.outputSummary && (
+              <div className={styles.agentEventDetail}>{evt.outputSummary}</div>
+            )}
+
+            {/* Tool/action detail or error message */}
+            {evt.type !== "slot" && "detail" in evt && evt.detail && (
+              <div className={styles.agentEventDetail}>{evt.detail}</div>
+            )}
+
+            {/* Action guard reason */}
+            {evt.type === "action_guard" && (
+              <div className={styles.agentEventDetail}>{evt.reason}</div>
+            )}
+          </div>
         </div>
       );
     },

@@ -1,4 +1,5 @@
 import type { PlanningOption, PlanningExecutableAction, PlanningAction } from "../../lib/api";
+import type { AgentTraceEvent } from "../../shared/agentResponse";
 
 /* ── Re-export API types used by extracted feature components ── */
 export type { PlanningOption, PlanningExecutableAction, PlanningAction };
@@ -46,6 +47,8 @@ export interface ChatMessage {
   nextActions?: NextActionItem[];
   selectedOptionId?: string;
   selectedPlanTitle?: string;
+  /** Trace events from agent execution, persisted in message payload */
+  traceEvents?: AgentTraceEvent[];
 }
 
 export interface ChatSession {

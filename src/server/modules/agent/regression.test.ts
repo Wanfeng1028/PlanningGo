@@ -27,6 +27,7 @@ import {
   classifyAgentIntent,
   extractPlanningSlots,
   mergeSlots,
+  getMissingSlots,
   isContinuationIntent,
   generateTitleFromSlots,
 } from "./chatRouter.js";
@@ -895,5 +896,327 @@ describe("Regression §16: casual chat does not write to user profile", () => {
     expect(merged.budgetRange).toEqual([100, 200]);
     expect(merged.foodPreferences).toEqual(["火锅", "烧烤"]);
     expect(merged.companionsPreference).toBe("solo");
+  });
+});
+
+
+// ══════════════════════════════════════════════════════════════
+//  §17  时间提取："明天上午9点"不会变成 14:00
+// ══════════════════════════════════════════════════════════════
+
+describe("Regression §17: time extraction — specific time not overridden by 14:00", () => {
+  it("extractPlanningSlots extracts '明天上午9点' into slots.time", () => {
+    const slots = extractPlanningSlots("明天上午9点出发去西湖");
+    expect(slots.time).toContain("9点");
+    expect(slots.time).toContain("上午");
+    expect(slots.timeWindow).toBe("morning");
+  });
+
+  it("extractPlanningSlots extracts '明天早上10点' into slots.time", () => {
+    const slots = extractPlanningSlots("明天早上10点去北京天安门");
+    expect(slots.time).toContain("10点");
+    expect(slots.time).toContain("早上");
+    expect(slots.timeWindow).toBe("morning");
+  });
+
+  it("extractPlanningSlots extracts '今天下午3点' into slots.time", () => {
+    const slots = extractPlanningSlots("今天下午3点去西湖");
+    expect(slots.time).toContain("3点");
+    expect(slots.time).toContain("下午");
+    expect(slots.timeWindow).toBe("afternoon");
+  });
+
+  it("time slot survives merge without being overridden", () => {
+    const turn1 = extractPlanningSlots("明天上午9点去西湖");
+    const turn2 = extractPlanningSlots("一个人");
+    const merged = mergeSlots(turn1, turn2);
+    expect(merged.time).toContain("9点");
+    expect(merged.timeWindow).toBe("morning");
+  });
+});
+
+
+// ══════════════════════════════════════════════════════════════
+//  §18  预算保护：用户预算不被默认值覆盖
+// ══════════════════════════════════════════════════════════════
+
+describe("Regression §18: budget protection — user budget not overridden by defaults", () => {
+  it("budget=300 not changed to 420 after merge", () => {
+    const slots = extractPlanningSlots("预算300元去西湖");
+    expect(slots.budget).toBe(300);
+    const merged = mergeSlots(slots, extractPlanningSlots("一个人"));
+    expect(merged.budget).toBe(300);
+    expect(merged.budget).not.toBe(420);
+  });
+
+  it("user not providing budget does NOT result in budget=420", () => {
+    const slots = extractPlanningSlots("去西湖一个人");
+    // When user doesn't mention budget, it should be undefined, not 420
+    expect(slots.budget).toBeUndefined();
+  });
+
+  it("getMissingSlots does NOT require budget", () => {
+    const slots: PlanningSlots = { destination: "西湖", partySize: 1, time: "明天上午9点" };
+    const missing = getMissingSlots(slots);
+    // Budget should NOT be in the missing list
+    expect(missing).not.toContain("budget");
+  });
+});
+
+
+// ══════════════════════════════════════════════════════════════
+//  §19  缺少 origin 时不出现"未知出发地"
+// ══════════════════════════════════════════════════════════════
+
+describe("Regression §19: missing origin — no '未知出发地' text", () => {
+  it("getMissingSlots includes 'origin' when origin is missing", () => {
+    const slots: PlanningSlots = { destination: "西湖", partySize: 1, time: "明天" };
+    const missing = getMissingSlots(slots);
+    expect(missing).toContain("origin");
+  });
+
+  it("extractPlanningSlots does NOT fabricate origin from non-origin text", () => {
+    const slots = extractPlanningSlots("想去西湖逛逛");
+    expect(slots.origin).toBeUndefined();
+  });
+
+  it("mergeSlots does NOT fill origin with default value", () => {
+    const existing: PlanningSlots = { destination: "北京天安门" };
+    const incoming: PlanningSlots = { partySize: 1 };
+    const merged = mergeSlots(existing, incoming);
+    expect(merged.origin).toBeUndefined();
+  });
+});
+
+
+// ══════════════════════════════════════════════════════════════
+//  §20  "北京天安门"不降级为"北京"
+// ══════════════════════════════════════════════════════════════
+
+describe("Regression §20: destination specificity — '北京天安门' not downgraded", () => {
+  it("extractPlanningSlots preserves '北京天安门' as full destination", () => {
+    const slots = extractPlanningSlots("我想去北京天安门");
+    expect(slots.destination).toBe("北京天安门");
+    expect(slots.destination).not.toBe("北京");
+  });
+
+  it("destinationCity inferred as '北京' from '北京天安门'", () => {
+    const slots = extractPlanningSlots("我想去北京天安门");
+    expect(slots.destinationCity).toBe("北京");
+  });
+
+  it("extractPlanningSlots preserves '杭州西湖' as full destination", () => {
+    const slots = extractPlanningSlots("去杭州西湖");
+    expect(slots.destination).toBe("杭州西湖");
+    expect(slots.destinationCity).toBe("杭州");
+  });
+
+  it("mergeSlots preserves specific destination", () => {
+    const turn1 = extractPlanningSlots("去北京天安门");
+    const turn2 = extractPlanningSlots("一个人");
+    const merged = mergeSlots(turn1, turn2);
+    expect(merged.destination).toBe("北京天安门");
+    expect(merged.destination).not.toBe("北京");
+  });
+});
+
+
+// ══════════════════════════════════════════════════════════════
+//  §21  偏好提取：咖啡厅+火锅+午饭 进入 preferences
+// ══════════════════════════════════════════════════════════════
+
+describe("Regression §21: preferences extraction — cafe, hotpot, lunch", () => {
+  it("extracts 咖啡厅 preference", () => {
+    const slots = extractPlanningSlots("找个咖啡厅坐坐");
+    expect(slots.preferences).toContain("咖啡厅");
+  });
+
+  it("extracts 火锅 preference", () => {
+    const slots = extractPlanningSlots("想吃火锅");
+    expect(slots.preferences).toContain("火锅");
+  });
+
+  it("extracts 午饭 preference", () => {
+    const slots = extractPlanningSlots("然后去吃午饭");
+    expect(slots.preferences).toContain("午饭");
+  });
+
+  it("extracts multiple preferences from complex sentence", () => {
+    const slots = extractPlanningSlots("找个咖啡厅坐坐，然后去吃午饭，想吃火锅");
+    expect(slots.preferences).toContain("咖啡厅");
+    expect(slots.preferences).toContain("午饭");
+    expect(slots.preferences).toContain("火锅");
+  });
+
+  it("extracts 老北京火锅 as 火锅 preference", () => {
+    const slots = extractPlanningSlots("想吃老北京火锅");
+    expect(slots.preferences).toContain("火锅");
+  });
+
+  it("extracts 少排队 and 室内优先 preferences", () => {
+    const slots = extractPlanningSlots("下雨天少排队");
+    expect(slots.preferences).toContain("少排队");
+    expect(slots.preferences).toContain("室内优先");
+  });
+
+  it("preferences survive merge across turns", () => {
+    const turn1 = extractPlanningSlots("找个咖啡厅");
+    const turn2 = extractPlanningSlots("想吃火锅");
+    const merged = mergeSlots(turn1, turn2);
+    expect(merged.preferences).toContain("咖啡厅");
+    expect(merged.preferences).toContain("火锅");
+  });
+});
+
+
+// ══════════════════════════════════════════════════════════════
+//  §22  getMissingSlots 正确判断缺失字段
+// ══════════════════════════════════════════════════════════════
+
+describe("Regression §22: getMissingSlots comprehensive check", () => {
+  it("requires destination when not provided", () => {
+    const slots: PlanningSlots = { partySize: 1 };
+    const missing = getMissingSlots(slots);
+    expect(missing).toContain("destination");
+  });
+
+  it("requires time/date when not provided", () => {
+    const slots: PlanningSlots = { destination: "西湖", partySize: 1 };
+    const missing = getMissingSlots(slots);
+    expect(missing).toContain("time");
+  });
+
+  it("requires partySize when not provided", () => {
+    const slots: PlanningSlots = { destination: "西湖", time: "明天" };
+    const missing = getMissingSlots(slots);
+    expect(missing).toContain("partySize");
+  });
+
+  it("no missing when all core fields present (origin optional for light plan)", () => {
+    const slots: PlanningSlots = {
+      destination: "西湖",
+      time: "明天上午9点",
+      partySize: 1,
+      origin: "杭师大仓前",
+    };
+    const missing = getMissingSlots(slots);
+    expect(missing).toHaveLength(0);
+  });
+
+  it("origin is listed as missing when not provided", () => {
+    const slots: PlanningSlots = {
+      destination: "西湖",
+      time: "明天",
+      partySize: 1,
+    };
+    const missing = getMissingSlots(slots);
+    expect(missing).toContain("origin");
+  });
+});
+
+
+// ══════════════════════════════════════════════════════════════
+//  §23  闲聊不生成 plan — 验证 intent classification
+// ══════════════════════════════════════════════════════════════
+
+describe("Regression §23: casual chat returns chat intent, not plan", () => {
+  it("'你好' is classified as greeting", () => {
+    expect(classifyAgentIntent("你好")).toBe("greeting");
+  });
+
+  it("'你是谁' is classified as identity_question", () => {
+    expect(classifyAgentIntent("你是谁")).toBe("identity_question");
+  });
+
+  it("'今天是什么时间' is classified as casual_chat", () => {
+    expect(classifyAgentIntent("今天是什么时间")).toBe("casual_chat");
+  });
+
+  it("'推荐几个适合周末半日游的地点' is classified as travel_question", () => {
+    expect(classifyAgentIntent("推荐几个适合周末半日游的地点，少排队，交通方便")).toBe("travel_question");
+  });
+
+  it("greeting does not produce planning slots", () => {
+    const slots = extractPlanningSlots("你好");
+    expect(Object.keys(slots)).toHaveLength(0);
+  });
+});
+
+
+// ══════════════════════════════════════════════════════════════
+//  §24  标题从闲聊更新为规划标题
+// ══════════════════════════════════════════════════════════════
+
+describe("Regression §24: title updates from chat to planning title", () => {
+  it("title includes destination and preferences", () => {
+    const slots: PlanningSlots = {
+      destination: "西湖",
+      preferences: ["咖啡厅", "火锅"],
+    };
+    const title = generateTitleFromSlots(slots);
+    expect(title).toContain("西湖");
+    expect(title).toContain("咖啡");
+  });
+
+  it("title includes 天安门 when destination is 北京天安门", () => {
+    const slots: PlanningSlots = {
+      destination: "北京天安门",
+      preferences: ["老北京火锅"],
+    };
+    const title = generateTitleFromSlots(slots);
+    expect(title).toContain("北京天安门");
+  });
+
+  it("title includes origin and destination", () => {
+    const slots: PlanningSlots = {
+      origin: "杭师大仓前",
+      destination: "西湖",
+    };
+    const title = generateTitleFromSlots(slots);
+    expect(title).toContain("杭师大仓前");
+    expect(title).toContain("西湖");
+  });
+});
+
+
+// ══════════════════════════════════════════════════════════════
+//  §25  continuation intent 使用上一轮 planningDraft
+// ══════════════════════════════════════════════════════════════
+
+describe("Regression §25: continuation uses previous planningDraft (supplementary)", () => {
+  it("full scenario: 去杭州西湖 → 补充信息 → 生成完整方案", () => {
+    // Turn 1: user provides destination
+    const turn1Slots = extractPlanningSlots("去杭州西湖");
+    expect(turn1Slots.destination).toBe("杭州西湖");
+
+    // Turn 2: user provides remaining info
+    const turn2Slots = extractPlanningSlots("一个人，从杭师大仓前出发，明天上午9点出发，找个咖啡厅坐坐，然后去吃午饭，想吃火锅，预算200");
+    expect(turn2Slots.origin).toBe("杭师大仓前");
+    expect(turn2Slots.partySize).toBe(1);
+    expect(turn2Slots.companions).toBe("solo");
+    expect(turn2Slots.budget).toBe(200);
+    expect(turn2Slots.time).toContain("9点");
+    expect(turn2Slots.preferences).toContain("咖啡厅");
+    expect(turn2Slots.preferences).toContain("午饭");
+    expect(turn2Slots.preferences).toContain("火锅");
+
+    // Merge all turns
+    const merged = mergeSlots(turn1Slots, turn2Slots);
+    expect(merged.destination).toBe("杭州西湖");
+    expect(merged.origin).toBe("杭师大仓前");
+    expect(merged.budget).toBe(200);
+    expect(merged.partySize).toBe(1);
+    expect(merged.time).toContain("9点");
+
+    // Turn 3: continuation — should use accumulated draft
+    const state: AgentState = {
+      phase: "collecting_slots",
+      planningDraft: merged,
+    };
+    expect(classifyAgentIntent("生成完整的方案", state)).toBe("continuation");
+
+    // Budget must NOT become 420
+    expect(merged.budget).toBe(200);
+    expect(merged.budget).not.toBe(420);
   });
 });

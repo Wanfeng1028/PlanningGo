@@ -33,7 +33,8 @@
     "smoke:chat": "node scripts/smoke-chat.mjs",
     "smoke:plan": "node scripts/smoke-plan.mjs",
     "smoke:all": "node scripts/smoke-all.mjs",
-    "smoke:auth-history": "node scripts/smoke-auth-history.mjs"
+    "smoke:auth-history": "node scripts/smoke-auth-history.mjs",
+    "debug:conversations": "node scripts/debug-conversations.mjs"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

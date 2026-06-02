@@ -24,6 +24,8 @@ describe("slotTools", () => {
   it("isReady when all required slots are present", () => {
     const result = executeUpdatePlanningDraft({}, {
       origin: "海淀区",
+      destination: "西湖",
+      time: "明天上午9点",
       budget: 300,
       partySize: 2,
     });
@@ -34,6 +36,7 @@ describe("slotTools", () => {
     const result = executeUpdatePlanningDraft({}, {
       origin: "朝阳区",
       destinationCity: "杭州",
+      time: "明天",
       budget: 800,
       partySize: 2,
     });

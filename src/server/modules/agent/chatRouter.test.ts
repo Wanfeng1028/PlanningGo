@@ -144,43 +144,51 @@ describe("chatRouter", () => {
 
   describe("getMissingSlots", () => {
     it("returns empty when all required slots present", () => {
-      const slots: PlanningSlots = { origin: "仓前", budget: 300, partySize: 2 };
+      const slots: PlanningSlots = { origin: "仓前", destination: "西湖", time: "明天", partySize: 2 };
       expect(getMissingSlots(slots)).toEqual([]);
     });
 
     it("returns empty when companions present instead of partySize", () => {
-      const slots: PlanningSlots = { origin: "仓前", budget: 300, companions: "friends" };
+      const slots: PlanningSlots = { origin: "仓前", destination: "西湖", time: "明天", companions: "friends" };
       expect(getMissingSlots(slots)).toEqual([]);
     });
 
-    it("does NOT require origin (can use default)", () => {
-      const slots: PlanningSlots = { budget: 300, partySize: 2 };
-      expect(getMissingSlots(slots)).toEqual([]);
+    it("reports origin as missing when not provided", () => {
+      const slots: PlanningSlots = { destination: "西湖", time: "明天", partySize: 2 };
+      expect(getMissingSlots(slots)).toContain("origin");
     });
 
-    it("does NOT require budget (can use default)", () => {
-      const slots: PlanningSlots = { origin: "仓前", partySize: 2 };
-      expect(getMissingSlots(slots)).toEqual([]);
+    it("does NOT require budget (optional field)", () => {
+      const slots: PlanningSlots = { origin: "仓前", destination: "西湖", time: "明天", partySize: 2 };
+      const missing = getMissingSlots(slots);
+      expect(missing).not.toContain("budget");
+      expect(missing).toEqual([]);
     });
 
     it("requires partySize or companions", () => {
-      const slots: PlanningSlots = { origin: "仓前", budget: 300 };
-      expect(getMissingSlots(slots)).toEqual(["partySize"]);
+      const slots: PlanningSlots = { origin: "仓前", destination: "西湖", time: "明天" };
+      expect(getMissingSlots(slots)).toContain("partySize");
     });
 
-    it("only reports partySize when both origin and budget missing", () => {
+    it("reports all missing fields when empty", () => {
       const slots: PlanningSlots = {};
-      expect(getMissingSlots(slots)).toEqual(["partySize"]);
+      const missing = getMissingSlots(slots);
+      expect(missing).toContain("destination");
+      expect(missing).toContain("time");
+      expect(missing).toContain("partySize");
+      expect(missing).toContain("origin");
     });
 
-    it("returns empty when destination + preferences present (enough to plan)", () => {
-      const slots: PlanningSlots = { destination: "西湖", preferences: ["咖啡厅", "火锅"] };
-      expect(getMissingSlots(slots)).toEqual([]);
+    it("reports time as missing when destination + preferences present but no time", () => {
+      const slots: PlanningSlots = { destination: "西湖", preferences: ["咖啡厅", "火锅"], partySize: 1 };
+      const missing = getMissingSlots(slots);
+      expect(missing).toContain("time");
     });
 
-    it("returns empty when destination + origin + budget present", () => {
-      const slots: PlanningSlots = { destination: "西湖", origin: "杭师大仓前", budget: 200 };
-      expect(getMissingSlots(slots)).toEqual([]);
+    it("reports time as missing when destination + origin + budget present but no time", () => {
+      const slots: PlanningSlots = { destination: "西湖", origin: "杭师大仓前", budget: 200, partySize: 1 };
+      const missing = getMissingSlots(slots);
+      expect(missing).toContain("time");
     });
   });
 

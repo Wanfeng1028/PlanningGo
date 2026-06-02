@@ -11,8 +11,9 @@ import type {
   AgentMessageInput,
   AgentState,
   PlanningSlots,
-  AgentVisibleEvent,
+  AgentTraceEvent,
 } from "../../../shared/agentResponse.js";
+import { traceId } from "../../../shared/agentResponse.js";
 import type { PlanningProviders } from "../planning/schemas.js";
 import { chatStream, getChatModel } from "./modelClient.js";
 import { buildSystemPrompt } from "./prompts.js";
@@ -52,7 +53,7 @@ interface AgentChatContext {
 
 interface StreamCallbacks {
   writeText: (delta: string) => void;
-  writeEvent?: (event: AgentVisibleEvent) => void;
+  writeEvent?: (event: AgentTraceEvent) => void;
 }
 
 // ─── Main Entry: Streaming Agent Chat ──────────────────────
@@ -135,17 +136,18 @@ export async function runAgentChatStream(
   let pendingAction: AgentResponse & { type: "action_confirm" } | null = null;
 
   // Collected visible events for persistence and streaming
-  const collectedEvents: AgentVisibleEvent[] = [];
-  const emitEvent = (event: AgentVisibleEvent) => {
+  const collectedEvents: AgentTraceEvent[] = [];
+  const emitEvent = (event: AgentTraceEvent) => {
     collectedEvents.push(event);
     stream.writeEvent?.(event);
   };
 
-  // Emit understanding stage before LLM call
+  // Emit: received user message (trace point 1)
   emitEvent({
+    id: traceId("recv"),
     type: "stage",
     stage: "understanding",
-    title: "正在理解你的出行需求",
+    label: "正在理解你的需求",
     status: "running",
     timestamp: new Date().toISOString(),
   });
@@ -218,11 +220,14 @@ export async function runAgentChatStream(
 
     // Execute each tool call and add results
     for (const [, tc] of toolCalls) {
-      // Emit tool running event
+      const toolEventId = traceId("tool");
+
+      // Emit tool running event (trace point 7)
       emitEvent({
+        id: toolEventId,
         type: "tool",
         toolName: tc.name,
-        title: getToolDisplayName(tc.name),
+        label: getToolDisplayName(tc.name),
         status: "running",
         timestamp: new Date().toISOString(),
       });
@@ -230,12 +235,14 @@ export async function runAgentChatStream(
       try {
         const { resultStr, sideEffect } = await executeToolCall(tc.name, tc.arguments, toolCtx);
 
-        // Emit tool success event
+        // Emit tool success event (trace point 8)
         emitEvent({
+          id: toolEventId,
           type: "tool",
           toolName: tc.name,
-          title: getToolDisplayName(tc.name),
-          status: "success",
+          label: getToolDisplayName(tc.name),
+          status: "done",
+          outputSummary: summarizeToolResult(tc.name, resultStr),
           timestamp: new Date().toISOString(),
         });
 
@@ -256,11 +263,12 @@ export async function runAgentChatStream(
       } catch (err) {
         log.warn({ err }, `[agentRuntime] Tool ${tc.name} failed`);
 
-        // Emit tool error event
+        // Emit tool error event (trace point 9)
         emitEvent({
+          id: toolEventId,
           type: "tool",
           toolName: tc.name,
-          title: getToolDisplayName(tc.name),
+          label: getToolDisplayName(tc.name),
           status: "error",
           detail: err instanceof Error ? err.message : String(err),
           timestamp: new Date().toISOString(),
@@ -275,18 +283,52 @@ export async function runAgentChatStream(
     }
   }
 
-  // ── Log draft merge ──
+  // ── Log draft merge ── (trace points 2-5: slot extracting, merging, missing, defaults)
   const newSlots = extractPlanningSlots(input.message);
   const mergedDraft = currentDraft ? mergeSlots(currentDraft, newSlots) : (Object.keys(newSlots).length > 0 ? newSlots : currentDraft);
   const missingSlots = mergedDraft ? getMissingSlots(mergedDraft) : [];
   const intent = isContinuationIntent(input.message) ? "continuation" : "normal";
 
-  // Emit slot_update event if slots were extracted
+  // Emit slot extraction event (trace point 3)
   if (Object.keys(newSlots).length > 0) {
+    const knownSlotsMap: Record<string, unknown> = {};
+    const slotLabels: Record<string, string> = {
+      destination: "目的地", origin: "出发地", budget: "预算",
+      partySize: "人数", date: "日期", time: "时间",
+      timeWindow: "时段", preference: "偏好", preferences: "偏好",
+      companions: "同行人",
+    };
+    for (const [k, v] of Object.entries(newSlots)) {
+      knownSlotsMap[slotLabels[k] ?? k] = v;
+    }
     emitEvent({
-      type: "slot_update",
-      title: "已识别出行信息",
-      slots: newSlots as Record<string, unknown>,
+      id: traceId("slot"),
+      type: "slot",
+      label: "已识别出行信息",
+      knownSlots: knownSlotsMap,
+      missingSlots: missingSlots.map((s) => slotLabels[s] ?? s),
+      status: missingSlots.length > 0 ? "warning" : "done",
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Emit missing slots warning (trace point 5)
+  if (missingSlots.length > 0 && Object.keys(newSlots).length === 0) {
+    const slotLabels: Record<string, string> = {
+      destination: "目的地", origin: "出发地", budget: "预算",
+      partySize: "人数", date: "日期", time: "时间",
+      timeWindow: "时段", preference: "偏好", preferences: "偏好",
+      companions: "同行人",
+    };
+    emitEvent({
+      id: traceId("slot"),
+      type: "slot",
+      label: "信息不完整",
+      knownSlots: mergedDraft ? Object.fromEntries(
+        Object.entries(mergedDraft).map(([k, v]) => [slotLabels[k] ?? k, v])
+      ) : {},
+      missingSlots: missingSlots.map((s) => slotLabels[s] ?? s),
+      status: "warning",
       timestamp: new Date().toISOString(),
     });
   }
@@ -303,11 +345,12 @@ export async function runAgentChatStream(
   // 7. If plan generation was requested, run the planning pipeline
   let planResponse: AgentResponse | null = null;
   if (shouldGeneratePlan) {
-    // Emit plan_generating stage event
+    // Emit plan_generating stage event (trace point 10)
     emitEvent({
+      id: traceId("stage"),
       type: "stage",
       stage: "plan_generating",
-      title: "正在生成出行方案",
+      label: "正在生成出行方案",
       status: "running",
       timestamp: new Date().toISOString(),
     });
@@ -319,8 +362,9 @@ export async function runAgentChatStream(
       // The LLM's tool call params may be incomplete or wrong; the draft is the source of truth
       const effectiveDraft = currentDraft ?? {};
       const city = (params.city as string) ?? input.city ?? "北京";
+      // origin: NEVER use "未知出发地" — leave undefined if not provided
       const origin = (typeof effectiveDraft.origin === "string" ? effectiveDraft.origin : undefined)
-        ?? (params.origin as string) ?? "未知出发地";
+        ?? (params.origin as string) ?? undefined;
       // Budget: ALWAYS prefer draft (user's explicit value), never let LLM override
       const budget = (typeof effectiveDraft.budget === "number" ? effectiveDraft.budget : undefined)
         ?? (params.budget as number);
@@ -332,16 +376,22 @@ export async function runAgentChatStream(
         ?? (typeof effectiveDraft.destinationCity === "string" ? effectiveDraft.destinationCity : undefined)
         ?? (params.city as string);
 
+      // Extract departAt from draft time — e.g. "明天上午9点"
+      const departAt = (typeof effectiveDraft.time === "string" ? effectiveDraft.time : undefined)
+        ?? (params.time as string) ?? undefined;
+
       // Build enriched prompt with all slot info
       const slotSummary: string[] = [];
       if (destination) slotSummary.push(`目的地：${destination}`);
       if (origin) slotSummary.push(`出发地：${origin}`);
+      else slotSummary.push("出发地：未提供");
       if (effectiveDraft.time) slotSummary.push(`时间：${effectiveDraft.time}`);
       if (effectiveDraft.date) slotSummary.push(`日期：${effectiveDraft.date}`);
       if (effectiveDraft.timeWindow) slotSummary.push(`时段：${effectiveDraft.timeWindow}`);
       if (partySize) slotSummary.push(`人数：${partySize}人`);
       if (companions) slotSummary.push(`同行人：${companions}`);
-      if (budget) slotSummary.push(`预算：${budget}元`);
+      if (budget) slotSummary.push(`预算：${budget}元（用户明确提供，请严格遵守）`);
+      else slotSummary.push("预算：用户未提供，请合理估算");
       const prefs = effectiveDraft.preferences || effectiveDraft.preference;
       if (prefs) slotSummary.push(`偏好：${Array.isArray(prefs) ? prefs.join("、") : prefs}`);
       if (effectiveDraft.budgetFlexible) slotSummary.push(`预算灵活`);
@@ -353,7 +403,7 @@ export async function runAgentChatStream(
       log.info({
         conversationId,
         finalSlotsUsedForPlan: {
-          city, origin, budget, partySize, companions, destination,
+          city, origin, budget, partySize, companions, destination, departAt,
           time: effectiveDraft.time, date: effectiveDraft.date,
           preferences: effectiveDraft.preferences || effectiveDraft.preference,
           budgetFlexible: effectiveDraft.budgetFlexible,
@@ -364,6 +414,7 @@ export async function runAgentChatStream(
         prompt: enrichedPrompt,
         city,
         startPoint: origin,
+        departAt,
         budget,
         companions: companions as "family" | "friends" | "couple" | "solo" | undefined,
         modelMode: input.modelMode,
@@ -378,6 +429,52 @@ export async function runAgentChatStream(
           conversationId,
         };
       } else {
+        // Emit: generating actions (trace point 11)
+        emitEvent({
+          id: traceId("stage"),
+          type: "stage",
+          stage: "action_generating",
+          label: "正在生成可执行动作",
+          status: "running",
+          timestamp: new Date().toISOString(),
+        });
+
+        const planningActions = createPlanningActions({
+          planId: pipelineResult.planId,
+          conversationId,
+          options: pipelineResult.options as import("../planning/schemas.js").ActivityPlan[],
+          intent: pipelineResult.intent,
+        });
+
+        // Emit action guard traces (trace point 12)
+        const hasOrigin = !!pipelineResult.intent?.origin?.label;
+        if (!hasOrigin) {
+          emitEvent({
+            id: traceId("guard"),
+            type: "action_guard",
+            label: "未生成导航：缺少出发地",
+            actionType: "navigation",
+            reason: "缺少出发地，无法生成导航路线",
+            status: "skipped",
+            timestamp: new Date().toISOString(),
+          });
+        }
+        const firstOption = pipelineResult.options[0];
+        if (firstOption) {
+          const hasStartEnd = firstOption.timeline?.[0]?.startTime && firstOption.timeline?.[firstOption.timeline.length - 1]?.endTime;
+          if (!hasStartEnd) {
+            emitEvent({
+              id: traceId("guard"),
+              type: "action_guard",
+              label: "未生成日历：缺少明确时间",
+              actionType: "calendar",
+              reason: "缺少明确的开始/结束时间",
+              status: "skipped",
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }
+
         planResponse = {
           type: "plan",
           content: pipelineResult.summary || "已为你生成出行方案",
@@ -386,12 +483,7 @@ export async function runAgentChatStream(
             options: pipelineResult.options,
             summary: pipelineResult.summary,
             executableActions: pipelineResult.executableActions,
-            planningActions: createPlanningActions({
-              planId: pipelineResult.planId,
-              conversationId,
-              options: pipelineResult.options as import("../planning/schemas.js").ActivityPlan[],
-              intent: pipelineResult.intent,
-            }),
+            planningActions,
             conversationId,
           },
           conversationId,
@@ -439,6 +531,17 @@ export async function runAgentChatStream(
       }
     } catch (err) {
       log.error({ err }, "[agentRuntime] Planning pipeline failed");
+
+      // Emit pipeline error warning
+      emitEvent({
+        id: traceId("warn"),
+        type: "warning",
+        label: "方案生成遇到问题，已切换为对话模式",
+        detail: err instanceof Error ? err.message.slice(0, 100) : undefined,
+        status: "warning",
+        timestamp: new Date().toISOString(),
+      });
+
       if (!finalContent) {
         finalContent = "抱歉，生成方案时遇到了问题，请稍后重试或补充更多信息。";
         stream.writeText(finalContent);
@@ -465,18 +568,29 @@ export async function runAgentChatStream(
   }
 
   // 9. Save assistant message with full payload for history restoration
-  // Emit finalizing stage event
+  // Emit saving stage event (trace point 13)
   emitEvent({
+    id: traceId("stage"),
     type: "stage",
-    stage: "finalizing",
-    title: "方案已完成",
-    status: "success",
+    stage: "saving",
+    label: "正在保存方案",
+    status: "running",
     timestamp: new Date().toISOString(),
   });
 
   const { conversationId: _respCid, ...responsePayload } = agentResponse;
   const payloadJson = { ...responsePayload, content: finalContent, events: collectedEvents };
   await saveMsg(db, conversationId, "assistant", finalContent, payloadJson, log);
+
+  // Emit finalizing stage event (trace point 14)
+  emitEvent({
+    id: traceId("stage"),
+    type: "stage",
+    stage: "finalizing",
+    label: "方案已完成",
+    status: "done",
+    timestamp: new Date().toISOString(),
+  });
 
   // 10. Update agent state (preserve draft across turns)
   const newState = computeAgentState(state, agentResponse, currentDraft);
@@ -576,16 +690,27 @@ async function ensureConversation(
       try {
         const existing = await db.conversation.findUnique({
           where: { id: input.conversationId },
-          select: { id: true },
+          select: { id: true, userId: true },
         });
         if (existing) {
-          log.info(`[agentRuntime] ensureConversation FOUND conv=${input.conversationId}`);
-          return input.conversationId;
+          // Ownership check: logged-in user must only use their own conversations
+          if (userId && existing.userId && existing.userId !== userId) {
+            log.warn(`[agentRuntime] ensureConversation OWNERSHIP MISMATCH conv=${input.conversationId} owner=${existing.userId} current=${userId}, creating new`);
+            // Fall through to create a new conversation
+          } else {
+            log.info(`[agentRuntime] ensureConversation FOUND conv=${input.conversationId}`);
+            return input.conversationId;
+          }
         }
         const memConv = mem.getConversation(input.conversationId);
         if (memConv) {
-          log.info(`[agentRuntime] ensureConversation FOUND in MEMORY conv=${input.conversationId}`);
-          return input.conversationId;
+          if (userId && memConv.userId && memConv.userId !== userId) {
+            log.warn(`[agentRuntime] ensureConversation MEMORY OWNERSHIP MISMATCH conv=${input.conversationId}`);
+            // Fall through to create new
+          } else {
+            log.info(`[agentRuntime] ensureConversation FOUND in MEMORY conv=${input.conversationId}`);
+            return input.conversationId;
+          }
         }
       } catch (err) {
         log.error({ err }, "[agentRuntime] Failed to verify conversationId");
@@ -764,4 +889,38 @@ function getToolDisplayName(name: string): string {
     prepare_action: "准备执行动作",
   };
   return map[name] ?? name;
+}
+
+// ─── Tool Result Summary Helper ─────────────────────────────
+
+/**
+ * Produce a short, user-friendly summary of a tool result.
+ * Never exposes raw API keys, tokens, or full internal payloads.
+ */
+function summarizeToolResult(toolName: string, resultStr: string): string {
+  try {
+    const result = JSON.parse(resultStr) as Record<string, unknown>;
+    if (typeof result.error === "string") {
+      return result.error.slice(0, 120);
+    }
+    switch (toolName) {
+      case "update_planning_draft": {
+        const known = result.knownSlots as Record<string, unknown> | undefined;
+        const count = known ? Object.keys(known).length : 0;
+        return `已记录 ${count} 项规划信息`;
+      }
+      case "search_places": {
+        const items = result.places as unknown[] | undefined;
+        return items ? `找到 ${items.length} 个相关地点` : "搜索完成";
+      }
+      case "generate_weekend_plan":
+        return "方案生成请求已提交";
+      case "prepare_action":
+        return "执行动作已准备就绪";
+      default:
+        return "操作完成";
+    }
+  } catch {
+    return "操作完成";
+  }
 }

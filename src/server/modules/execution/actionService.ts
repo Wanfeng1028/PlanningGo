@@ -5,6 +5,7 @@ import type { PlanningAction } from "../../../shared/agentResponse.js";
 /**
  * 为方案生成可执行动作（预约、锁座、日历、分享等）。
  * 所有不可逆动作默认 waiting_confirm，需用户确认后执行。
+ * 包含 action guard：缺失必要字段时跳过对应 action，不生成无效动作。
  */
 export function createActionsForPlans(input: {
   planId: string;
@@ -14,16 +15,28 @@ export function createActionsForPlans(input: {
 }): ExecutionAction[] {
   const userId = input.userId ?? "anonymous";
   const actions: ExecutionAction[] = [];
+  const hasOrigin = !!input.intent.origin?.label;
 
   for (const option of input.options) {
     for (const step of option.timeline) {
-      if (step.bookingNeeded) {
+      // Guard: 缺少 poiName 时不生成 "预约 null"
+      if (step.bookingNeeded && step.poiName && step.poiName !== "null") {
         actions.push(createBookingAction(input.planId, option.id, step, input.intent, userId));
       }
     }
 
-    actions.push(createNavigationAction(input.planId, option.id, option, userId));
-    actions.push(createCalendarAction(input.planId, option.id, option, userId));
+    // Guard: 缺少 origin 或有效 points 时不生成导航 action
+    if (hasOrigin) {
+      actions.push(createNavigationAction(input.planId, option.id, option, userId));
+    }
+
+    // Guard: 缺少 startTime 时不生成日历 action
+    const startTime = option.timeline[0]?.startTime;
+    const endTime = option.timeline[option.timeline.length - 1]?.endTime;
+    if (startTime && endTime) {
+      actions.push(createCalendarAction(input.planId, option.id, option, userId));
+    }
+
     actions.push(createShareAction(input.planId, option.id, option, input.intent, userId));
   }
 
@@ -167,15 +180,16 @@ export function createPlanningActions(input: {
     city,
   });
 
-  // 2. navigation — navigate to the first POI (skip if POI is null or same as origin)
-  const firstPOI = firstOption.timeline.find((step) => step.poiName && step.poiName !== "null")?.poiName;
+  // 2. navigation — navigate to the first POI
+  // Guard: require both a valid POI AND a valid origin; skip if origin is missing
+  const firstPOI = firstOption.timeline.find((step) => step.poiName && step.poiName !== "null" && step.poiName !== "未知出发地")?.poiName;
   const originLabel = input.intent.origin?.label;
-  if (firstPOI && firstPOI !== originLabel) {
+  if (firstPOI && firstPOI !== originLabel && originLabel) {
     actions.push({
       type: "navigation",
       label: `导航到${firstPOI}`,
       provider: "amap",
-      origin: originLabel ?? undefined,
+      origin: originLabel,
       destination: firstPOI,
     });
   }
@@ -189,15 +203,18 @@ export function createPlanningActions(input: {
   });
 
   // 4. calendar — generate a calendar event for the plan
+  // Guard: only generate if we have valid start/end times
   const startTime = firstOption.timeline[0]?.startTime;
   const endTime = firstOption.timeline[firstOption.timeline.length - 1]?.endTime;
-  actions.push({
-    type: "calendar",
-    label: "生成日程",
-    title: firstOption.title,
-    startTime,
-    endTime,
-  });
+  if (startTime && endTime && startTime !== "undefined" && endTime !== "undefined") {
+    actions.push({
+      type: "calendar",
+      label: "生成日程",
+      title: firstOption.title,
+      startTime,
+      endTime,
+    });
+  }
 
   // 5. mobile_handoff — QR code to continue on mobile
   if (input.conversationId) {

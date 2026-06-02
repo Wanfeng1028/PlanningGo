@@ -5,6 +5,15 @@
  * plan / plan_selected / action_confirm / error
  */
 
+// ─── Trace Event Helpers ────────────────────────────────────
+
+let _traceCounter = 0;
+
+/** Generate a unique trace event ID (not cryptographic, just for ordering). */
+export function traceId(prefix = "t"): string {
+  return `${prefix}_${Date.now().toString(36)}_${(++_traceCounter).toString(36)}`;
+}
+
 // ─── Agent Intent ───────────────────────────────────────────
 
 export type AgentIntent =
@@ -162,6 +171,7 @@ export interface AgentResponseMetadata {
   mode?: "llm" | "rule" | "mock" | "hybrid";
   fallbackUsed?: boolean;
   traceId?: string;
+  traceEvents?: AgentTraceEvent[];
 }
 
 export type AgentResponse =
@@ -232,8 +242,16 @@ export type AgentResponse =
 
 // ─── Agent Visible Events (execution process) ───────────────
 
-export type AgentVisibleEvent =
+/**
+ * 产品级、可审计的执行过程事件。
+ * 不暴露模型 chain-of-thought，仅展示系统状态、slot、工具调用和动作 guard。
+ * 每个事件有唯一 id，同一 id 可通过后续事件更新状态（pending → running → done）。
+ */
+export type AgentTraceStatus = "pending" | "running" | "done" | "warning" | "error" | "skipped" | "fallback";
+
+export type AgentTraceEvent =
   | {
+      id: string;
       type: "stage";
       stage:
         | "understanding"
@@ -244,30 +262,52 @@ export type AgentVisibleEvent =
         | "route_planning"
         | "plan_generating"
         | "action_generating"
+        | "saving"
         | "finalizing";
-      title: string;
+      label: string;
       detail?: string;
-      status: "pending" | "running" | "success" | "error" | "skipped";
+      status: AgentTraceStatus;
       timestamp: string;
     }
   | {
-      type: "slot_update";
-      title: string;
-      slots: Record<string, unknown>;
+      id: string;
+      type: "slot";
+      label: string;
+      knownSlots: Record<string, unknown>;
+      missingSlots: string[];
+      defaults?: Record<string, string>;
+      status: "done" | "warning";
       timestamp: string;
     }
   | {
+      id: string;
       type: "tool";
+      label: string;
       toolName: string;
-      title: string;
-      status: "running" | "success" | "error" | "fallback";
+      inputSummary?: string;
+      outputSummary?: string;
+      status: AgentTraceStatus;
       detail?: string;
       fallbackUsed?: boolean;
       timestamp: string;
     }
   | {
+      id: string;
+      type: "action_guard";
+      label: string;
+      actionType: string;
+      reason: string;
+      status: "skipped" | "done";
+      timestamp: string;
+    }
+  | {
+      id: string;
       type: "warning";
-      title: string;
+      label: string;
       detail?: string;
+      status: "warning";
       timestamp: string;
     };
+
+/** @deprecated Use AgentTraceEvent instead. Kept for backward compat during migration. */
+export type AgentVisibleEvent = AgentTraceEvent;

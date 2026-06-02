@@ -137,21 +137,31 @@ export function extractPlanningSlots(message: string): PlanningSlots {
     }
   }
 
-  // destination — "去西湖" / "去杭州西湖" / "目的地：西湖"
+  // destination — "去西湖" / "去杭州西湖" / "去北京天安门" / "目的地：西湖"
+  // Must exclude verb patterns like "去吃午饭" / "去看看" / "去玩"
   const destMatch = normalized.match(/去([^，,。.！!？?\s]{2,20})/) ||
                     normalized.match(/目的地[：:]\s*(.+)/) ||
                     normalized.match(/到([^，,。.！!？?\s]{2,20})/);
   if (destMatch) {
     const dest = destMatch[1].replace(/[，,。.！!？?、]/g, "").trim();
-    if (dest.length > 0 && dest.length < 30) {
+    // Exclude verb patterns: "吃午饭", "看看", "玩玩", "逛" etc. are NOT destinations
+    const isVerbPattern = /^(吃|看|玩|逛|买|喝|坐|拍|找|选|试|听|学|做|体验|享受|参加|参观)/.test(dest);
+    if (dest.length > 0 && dest.length < 30 && !isVerbPattern) {
       slots.destination = dest;
-      // Infer city from well-known destinations
-      const cityMap: Record<string, string> = {
-        "西湖": "杭州", "灵隐寺": "杭州", "西溪": "杭州", "千岛湖": "杭州",
-        "外滩": "上海", "南京路": "上海", "迪士尼": "上海",
-        "故宫": "北京", "天安门": "北京", "长城": "北京",
-      };
-      slots.destinationCity = cityMap[dest] ?? undefined;
+      // Infer city: check if dest CONTAINS known landmarks (not exact match)
+      const cityMap: Array<[string, string]> = [
+        ["西湖", "杭州"], ["灵隐寺", "杭州"], ["西溪", "杭州"], ["千岛湖", "杭州"],
+        ["外滩", "上海"], ["南京路", "上海"], ["迪士尼", "上海"],
+        ["故宫", "北京"], ["天安门", "北京"], ["长城", "北京"], ["颐和园", "北京"],
+        ["宽窄巷子", "成都"], ["春熙路", "成都"],
+        ["兵马俑", "西安"], ["大雁塔", "西安"],
+      ];
+      for (const [landmark, city] of cityMap) {
+        if (dest.includes(landmark)) {
+          slots.destinationCity = city;
+          break;
+        }
+      }
     }
   }
 
@@ -198,9 +208,10 @@ export function extractPlanningSlots(message: string): PlanningSlots {
   else if (/明天/.test(normalized)) slots.date = "明天";
   else if (/下周/.test(normalized)) slots.date = "下周";
 
-  // time — extract specific time like "明天上午9点"
-  const timeMatch = normalized.match(/(明天|下周[一二三四五六日]?|周末|周[一二三四五六日])(上午|下午|晚上)?(\d{1,2}[点时:：]\d{0,2})?/) ||
-                    normalized.match(/(\d{1,2}[点时:：]\d{0,2})/);
+  // time — extract specific time like "明天上午9点"、"明天早上10点"、"今天下午3点"
+  const timeMatch = normalized.match(/(明天|下周[一二三四五六日]?|周末|周[一二三四五六日]|今天)(上午|早上|下午|晚上)(\d{1,2}[点时:：]\d{0,2}(?:分)?)?/) ||
+                    normalized.match(/(明天|下周[一二三四五六日]?|周末|周[一二三四五六日]|今天)(\d{1,2}[点时:：]\d{0,2}(?:分)?)/) ||
+                    normalized.match(/(\d{1,2}[点时:：]\d{0,2}(?:分)?)/);
   if (timeMatch) {
     const parts = [timeMatch[1], timeMatch[2], timeMatch[3]].filter(Boolean);
     if (parts.length > 0) {
@@ -270,21 +281,25 @@ export function mergeSlots(existing: PlanningSlots, incoming: PlanningSlots): Pl
 
 export function getMissingSlots(slots: PlanningSlots): PlanningSlotKey[] {
   const missing: PlanningSlotKey[] = [];
-  // Very lenient: only require partySize/companions if nothing else is known.
-  // If user has provided destination or preferences, we have enough to plan.
+
   const hasDestination = !!(slots.destination || slots.destinationCity);
   const hasOrigin = !!slots.origin;
-  const hasBudget = !!slots.budget;
+  const hasTime = !!(slots.time || slots.date || slots.timeWindow);
   const hasParty = !!(slots.partySize || slots.companions);
-  const hasPrefs = !!(slots.preferences || slots.preference);
 
-  // If user has given us a destination and at least one other detail, we can plan
-  if (hasDestination && (hasOrigin || hasBudget || hasPrefs || hasParty)) {
-    return []; // enough info to generate a plan
-  }
+  // 目的地是必须的 — 没有目的地无法规划
+  if (!hasDestination) missing.push("destination");
 
-  // Otherwise only block on partySize/companions
+  // 时间是必要的 — 至少需要日期或时段
+  if (!hasTime) missing.push("time");
+
+  // 人数/同行人是必要的
   if (!hasParty) missing.push("partySize");
+
+  // 出发地：如果缺失则标记，后续方案生成时判断是否需要
+  // 缺 origin 不生成导航型完整方案，但可以生成轻方案
+  if (!hasOrigin) missing.push("origin");
+
   return missing;
 }
 
@@ -721,12 +736,16 @@ async function generatePlanFromSlots(
       ? `${input.message}\n\n[规划信息] ${slotSummary.join("；")}`
       : input.message;
 
+    // Extract departAt from time slot — e.g. "明天上午9点" → pass to pipeline
+    const departAt = typeof slots.time === "string" ? slots.time : undefined;
+
     const result = await runPlanningPipeline({
       prompt: enrichedPrompt,
       city: input.city ?? (typeof (slots.destination || slots.origin) === "string" ? (slots.destination as string) || (slots.origin as string) : undefined) ?? "北京",
       startPoint: typeof slots.origin === "string" ? slots.origin : undefined,
       companions,
       budget: typeof slots.budget === "number" ? slots.budget : undefined,
+      departAt,
       modelMode: (input.modelMode as "flash" | "pro") ?? "flash",
       providers,
       userId,
@@ -868,17 +887,29 @@ async function ensureConversation(
       try {
         const existing = await db.conversation.findUnique({
           where: { id: input.conversationId },
-          select: { id: true },
+          select: { id: true, userId: true },
         });
         if (existing) {
-          log.info(`[chatRouter] ensureConversation FOUND conv=${input.conversationId}`);
-          return input.conversationId;
-        }
-        log.warn(`[chatRouter] ensureConversation NOT FOUND in DB conv=${input.conversationId}, checking memory`);
-        const memConv = mem.getConversation(input.conversationId);
-        if (memConv) {
-          log.info(`[chatRouter] ensureConversation FOUND in MEMORY conv=${input.conversationId}`);
-          return input.conversationId;
+          // Ownership check: logged-in user must only use their own conversations
+          if (userId && existing.userId && existing.userId !== userId) {
+            log.warn(`[chatRouter] ensureConversation OWNERSHIP MISMATCH conv=${input.conversationId} owner=${existing.userId} current=${userId}, creating new`);
+            // Fall through to create a new conversation
+          } else {
+            log.info(`[chatRouter] ensureConversation FOUND conv=${input.conversationId}`);
+            return input.conversationId;
+          }
+        } else {
+          log.warn(`[chatRouter] ensureConversation NOT FOUND in DB conv=${input.conversationId}, checking memory`);
+          const memConv = mem.getConversation(input.conversationId);
+          if (memConv) {
+            if (userId && memConv.userId && memConv.userId !== userId) {
+              log.warn(`[chatRouter] ensureConversation MEMORY OWNERSHIP MISMATCH conv=${input.conversationId}`);
+              // Fall through to create new
+            } else {
+              log.info(`[chatRouter] ensureConversation FOUND in MEMORY conv=${input.conversationId}`);
+              return input.conversationId;
+            }
+          }
         }
       } catch (err) {
         log.error({ err }, "[chatRouter] Failed to verify conversationId");
