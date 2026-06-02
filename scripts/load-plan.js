@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 import autocannon from "autocannon";
 import { parseArgs } from "node:util";
 

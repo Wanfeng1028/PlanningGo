@@ -5,7 +5,7 @@ export class ShareProvider {
   /**
    * Generate a shareable link for a plan
    */
-  async generateShareLink(params: {
+  async generateShareLink(_params: {
     planId: string;
     optionId: string;
     title: string;
@@ -36,7 +36,7 @@ export class ShareProvider {
   /**
    * Generate a shareable image/card
    */
-  async generateShareCard(params: {
+  async generateShareCard(_params: {
     title: string;
     summary: string;
     timeline: Array<{ startTime: string; endTime: string; title: string }>;

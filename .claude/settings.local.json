@@ -33,7 +33,10 @@
       "Bash(npx vitest *)",
       "Bash(Get-ChildItem -Path \"E:\\\\code\\\\javascript\\\\project\\\\PlanningGo\\\\src\" -Recurse -Directory)",
       "Bash(Select-Object FullName)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(Get-ChildItem -Recurse \"E:\\\\code\\\\javascript\\\\project\\\\PlanningGo\\\\src\" -Name)",
+      "Bash(cmd /c \"dir /s /b E:\\\\code\\\\javascript\\\\project\\\\PlanningGo\\\\src 2>nul\")",
+      "Read(//tmp/**)"
     ]
   }
 }

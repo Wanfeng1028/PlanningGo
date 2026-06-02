@@ -5,10 +5,9 @@
  * 优先使用 LLM，异常时 fallback 到旧规则模板。
  */
 import type OpenAI from "openai";
-import type { PrismaClient } from "../../../generated/prisma/client.js";
+import type { PrismaClient, Prisma } from "../../../generated/prisma/client.js";
 import type {
   AgentResponse,
-  AgentMessageInput,
   AgentState,
   PlanningSlots,
   AgentTraceEvent,
@@ -22,6 +21,7 @@ import { runPlanningPipeline } from "./orchestrator.js";
 import { createPlanningActions } from "../execution/actionService.js";
 import { extractPlanningSlots, getMissingSlots, isContinuationIntent, generateTitleFromSlots, mergeSlots } from "./chatRouter.js";
 import { extractMemoryFromSlots, mergeMemoryProfile } from "./memoryExtractor.js";
+import { updateConversationTitle } from "./titleUtils.js";
 import * as mem from "../../services/memoryStore.js";
 
 // ─── Constants ──────────────────────────────────────────────
@@ -95,7 +95,7 @@ export async function runAgentChatStream(
   }, "[agent] loaded history");
 
   // 5. Build messages array — include planningDraft in system prompt
-  const modelInfo = getChatModel(input.modelMode);
+  const _modelInfo = getChatModel(input.modelMode);
 
   // Load user memory profile to inform planning context
   let userMemory: Record<string, unknown> | undefined;
@@ -133,7 +133,7 @@ export async function runAgentChatStream(
   let toolRounds = 0;
   let shouldGeneratePlan = false;
   let planParams: Record<string, unknown> | null = null;
-  let pendingAction: AgentResponse & { type: "action_confirm" } | null = null;
+  let _pendingAction: AgentResponse & { type: "action_confirm" } | null = null;
 
   // Collected visible events for persistence and streaming
   const collectedEvents: AgentTraceEvent[] = [];
@@ -161,7 +161,7 @@ export async function runAgentChatStream(
     };
 
     // Call LLM with streaming
-    const { stream: llmStream, provider, model } = await chatStream(messages, {
+    const { stream: llmStream, provider: _provider, model: _model } = await chatStream(messages, {
       mode: input.modelMode,
       tools: AGENT_TOOLS,
     });
@@ -783,7 +783,7 @@ async function saveAgentState(
       await db.conversation.update({
         where: { id: conversationId },
         data: {
-          agentStateJson: state as any,
+          agentStateJson: state as unknown as Prisma.InputJsonValue,
           selectedOptionId: state.selectedOptionId ?? null,
           updatedAt: new Date(),
         },
@@ -795,26 +795,6 @@ async function saveAgentState(
   }
 }
 
-async function updateConversationTitle(
-  db: PrismaClient | null,
-  conversationId: string,
-  title: string,
-  log: AgentChatContext["log"],
-): Promise<void> {
-  if (db) {
-    try {
-      await db.conversation.update({
-        where: { id: conversationId },
-        data: { title, updatedAt: new Date() },
-      });
-      log.info(`[agentRuntime] updateTitle OK conv=${conversationId} title=${title}`);
-    } catch (err) {
-      log.warn({ err }, `[agentRuntime] updateTitle FAILED conv=${conversationId}`);
-    }
-  }
-  // Also update memory store
-  mem.updateConversationTitle?.(conversationId, title);
-}
 
 async function saveMsg(
   db: PrismaClient | null,
@@ -827,7 +807,7 @@ async function saveMsg(
   if (db) {
     try {
       const msg = await db.message.create({
-        data: { conversationId, role, content, payloadJson: payloadJson as any },
+        data: { conversationId, role, content, payloadJson: payloadJson as unknown as Prisma.InputJsonValue },
       });
       log?.info({
         conversationId,

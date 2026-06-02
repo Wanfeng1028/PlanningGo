@@ -576,7 +576,7 @@ export function addMessage(data: {
   conversationId: string;
   role: string;
   content: string;
-  payloadJson?: any;
+  payloadJson?: unknown;
 }): MemoryMessage {
   const msg: MemoryMessage = {
     id: randomUUID(),
@@ -608,7 +608,7 @@ export function createPlan(data: {
   conversationId?: string;
   title: string;
   summary?: string;
-  options?: any[];
+  options?: unknown[];
   execActions?: MemoryExecAction[];
 }): MemoryPlan {
   const plan: MemoryPlan = {
@@ -695,7 +695,7 @@ export function trackEvent(data: {
   guestId?: string | null;
   conversationId?: string | null;
   eventName: string;
-  eventPayloadJson?: any;
+  eventPayloadJson?: unknown;
   page?: string;
   traceId?: string;
 }): MemoryUserEvent {
@@ -727,7 +727,7 @@ export function logClientError(data: {
   route?: string;
   message: string;
   stack?: string | null;
-  payloadJson?: any;
+  payloadJson?: unknown;
 }): MemoryErrorLog {
   const log: MemoryErrorLog = {
     id: randomUUID(),

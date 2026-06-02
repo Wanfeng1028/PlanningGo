@@ -16,6 +16,31 @@ import type { PermissionScope } from "../agent/middleware/permissionGuard";
 import QRCode from "qrcode";
 
 /**
+ * Minimal type for Prisma raw query methods.
+ * The generated types may not include these due to prisma generate compatibility issues.
+ */
+type RawQueryClient = {
+  $executeRawUnsafe(query: string, ...values: unknown[]): Promise<number>;
+  $queryRawUnsafe<T = Record<string, unknown>>(query: string, ...values: unknown[]): Promise<T[]>;
+};
+
+/** Shape of rows returned from handoff_sessions raw queries */
+interface HandoffSessionRow {
+  id: string;
+  conversation_id: string;
+  plan_id: string | null;
+  selected_option_id: string | null;
+  user_id: string | null;
+  guest_id: string | null;
+  scopes: PermissionScope[] | string | null;
+  status: string;
+  consumed_at: Date | string | null;
+  expires_at: Date | string;
+  claimed_device_id: string | null;
+  claimed_at: Date | string | null;
+}
+
+/**
  * Create a mobile handoff session
  */
 export async function createMobileHandoff(params: {
@@ -42,7 +67,7 @@ export async function createMobileHandoff(params: {
   const now = new Date();
 
   // Use raw SQL since the HandoffSession model may not yet be in generated client
-  await (prisma as any).$executeRawUnsafe(`
+  await (prisma as unknown as RawQueryClient).$executeRawUnsafe(`
     INSERT INTO handoff_sessions (id, token_hash, conversation_id, plan_id, selected_option_id,
       user_id, guest_id, scopes, status, expires_at, created_at)
     VALUES ($1, $2, $3::uuid, $4::uuid, $5, $6::uuid, $7, $8::jsonb, $9, $10, $11)
@@ -79,7 +104,7 @@ export async function getHandoffByToken(tokenId: string): Promise<HandoffTokenPa
 
   const tokenHash = hashToken(tokenId);
 
-  const rows: any[] = await (prisma as any).$queryRawUnsafe(`
+  const rows = await (prisma as unknown as RawQueryClient).$queryRawUnsafe<HandoffSessionRow>(`
     SELECT id, token_hash, conversation_id, plan_id, selected_option_id,
            user_id, guest_id, scopes, status, consumed_at, expires_at
     FROM handoff_sessions
@@ -123,7 +148,7 @@ export async function claimHandoff(params: {
 
   const tokenHash = hashToken(params.token);
 
-  const rows: any[] = await (prisma as any).$queryRawUnsafe(`
+  const rows = await (prisma as unknown as RawQueryClient).$queryRawUnsafe<HandoffSessionRow>(`
     SELECT id, consumed_at, expires_at
     FROM handoff_sessions
     WHERE token_hash = $1
@@ -136,7 +161,7 @@ export async function claimHandoff(params: {
   if (session.consumed_at) throw new Error("Handoff session already consumed");
   if (new Date() > new Date(session.expires_at)) throw new Error("Handoff session expired");
 
-  await (prisma as any).$executeRawUnsafe(`
+  await (prisma as unknown as RawQueryClient).$executeRawUnsafe(`
     UPDATE handoff_sessions
     SET status = 'claimed', claimed_device_id = $1, claimed_at = $2
     WHERE id = $3
@@ -159,7 +184,7 @@ export async function getHandoffStatus(handoffId: string): Promise<{
   const prisma = getPrismaClient();
   if (!prisma) throw new Error("Database not available");
 
-  const rows: any[] = await (prisma as any).$queryRawUnsafe(`
+  const rows = await (prisma as unknown as RawQueryClient).$queryRawUnsafe<HandoffSessionRow>(`
     SELECT status, claimed_device_id, claimed_at
     FROM handoff_sessions
     WHERE id = $1
@@ -185,7 +210,7 @@ export async function consumeHandoff(tokenId: string): Promise<void> {
 
   const tokenHash = hashToken(tokenId);
 
-  await (prisma as any).$executeRawUnsafe(`
+  await (prisma as unknown as RawQueryClient).$executeRawUnsafe(`
     UPDATE handoff_sessions
     SET consumed_at = $1, status = 'consumed'
     WHERE token_hash = $2

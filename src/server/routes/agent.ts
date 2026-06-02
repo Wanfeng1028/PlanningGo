@@ -9,8 +9,9 @@ import { parseDemand, planningRequestSchema, runPlanningAgent, simulateWhatIf } 
 import { runPlanningPipeline } from "../modules/agent/orchestrator.js";
 import { saveActions } from "../services/store.js";
 import { corsOrigins } from "../config/env.js";
+import { updateConversationTitle } from "../modules/agent/titleUtils.js";
 
-const agentChatBodySchema = z.object({
+const _agentChatBodySchema = z.object({
   message: z.string().min(1).max(10000),
   conversationId: z.string().uuid().optional(),
   guestId: z.string().max(128).optional(),
@@ -223,28 +224,19 @@ export async function registerAgentRoutes(app: FastifyInstance) {
 
         // ── 5. 更新会话标题 ──
         if (result.options && result.options.length > 0) {
-          try {
-            const summary = result.summary || "";
-            // Try to extract a meaningful title from the plan
-            const destMatch = summary.match(/(杭州|上海|北京|西湖|灵隐|外滩|故宫|杭师大|南京|成都|广州|深圳)[^\n]{0,15}/);
-            let newTitle: string | null = null;
-            if (destMatch) {
-              newTitle = destMatch[0].slice(0, 25);
-            } else if (parsed.prompt.length > 5) {
-              // Use the prompt if it's descriptive
-              const cleaned = parsed.prompt.replace(/(帮我|请|麻烦|安排|规划|计划)/g, "").trim();
-              if (cleaned.length > 3 && cleaned.length <= 25) {
-                newTitle = cleaned;
-              }
+          const summary = result.summary || "";
+          const destMatch = summary.match(/(杭州|上海|北京|西湖|灵隐|外滩|故宫|杭师大|南京|成都|广州|深圳)[^\n]{0,15}/);
+          let newTitle: string | null = null;
+          if (destMatch) {
+            newTitle = destMatch[0].slice(0, 25);
+          } else if (parsed.prompt.length > 5) {
+            const cleaned = parsed.prompt.replace(/(帮我|请|麻烦|安排|规划|计划)/g, "").trim();
+            if (cleaned.length > 3 && cleaned.length <= 25) {
+              newTitle = cleaned;
             }
-            if (newTitle && db) {
-              await db.conversation.update({
-                where: { id: conversationId },
-                data: { title: newTitle },
-              });
-            }
-          } catch (titleErr) {
-            app.log.warn({ err: titleErr }, "Title update failed (non-critical)");
+          }
+          if (newTitle) {
+            await updateConversationTitle(db, conversationId, newTitle, app.log);
           }
         }
 
@@ -372,28 +364,19 @@ export async function registerAgentRoutes(app: FastifyInstance) {
 
         // ── 5. 更新会话标题 ──
         if (result.options && result.options.length > 0) {
-          try {
-            const summaryText = result.summary || "";
-            // Try to extract a meaningful title from the plan
-            const destMatch = summaryText.match(/(杭州|上海|北京|西湖|灵隐|外滩|故宫|杭师大|南京|成都|广州|深圳)[^\n]{0,15}/);
-            let newTitle: string | null = null;
-            if (destMatch) {
-              newTitle = destMatch[0].slice(0, 25);
-            } else if (parsed.prompt.length > 5) {
-              // Use the prompt if it's descriptive
-              const cleaned = parsed.prompt.replace(/(帮我|请|麻烦|安排|规划|计划)/g, "").trim();
-              if (cleaned.length > 3 && cleaned.length <= 25) {
-                newTitle = cleaned;
-              }
+          const summaryText = result.summary || "";
+          const destMatch = summaryText.match(/(杭州|上海|北京|西湖|灵隐|外滩|故宫|杭师大|南京|成都|广州|深圳)[^\n]{0,15}/);
+          let newTitle: string | null = null;
+          if (destMatch) {
+            newTitle = destMatch[0].slice(0, 25);
+          } else if (parsed.prompt.length > 5) {
+            const cleaned = parsed.prompt.replace(/(帮我|请|麻烦|安排|规划|计划)/g, "").trim();
+            if (cleaned.length > 3 && cleaned.length <= 25) {
+              newTitle = cleaned;
             }
-            if (newTitle && db) {
-              await db.conversation.update({
-                where: { id: conversationId },
-                data: { title: newTitle },
-              });
-            }
-          } catch (titleErr) {
-            app.log.warn({ err: titleErr }, "Title update failed (non-critical)");
+          }
+          if (newTitle) {
+            await updateConversationTitle(db, conversationId, newTitle, app.log);
           }
         }
 

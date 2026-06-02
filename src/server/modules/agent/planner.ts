@@ -286,7 +286,7 @@ function buildPrimaryPlan(input: PlannerInput): ActivityPlan {
 
 function buildFriendsPlan(input: PlannerInput): ActivityPlan {
   const { intent, candidates } = input;
-  const city = intent.city || "杭州";
+  const _city = intent.city || "杭州";
   const origin = intent.origin.label;
   const hasUserOrigin = !!origin;
   const userBudget = intent.budgetMax;
@@ -389,7 +389,7 @@ function buildCouplePlan(input: PlannerInput): ActivityPlan {
 
 function buildIndoorBackupPlan(input: PlannerInput): ActivityPlan {
   const { intent, candidates } = input;
-  const city = intent.city || "杭州";
+  const _city = intent.city || "杭州";
   const origin = intent.origin.label;
   const hasUserOrigin = !!origin;
   const userBudget = intent.budgetMax;

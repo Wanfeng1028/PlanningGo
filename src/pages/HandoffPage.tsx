@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { getHandoffCode, claimHandoffCode, getConversation } from "../lib/api";
+import { getHandoffCode, claimHandoffCode } from "../lib/api";
 
 interface HandoffPageProps {
   code: string;

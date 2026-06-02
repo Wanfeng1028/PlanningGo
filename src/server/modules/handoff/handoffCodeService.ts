@@ -14,6 +14,33 @@ import QRCode from "qrcode";
 const CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const CODE_LENGTH = 6;
 
+/**
+ * Minimal type for the handoffCode Prisma model.
+ * The generated types may not include this model due to prisma generate compatibility issues.
+ */
+interface HandoffCodeRecord {
+  id: string;
+  code: string;
+  conversationId: string;
+  planId: string | null;
+  userId: string | null;
+  guestId: string | null;
+  status: string;
+  expiresAt: Date;
+  claimedDeviceId?: string;
+  claimedAt?: Date;
+}
+
+interface HandoffCodeModel {
+  create(args: { data: Record<string, unknown> }): Promise<HandoffCodeRecord>;
+  findUnique(args: { where: Record<string, unknown> }): Promise<HandoffCodeRecord | null>;
+  update(args: { where: Record<string, unknown>; data: Record<string, unknown> }): Promise<HandoffCodeRecord>;
+}
+
+interface HandoffCodePrisma {
+  handoffCode: HandoffCodeModel;
+}
+
 /** Generate a URL-safe short code */
 function generateShortCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no O/0/1/I ambiguity
@@ -50,7 +77,7 @@ export async function createHandoffCode(input: CreateHandoffCodeInput): Promise<
   const expiresAt = new Date(Date.now() + CODE_TTL_MS);
 
   // Persist handoff code
-  await (prisma as any).handoffCode.create({
+  await (prisma as unknown as HandoffCodePrisma).handoffCode.create({
     data: {
       code,
       conversationId: input.conversationId,
@@ -97,7 +124,7 @@ export async function getHandoffCode(code: string): Promise<{
   const prisma = getPrismaClient();
   if (!prisma) throw new Error("Database not available");
 
-  const record = await (prisma as any).handoffCode.findUnique({
+  const record = await (prisma as unknown as HandoffCodePrisma).handoffCode.findUnique({
     where: { code: code.toUpperCase() },
   });
 
@@ -139,7 +166,7 @@ export async function claimHandoffCode(params: {
   const prisma = getPrismaClient();
   if (!prisma) throw new Error("Database not available");
 
-  const record = await (prisma as any).handoffCode.findUnique({
+  const record = await (prisma as unknown as HandoffCodePrisma).handoffCode.findUnique({
     where: { code: params.code.toUpperCase() },
   });
 
@@ -156,7 +183,7 @@ export async function claimHandoffCode(params: {
   }
 
   // Mark as claimed (one-time use)
-  await (prisma as any).handoffCode.update({
+  await (prisma as unknown as HandoffCodePrisma).handoffCode.update({
     where: { id: record.id },
     data: {
       status: "claimed",

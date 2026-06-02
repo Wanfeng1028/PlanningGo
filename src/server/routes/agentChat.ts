@@ -6,14 +6,14 @@
  * POST /api/agent/plans/select — Plan selection endpoint
  */
 
-import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { ZodError, z } from "zod";
 import { corsOrigins } from "../config/env.js";
 import { handleAgentMessage } from "../modules/agent/chatRouter.js";
 import { runAgentChatStream } from "../modules/agent/agentRuntime.js";
 import { hasAnyLlmKey } from "../modules/agent/modelClient.js";
 import { env } from "../config/env.js";
-import type { AgentMessageInput, AgentResponse } from "../../shared/agentResponse.js";
+import type { AgentResponse } from "../../shared/agentResponse.js";
 import type { PrismaClient } from "../../generated/prisma/client.js";
 import * as mem from "../services/memoryStore.js";
 

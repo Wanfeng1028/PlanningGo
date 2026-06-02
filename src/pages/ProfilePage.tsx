@@ -13,12 +13,9 @@ import {
   Star,
   Heart,
   Check,
-  X,
   Plus,
   Eye,
   EyeOff,
-  Copy,
-  RotateCw,
   Info,
   Menu,
   Sparkles,
@@ -57,7 +54,6 @@ import {
   createNewApiKey,
   revokeApiKey,
   deleteWebhook,
-  replayWebhook,
   getToolLogs,
   changePassword,
   clearMemory,
@@ -147,18 +143,18 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
     personaCompleteness: 0,
   });
   const [memories, setMemories] = useState<MemoryInsight[]>([]);
-  const [insights, setInsights] = useState<AiInsight[]>([]);
+  const [insights, _setInsights] = useState<AiInsight[]>([]);
   const [companions, setCompanions] = useState<CompanionProfile[]>([]);
   const [history, setHistory] = useState<PlanHistoryItem[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notifPrefs, setNotifPrefs] = useState<NotificationPreferences | null>(null);
   const [permissions, setPermissions] = useState<PermissionSettings | null>(null);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
-  const [devMetrics, setDevMetrics] = useState<Array<{ label: string; value: string }>>([]);
-  const [apiKeys, setApiKeys] = useState<ApiKeyInfo[]>([]);
-  const [webhooks, setWebhooks] = useState<WebhookInfo[]>([]);
-  const [toolLogs, setToolLogs] = useState<ToolLogItem[]>([]);
-  const [newKeyReveal, setNewKeyReveal] = useState<string | null>(null);
+  const [_devMetrics, setDevMetrics] = useState<Array<{ label: string; value: string }>>([]);
+  const [_apiKeys, setApiKeys] = useState<ApiKeyInfo[]>([]);
+  const [_webhooks, setWebhooks] = useState<WebhookInfo[]>([]);
+  const [_toolLogs, setToolLogs] = useState<ToolLogItem[]>([]);
+  const [_newKeyReveal, setNewKeyReveal] = useState<string | null>(null);
 
   // ── Form state ──
   const [personaForm, setPersonaForm] = useState({
@@ -269,7 +265,7 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
               developerEnabled: local.developerEnabled ?? false,
             });
           }
-        } catch {}
+        } catch { /* ignore parse error */ }
       }
       if (sessData.status === "fulfilled") {
         setSessions(toArray<SessionInfo>(sessData.value, "sessions"));
@@ -487,7 +483,7 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
     });
   };
 
-  const handleCreateApiKey = async () => {
+  const _handleCreateApiKey = async () => {
     try {
       const res = await createNewApiKey("New Key");
       // 服务端在创建时额外返回 key 字段（明文，仅此一次）
@@ -499,7 +495,7 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
     }
   };
 
-  const handleRevokeApiKey = (id: string) => {
+  const _handleRevokeApiKey = (id: string) => {
     setConfirmDialog({
       title: "撤销 API Key",
       desc: "撤销后不可恢复，使用该 Key 的调用将立即失败。",
@@ -515,7 +511,7 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
     });
   };
 
-  const handleDeleteWebhook = (id: string) => {
+  const _handleDeleteWebhook = (id: string) => {
     setConfirmDialog({
       title: "删除 Webhook",
       desc: "确定要删除这个 Webhook 吗？",
@@ -587,7 +583,7 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
     });
   };
 
-  const handleCopyKey = (text: string) => {
+  const _handleCopyKey = (text: string) => {
     navigator.clipboard.writeText(text).catch(() => { });
     show("已复制");
   };

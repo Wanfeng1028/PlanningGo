@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { createMobileHandoff, getHandoffByToken, claimHandoff, getHandoffStatus, consumeHandoff } from "../modules/handoff/qrService";
+import { createMobileHandoff, getHandoffByToken, claimHandoff, getHandoffStatus } from "../modules/handoff/qrService";
 import { createHandoffCode, getHandoffCode, claimHandoffCode } from "../modules/handoff/handoffCodeService";
 import type { PermissionScope } from "../modules/agent/middleware/permissionGuard";
 import { sendOk, sendError } from "../common/response.js";
@@ -151,7 +151,7 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
    */
   fastify.post("/api/handoff/create", { preHandler: [fastify.optionalAuthGuard] }, async (request, reply) => {
     const body = createCodeSchema.parse(request.body);
-    const userId = (request as any).userId as string | undefined;
+    const userId = (request as unknown as { userId?: string }).userId;
 
     try {
       const result = await createHandoffCode({

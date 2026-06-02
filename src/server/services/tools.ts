@@ -1,4 +1,4 @@
-import { demoProfile, pois, trafficRoutes, weather } from "../data/mockData";
+import { demoProfile, pois, trafficRoutes } from "../data/mockData";
 
 // ============================================================================
 // Type Definitions

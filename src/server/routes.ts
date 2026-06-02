@@ -1,22 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { ZodError } from "zod";
-import { z } from "zod";
-import { demoProfile, pois, baseToolLogs, planOptions, trafficRoutes, weather } from "./data/mockData";
-import { parseDemand, planningRequestSchema, runPlanningAgent, simulateWhatIf } from "./services/agent";
 import { env } from "./config/env";
-import { runPlanningPipeline } from "./modules/agent/orchestrator";
-import {
-  advanceExecution,
-  createShareRoom,
-  listExecutionSteps,
-  listReservations,
-  listShareRooms,
-  updateExecutionStep,
-  updateReservationStatus,
-  upsertReservation,
-  vote,
-  saveActions,
-} from "./services/store";
 
 export async function registerRoutes(app: FastifyInstance) {
   // ── 根路由：API 信息 ──

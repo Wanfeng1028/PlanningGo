@@ -26,7 +26,7 @@ registerTool({
     adcode: z.string(),
     location: z.string(), // "lng,lat"
   }),
-  async execute(input: AmapGeocodeInput, ctx: ToolExecutionContext) {
+  async execute(input: AmapGeocodeInput, _ctx: ToolExecutionContext) {
     const client = getAmapClient();
 
     // Mock fallback if AMap not configured
@@ -85,7 +85,7 @@ registerTool({
     district: z.string(),
     adcode: z.string(),
   }),
-  async execute(input: AmapReverseGeocodeInput, ctx: ToolExecutionContext) {
+  async execute(input: AmapReverseGeocodeInput, _ctx: ToolExecutionContext) {
     const client = getAmapClient();
 
     // Mock fallback if AMap not configured

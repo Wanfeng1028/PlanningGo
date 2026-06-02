@@ -1,8 +1,8 @@
 import { createTraceId, createId } from "../../common/id";
 import { env } from "../../config/env";
 import { createToolExecutor } from "../tools/executor";
-import { buildCityContext, applyCityGuard } from "./middleware/cityGuard";
-import { hasPermission, filterActionsByPermissions, type UserPermissionSnapshot } from "./middleware/permissionGuard";
+import { buildCityContext } from "./middleware/cityGuard";
+import { filterActionsByPermissions, type UserPermissionSnapshot } from "./middleware/permissionGuard";
 import { extractIntent } from "./intent";
 import { buildPlanningContext } from "../planning/contextBuilder";
 import { generateCandidates } from "../planning/candidateGenerator";
@@ -10,9 +10,9 @@ import { rankCandidates } from "../planning/ranking";
 import { generateMockPlans, generateLlmPlans } from "./planner";
 import { validatePlans } from "../planning/validator";
 import { createActionsForPlans } from "../execution/actionService";
-import type { ActivityPlan, ExecutionAction, UserIntent } from "../planning/schemas";
+import type { ActivityPlan, ExecutionAction, UserIntent, ValidationReport } from "../planning/schemas";
 import type { PlanningRequest } from "../../types";
-import type { ToolCallPlan, ToolExecutionContext, CityContext } from "../tools/types";
+import type { ToolExecutionContext, CityContext } from "../tools/types";
 
 /**
  * Agent Runtime input
@@ -54,7 +54,7 @@ export interface AgentRunResult {
   executableActions: ExecutionAction[];
   autoExecutedActions: ExecutionAction[];
   blockedActions: ExecutionAction[];
-  validation: any;
+  validation: ValidationReport;
   nextActions: string[];
   modelMode: string;
   llmModel: string;
@@ -257,7 +257,7 @@ export async function runAgentRuntime(input: AgentRunInput): Promise<AgentRunRes
     for (const action of allowed.slice(0, env.AUTO_EXECUTION_MAX_ACTIONS)) {
       if (action.type === "navigation") {
         // Navigation can be auto-executed
-        autoExecutedActions.push({ ...action, status: "success" as any });
+        autoExecutedActions.push({ ...action, status: "success" });
       }
     }
   }

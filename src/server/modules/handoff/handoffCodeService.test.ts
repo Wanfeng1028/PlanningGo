@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { PrismaClient } from "../../../generated/prisma/client.js";
 
 // Mock dependencies
 vi.mock("../../common/prisma", () => ({
@@ -31,7 +32,7 @@ const mockPrisma = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(getPrismaClient).mockReturnValue(mockPrisma as any);
+  vi.mocked(getPrismaClient).mockReturnValue(mockPrisma as unknown as PrismaClient);
 });
 
 describe("createHandoffCode", () => {

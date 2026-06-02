@@ -25,7 +25,7 @@ registerTool({
       }),
     ),
   }),
-  async execute(input: AmapRouteInput, ctx: ToolExecutionContext) {
+  async execute(input: AmapRouteInput, _ctx: ToolExecutionContext) {
     const client = getAmapClient();
 
     // Mock fallback if AMap not configured
@@ -92,7 +92,7 @@ registerTool({
       }),
     ),
   }),
-  async execute(input: AmapRouteInput, ctx: ToolExecutionContext) {
+  async execute(input: AmapRouteInput, _ctx: ToolExecutionContext) {
     const client = getAmapClient();
 
     // Mock fallback if AMap not configured
@@ -160,7 +160,7 @@ registerTool({
       }),
     ),
   }),
-  async execute(input: AmapRouteInput, ctx: ToolExecutionContext) {
+  async execute(input: AmapRouteInput, _ctx: ToolExecutionContext) {
     const client = getAmapClient();
 
     // Mock fallback if AMap not configured

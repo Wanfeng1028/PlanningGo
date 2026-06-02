@@ -5,7 +5,7 @@ export class BookingProvider {
   /**
    * Create a restaurant reservation
    */
-  async createRestaurantReservation(params: {
+  async createRestaurantReservation(_params: {
     poiId: string;
     poiName: string;
     date: string;
@@ -27,7 +27,7 @@ export class BookingProvider {
   /**
    * Lock tickets for an event/movie
    */
-  async lockTickets(params: {
+  async lockTickets(_params: {
     poiId: string;
     poiName: string;
     date: string;
@@ -48,7 +48,7 @@ export class BookingProvider {
   /**
    * Confirm a ticket lock (convert to actual purchase)
    */
-  async confirmTicketLock(params: {
+  async confirmTicketLock(_params: {
     lockId: string;
     paymentMethod?: string;
   }): Promise<{ reservationId: string; status: string }> {
@@ -64,7 +64,7 @@ export class BookingProvider {
   /**
    * Cancel a reservation
    */
-  async cancelReservation(params: {
+  async cancelReservation(_params: {
     reservationId: string;
   }): Promise<{ success: boolean; refundStatus?: string }> {
     // In production, this would call external APIs to cancel

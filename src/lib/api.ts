@@ -1002,7 +1002,14 @@ export async function getHandoffCode(code: string): Promise<{
   expiresAt: string;
 } | null> {
   try {
-    const resp = await apiJson<{ data: any }>(`/api/handoff/${encodeURIComponent(code)}`);
+    const resp = await apiJson<{ data: {
+      code: string;
+      conversationId: string;
+      planId: string | null;
+      userId: string | null;
+      status: string;
+      expiresAt: string;
+    } | null }>(`/api/handoff/${encodeURIComponent(code)}`);
     return resp.data;
   } catch {
     return null;
@@ -1014,7 +1021,11 @@ export async function claimHandoffCode(code: string, deviceId: string): Promise<
   conversationId: string;
   planId: string | null;
 }> {
-  const resp = await apiJson<{ data: any }>(`/api/handoff/${encodeURIComponent(code)}/claim`, {
+  const resp = await apiJson<{ data: {
+    success: boolean;
+    conversationId: string;
+    planId: string | null;
+  } }>(`/api/handoff/${encodeURIComponent(code)}/claim`, {
     method: "POST",
     body: JSON.stringify({ deviceId }),
   });

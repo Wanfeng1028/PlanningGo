@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import type { PrismaClient } from "../../../generated/prisma/client.js";
 
 /**
  * conversationOwnership.test.ts
@@ -95,7 +96,7 @@ const mockDb = {
     findFirst: vi.fn(async () => null),
     create: vi.fn(async () => ({})),
   },
-};
+} as unknown as PrismaClient;
 
 vi.mock("./modelClient.js", () => ({
   hasAnyLlmKey: () => true,
@@ -103,7 +104,7 @@ vi.mock("./modelClient.js", () => ({
     provider: "openai",
     model: mode === "pro" ? "gpt-4o" : "gpt-4o-mini",
   }),
-  getProviderCapability: (provider: string) => ({
+  getProviderCapability: (_provider: string) => ({
     toolCalling: true,
   }),
   chatStream: vi.fn().mockResolvedValue({
@@ -118,7 +119,7 @@ vi.mock("./modelClient.js", () => ({
 }));
 
 vi.mock("../../services/memoryStore.js", () => ({
-  createConversation: (data: any) => ({ id: "mem-conv-id", ...data, createdAt: new Date(), updatedAt: new Date() }),
+  createConversation: (data: Record<string, unknown>) => ({ id: "mem-conv-id", ...data, createdAt: new Date(), updatedAt: new Date() }),
   getConversation: () => undefined,
   addMessage: () => {},
   updateConversationTitle: () => {},
@@ -163,7 +164,7 @@ describe("Conversation Ownership & User Isolation", () => {
   it("creates conversation with userId for logged-in user (no existing conversationId)", async () => {
     const result = await runAgentChatStream(
       { message: "你好", city: "杭州", modelMode: "flash" },
-      { db: mockDb as any, userId: "user-xiaoming-id", log: baseLog },
+      { db: mockDb, userId: "user-xiaoming-id", log: baseLog },
       { writeText: () => {} },
     );
 
@@ -183,7 +184,7 @@ describe("Conversation Ownership & User Isolation", () => {
 
     const result = await runAgentChatStream(
       { message: "你好", city: "杭州", modelMode: "flash", conversationId: "existing-conv-id" },
-      { db: mockDb as any, userId: "user-xiaoming-id", log: baseLog },
+      { db: mockDb, userId: "user-xiaoming-id", log: baseLog },
       { writeText: () => {} },
     );
 
@@ -202,7 +203,7 @@ describe("Conversation Ownership & User Isolation", () => {
 
     const result = await runAgentChatStream(
       { message: "你好", city: "杭州", modelMode: "flash", conversationId: "other-user-conv" },
-      { db: mockDb as any, userId: "user-xiaoming-id", log: baseLog },
+      { db: mockDb, userId: "user-xiaoming-id", log: baseLog },
       { writeText: () => {} },
     );
 
@@ -227,7 +228,7 @@ describe("Conversation Ownership & User Isolation", () => {
 
     const result = await runAgentChatStream(
       { message: "你好", city: "杭州", modelMode: "flash", conversationId: "guest-conv" },
-      { db: mockDb as any, userId: undefined, log: baseLog },
+      { db: mockDb, userId: undefined, log: baseLog },
       { writeText: () => {} },
     );
 
@@ -245,7 +246,7 @@ describe("Conversation Ownership & User Isolation", () => {
 
     const result = await runAgentChatStream(
       { message: "你好", city: "杭州", modelMode: "flash", conversationId: "anonymous-conv" },
-      { db: mockDb as any, userId: "user-xiaoming-id", log: baseLog },
+      { db: mockDb, userId: "user-xiaoming-id", log: baseLog },
       { writeText: () => {} },
     );
 
@@ -257,7 +258,7 @@ describe("Conversation Ownership & User Isolation", () => {
   it("response always includes conversationId for frontend migration", async () => {
     const result = await runAgentChatStream(
       { message: "去杭州西湖", city: "杭州", modelMode: "flash" },
-      { db: mockDb as any, userId: "user-xiaoming-id", log: baseLog },
+      { db: mockDb, userId: "user-xiaoming-id", log: baseLog },
       { writeText: () => {} },
     );
 
@@ -276,7 +277,7 @@ describe("Conversation Ownership & User Isolation", () => {
 
     await runAgentChatStream(
       { message: "去杭州西湖，一个人", city: "杭州", modelMode: "flash", conversationId: "my-conv" },
-      { db: mockDb as any, userId: "user-xiaoming-id", log: baseLog },
+      { db: mockDb, userId: "user-xiaoming-id", log: baseLog },
       { writeText: () => {} },
     );
 
@@ -296,7 +297,7 @@ describe("Conversation Ownership & User Isolation", () => {
   it("new conversation title is derived from first message", async () => {
     const result = await runAgentChatStream(
       { message: "去杭州西湖，明天上午9点，一个人", city: "杭州", modelMode: "flash" },
-      { db: mockDb as any, userId: "user-xiaoming-id", log: baseLog },
+      { db: mockDb, userId: "user-xiaoming-id", log: baseLog },
       { writeText: () => {} },
     );
 
@@ -320,7 +321,7 @@ describe("Conversation Ownership & User Isolation", () => {
     // But the conversation detail route would block access (403)
     const result = await runAgentChatStream(
       { message: "你好", city: "杭州", modelMode: "flash", conversationId: "guest-only-conv" },
-      { db: mockDb as any, userId: "user-xiaoming-id", log: baseLog },
+      { db: mockDb, userId: "user-xiaoming-id", log: baseLog },
       { writeText: () => {} },
     );
 
@@ -340,7 +341,7 @@ describe("Conversation Ownership & User Isolation", () => {
     // First message
     const result1 = await runAgentChatStream(
       { message: "你好", city: "杭州", modelMode: "flash", conversationId: "multi-msg-conv" },
-      { db: mockDb as any, userId: "user-xiaoming-id", log: baseLog },
+      { db: mockDb, userId: "user-xiaoming-id", log: baseLog },
       { writeText: () => {} },
     );
 
@@ -349,7 +350,7 @@ describe("Conversation Ownership & User Isolation", () => {
     // Second message
     const result2 = await runAgentChatStream(
       { message: "去杭州西湖", city: "杭州", modelMode: "flash", conversationId: "multi-msg-conv" },
-      { db: mockDb as any, userId: "user-xiaoming-id", log: baseLog },
+      { db: mockDb, userId: "user-xiaoming-id", log: baseLog },
       { writeText: () => {} },
     );
 

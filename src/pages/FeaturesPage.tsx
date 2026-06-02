@@ -12,9 +12,7 @@ import {
   trackAction,
   type PlanningOption,
   type PlanningExecutableAction,
-  type PlanningResult,
-    selectAgentPlan,
-  type AgentPlanSelectResponse,
+  selectAgentPlan,
 } from "../lib/api";
 import type { AgentTraceEvent } from "../shared/agentResponse";
 import { GlassToast, useGlassToast } from "../components/GlassToast";
@@ -286,13 +284,13 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     if (savedDrafts) {
       try {
         setDrafts(JSON.parse(savedDrafts));
-      } catch {}
+      } catch { /* ignore corrupt localStorage */ }
     }
     const savedFavorites = localStorage.getItem("pg_favorites");
     if (savedFavorites) {
       try {
         setFavorites(JSON.parse(savedFavorites));
-      } catch {}
+      } catch { /* ignore corrupt localStorage */ }
     }
     // Load conversations: backend DB for logged-in users, localStorage for guests
     if (user?.id) {
@@ -355,7 +353,13 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
                     setAgentEvents(lastWithEvents.traceEvents);
                   }
                   // Auto-scroll to bottom after loading
-                  forceScrollToBottom("auto");
+                  setShouldAutoScroll(true);
+                  requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                      const el = messagesContainerRef.current;
+                      if (el) el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
+                    });
+                  });
                 }
               }).catch(() => {});
             }
@@ -387,9 +391,10 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
             map.set(session.id, session.messages ?? []);
           });
           messagesBySessionRef.current = map;
-        } catch {}
+        } catch { /* ignore corrupt localStorage */ }
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- setSessionMessages is stable (empty deps)
   }, [user?.id]);
 
   // Save modelMode to localStorage when changed
@@ -448,14 +453,6 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     });
   }, [shouldAutoScroll]);
 
-  /** Utility: unconditionally scroll messages container to bottom via rAF */
-  function scrollMessagesToBottom(reason: string, behavior: ScrollBehavior = "auto") {
-    requestAnimationFrame(() => {
-      const el = messagesContainerRef.current;
-      if (!el) return;
-      el.scrollTo({ top: el.scrollHeight, behavior });
-    });
-  }
 
   // Auto-scroll only when user is at bottom
   useEffect(() => {
@@ -867,7 +864,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
         setAbortController(null);
       }
     },
-    [isBusy, city, modelMode, addMessage, setSessionMessages, showToast, updateLastAssistant, forceScrollToBottom],
+    [isBusy, city, modelMode, addMessage, setSessionMessages, showToast, updateLastAssistant, forceScrollToBottom, selectedPlanId, user?.id],
   );
 
   const handleStopGeneration = useCallback(() => {
@@ -1190,7 +1187,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
               }),
             );
           }
-        } catch (err) {
+        } catch {
           showToast("操作失败，请重试", "error");
         } finally {
           setBusyActionId(null);
@@ -1318,7 +1315,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     }
   }, [showToast]);
 
-  const handleNextAction = useCallback(
+  const _handleNextAction = useCallback(
     (label: string) => {
       switch (label) {
         case "保存方案":
@@ -1477,7 +1474,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
       }
 
       // Assistant message
-      const isStreaming = msg.status === "streaming" || msg.status === "thinking";
+      const _isStreaming = msg.status === "streaming" || msg.status === "thinking";
       const isDone = msg.status === "done" || msg.status === "success";
       const isError = msg.status === "error";
       const isFallback = msg.status === "fallback";

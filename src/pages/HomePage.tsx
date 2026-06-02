@@ -11,7 +11,7 @@ interface HomePageProps {
   onAuthRequiredNavigate: (key: NavKey) => void;
 }
 
-const routeStops = ["浙大紫金港", "地铁/打车", "断桥", "白堤散步", "湖滨休息"];
+const _routeStops = ["浙大紫金港", "地铁/打车", "断桥", "白堤散步", "湖滨休息"];
 
 const homeSections = [
   {
@@ -96,7 +96,7 @@ const whyChooseCards = [
 
 const AUTO_SLIDE_INTERVAL = 3600;
 
-export function HomePage({ onNavigate, onOpenModal, user, onAuthRequiredNavigate }: HomePageProps) {
+export function HomePage({ onNavigate, onOpenModal, user: _user, onAuthRequiredNavigate }: HomePageProps) {
   const [activeSection, setActiveSection] = useState(0);
 
   useEffect(() => {

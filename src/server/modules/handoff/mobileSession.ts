@@ -2,7 +2,6 @@
  * @deprecated 未注册到路由 — DeviceSession 模型未在 Prisma schema 中定义
  * 保留供未来跨设备会话功能参考，当前为死代码
  */
-import { createId } from "../../common/id";
 import { getPrismaClient } from "../../common/prisma";
 
 function getPrisma() {

@@ -1,6 +1,6 @@
-import type { PermissionScope, UserPermissionSnapshot } from "../agent/middleware/permissionGuard";
 import { env } from "../../config/env";
 import { getPrismaClient } from "../../common/prisma";
+import type { Prisma } from "../../../generated/prisma/client.js";
 
 /**
  * Log a user event
@@ -28,7 +28,7 @@ export async function trackEvent(params: {
         guestId: params.guestId,
         conversationId: params.conversationId,
         eventName: params.eventName,
-        eventPayloadJson: params.eventPayload as any,
+        eventPayloadJson: params.eventPayload as unknown as Prisma.InputJsonValue,
         page: params.page || "",
         traceId: params.traceId || "",
       },
@@ -66,7 +66,7 @@ export async function reportClientError(params: {
         route: params.route,
         message: params.message,
         stack: params.stack,
-        payloadJson: params.payload as any,
+        payloadJson: params.payload as unknown as Prisma.InputJsonValue,
       },
     });
   } catch (error) {

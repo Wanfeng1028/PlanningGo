@@ -12,7 +12,8 @@
  * 3. 作为意图分类的参考实现
  */
 
-import type { PrismaClient } from "../../../generated/prisma/client.js";
+import type { PrismaClient, Prisma } from "../../../generated/prisma/client.js";
+import { updateConversationTitle } from "./titleUtils.js";
 import type {
   AgentResponse,
   AgentIntent,
@@ -464,21 +465,8 @@ export async function handleAgentMessage(
   const currentDraftForTitle = newState?.planningDraft;
   if (currentDraftForTitle) {
     const newTitle = generateTitleFromSlots(currentDraftForTitle);
-
-    if (newTitle && db) {
-      try {
-        await db.conversation.update({
-          where: { id: conversationId },
-          data: { title: newTitle, updatedAt: new Date() },
-        });
-        log.info({ conversationId, newTitle }, "[chatRouter] title updated");
-      } catch (err) {
-        log.warn({ err }, "[chatRouter] title update failed");
-      }
-    }
-    // Also update memory store
     if (newTitle) {
-      mem.updateConversationTitle?.(conversationId, newTitle);
+      await updateConversationTitle(db, conversationId, newTitle, log);
     }
   }
 
@@ -537,7 +525,7 @@ async function handlePlanSelectedByText(
   conversationId: string,
   message: string,
   state: AgentState | null,
-  log: HandlerContext["log"],
+  _log: HandlerContext["log"],
 ): Promise<AgentResponse> {
   // Check if user has a selectedOptionId in state
   const selectedId = state?.selectedOptionId;
@@ -981,7 +969,7 @@ async function saveAgentState(
       await db.conversation.update({
         where: { id: conversationId },
         data: {
-          agentStateJson: state as any,
+          agentStateJson: state as unknown as Prisma.InputJsonValue,
           selectedOptionId: state.selectedOptionId ?? null,
           updatedAt: new Date(),
         },
@@ -1003,7 +991,7 @@ async function saveMsg(
   if (db) {
     try {
       const msg = await db.message.create({
-        data: { conversationId, role, content, payloadJson: payloadJson as any },
+        data: { conversationId, role, content, payloadJson: payloadJson as unknown as Prisma.InputJsonValue },
       });
       log?.info({
         conversationId,

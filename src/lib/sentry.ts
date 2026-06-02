@@ -8,8 +8,6 @@
  *   SENTRY_ENVIRONMENT - 环境名称（production/staging/development）
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
-
 async function loadSentry(): Promise<any> {
   const specifier = "@sentry/react";
   return new Function("s", "return import(s);")(specifier);

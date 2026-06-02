@@ -5,7 +5,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { listActions, quoteAction, confirmAction, cancelAction } from "../services/store.js";
-import { ForbiddenError, NotFoundError, RateLimitError } from "../common/errors.js";
+import { ForbiddenError, NotFoundError } from "../common/errors.js";
 import { sendOk } from "../common/response.js";
 import { optionalUserId } from "../common/uid.js";
 

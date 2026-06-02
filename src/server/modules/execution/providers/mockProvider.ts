@@ -5,7 +5,7 @@ export class MockProvider {
   /**
    * Mock navigation
    */
-  async mockNavigation(params: { points: string[] }): Promise<{ navigationUrl: string }> {
+  async mockNavigation(_params: { points: string[] }): Promise<{ navigationUrl: string }> {
     return {
       navigationUrl: "https://mock-navigation.example.com",
     };
@@ -14,7 +14,7 @@ export class MockProvider {
   /**
    * Mock calendar event
    */
-  async mockCalendar(params: { title: string }): Promise<{ eventId: string }> {
+  async mockCalendar(_params: { title: string }): Promise<{ eventId: string }> {
     return {
       eventId: `mock_cal_${Date.now()}`,
     };
@@ -23,7 +23,7 @@ export class MockProvider {
   /**
    * Mock share
    */
-  async mockShare(params: { text: string }): Promise<{ shareUrl: string }> {
+  async mockShare(_params: { text: string }): Promise<{ shareUrl: string }> {
     return {
       shareUrl: "https://mock-share.example.com",
     };
@@ -32,7 +32,7 @@ export class MockProvider {
   /**
    * Mock reservation
    */
-  async mockReservation(params: { poiName: string }): Promise<{ reservationId: string }> {
+  async mockReservation(_params: { poiName: string }): Promise<{ reservationId: string }> {
     return {
       reservationId: `mock_res_${Date.now()}`,
     };
