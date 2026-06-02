@@ -29,8 +29,8 @@ function buildLlmCandidates(): LlmCandidate[] {
       name: "mimo",
       apiKey: env.MIMO_API_KEY,
       baseUrl: env.MIMO_BASE_URL,
-      flashModel: env.MIMO_FLASH_MODEL ?? "mimo-7b",
-      proModel: env.MIMO_PRO_MODEL ?? "mimo-7b",
+      flashModel: env.MIMO_FLASH_MODEL ?? "mimo-v2.5-pro",
+      proModel: env.MIMO_PRO_MODEL ?? "mimo-v2.5-pro",
     },
     {
       name: "qwen",

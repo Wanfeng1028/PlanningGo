@@ -69,6 +69,7 @@ vi.mock("../../services/memoryStore.js", () => ({
   createConversation: (data: any) => ({ id: "mem-conv-id", ...data, createdAt: new Date(), updatedAt: new Date() }),
   getConversation: () => undefined,
   addMessage: () => {},
+  updateConversationTitle: () => {},
   listMessages: () => [],
 }));
 
@@ -177,13 +178,13 @@ describe("agentRuntime", () => {
     // Configure mock to return mimo provider (no tool calling)
     mockGetChatModel.mockImplementation((mode?: string) => ({
       provider: "mimo",
-      model: "mimo-7b",
+      model: "mimo-v2.5-pro",
     }));
 
     mockChatStream.mockResolvedValue({
       stream: makeTextStream("你好！有什么出行计划需要帮忙吗？"),
       provider: "mimo",
-      model: "mimo-7b",
+      model: "mimo-v2.5-pro",
       abort: () => {},
     });
 
@@ -208,13 +209,13 @@ describe("agentRuntime", () => {
     // Configure mock to return mimo provider (no tool calling)
     mockGetChatModel.mockImplementation((mode?: string) => ({
       provider: "mimo",
-      model: "mimo-7b",
+      model: "mimo-v2.5-pro",
     }));
 
     mockChatStream.mockResolvedValue({
       stream: makeTextStream("好的，我来帮你安排杭州半日游路线。"),
       provider: "mimo",
-      model: "mimo-7b",
+      model: "mimo-v2.5-pro",
       abort: () => {},
     });
 

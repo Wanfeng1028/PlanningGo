@@ -1,5 +1,6 @@
 import type { PlanningRequestInput, PlanningResult } from "./api";
-import { getAuthToken } from "./api";
+import { getAuthToken, setAuthToken } from "./api";
+import { refreshToken } from "./retry";
 import { API_BASE } from "./config";
 
 export interface StreamOptions {
@@ -107,7 +108,14 @@ export async function streamPlanningRequest(
     "content-type": "application/json",
   };
 
-  const token = getAuthToken();
+  let token = getAuthToken();
+  if (!token) {
+    const refreshed = await refreshToken().catch(() => null);
+    if (refreshed) {
+      setAuthToken(refreshed);
+      token = refreshed;
+    }
+  }
   if (token) {
     headers.authorization = `Bearer ${token}`;
   }
@@ -144,7 +152,15 @@ export async function streamAgentMessage(
     "content-type": "application/json",
   };
 
-  const token = getAuthToken();
+  let token = getAuthToken();
+  // Proactive token refresh if token might be expired
+  if (!token) {
+    const refreshed = await refreshToken().catch(() => null);
+    if (refreshed) {
+      setAuthToken(refreshed);
+      token = refreshed;
+    }
+  }
   if (token) {
     headers.authorization = `Bearer ${token}`;
   }

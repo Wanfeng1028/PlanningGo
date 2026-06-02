@@ -169,6 +169,43 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     };
   }, [phraseIndex, typedText, isDeleting]);
 
+  /* ── Message helpers (declared before useEffects that reference them) ── */
+  const updateSessionMessages = useCallback((sessionId: string, updater: (prev: ChatMessage[]) => ChatMessage[]) => {
+    const prevSessionMessages = messagesBySessionRef.current.get(sessionId) ?? [];
+    const nextSessionMessages = updater(prevSessionMessages);
+    messagesBySessionRef.current.set(sessionId, nextSessionMessages);
+
+    setChatSessions((prev) =>
+      prev.map((session) =>
+        session.id === sessionId
+          ? { ...session, messages: nextSessionMessages, updatedAt: new Date().toISOString() }
+          : session,
+      ),
+    );
+
+    if (currentSessionIdRef.current === sessionId) {
+      setMessages(nextSessionMessages);
+    }
+  }, []);
+
+  const addMessage = useCallback((sessionId: string, msg: ChatMessage) => {
+    updateSessionMessages(sessionId, (prev) => [...prev, msg]);
+  }, [updateSessionMessages]);
+
+  const setSessionMessages = useCallback((sessionId: string, sessionMessages: ChatMessage[]) => {
+    messagesBySessionRef.current.set(sessionId, sessionMessages);
+    setChatSessions((prev) =>
+      prev.map((session) =>
+        session.id === sessionId
+          ? { ...session, messages: sessionMessages, updatedAt: new Date().toISOString() }
+          : session,
+      ),
+    );
+    if (currentSessionIdRef.current === sessionId) {
+      setMessages(sessionMessages);
+    }
+  }, []);
+
   // Load saved preferences from localStorage
   useEffect(() => {
     const savedMode = localStorage.getItem("pg_model_mode");
@@ -191,6 +228,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     if (user?.id) {
       listConversations({ limit: 50 })
         .then((convs) => {
+          console.info("[FeaturesPage] load DB conversations", { userId: user?.id, count: convs.length, titles: convs.map((c) => c.title) });
           if (convs.length > 0) {
             const sessions: ChatSession[] = convs.map((cv) => ({
               id: cv.id,
@@ -208,10 +246,93 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
               conversationIdRef.current = savedConvId;
               setCurrentSessionId(savedConvId);
               currentSessionIdRef.current = savedConvId;
+              // Auto-load messages for the active conversation from DB
+              console.info("[FeaturesPage] active conversation set", { sessionId: savedConvId, conversationId: savedConvId });
+              getConversation(savedConvId).then((detail) => {
+                if (detail && detail.messages.length > 0) {
+                  const loadedMessages: ChatMessage[] = detail.messages.map((m) => {
+                    const payload = m.payloadJson as Record<string, unknown> | undefined;
+                    const payloadType = (payload?.type as string) || 'text';
+                    const meta = payload?.metadata as Record<string, unknown> | undefined;
+                    return {
+                      id: m.id,
+                      role: m.role as 'user' | 'assistant',
+                      content: m.content,
+                      createdAt: m.createdAt,
+                      status: 'done' as const,
+                      kind: payloadType as ChatMessageKind,
+                      metadata: meta ? {
+                        provider: meta.provider as string | undefined,
+                        model: meta.model as string | undefined,
+                        fallbackUsed: meta.fallbackUsed as boolean | undefined,
+                      } : undefined,
+                      plans: payloadType === 'plan' ? ((payload?.data as Record<string, unknown>)?.options as PlanningOption[]) ?? [] : undefined,
+                      actions: payloadType === 'plan' ? ((payload?.data as Record<string, unknown>)?.executableActions as PlanningExecutableAction[]) ?? [] : undefined,
+                      chips: payloadType === 'slot_question' ? ((payload?.missingSlots as string[]) ?? [])
+                        : payloadType === 'plan_selected' ? ((payload?.nextActions as NextActionItem[])?.map((a: NextActionItem) => a.label) ?? [])
+                        : ((payload?.suggestions as string[]) ?? undefined),
+                      nextActions: payloadType === 'plan_selected' ? (payload?.nextActions as NextActionItem[]) : undefined,
+                      selectedOptionId: payloadType === 'plan_selected' ? (payload?.selectedOptionId as string) : undefined,
+                      selectedPlanTitle: payloadType === 'plan_selected' ? (payload?.selectedPlanTitle as string) : undefined,
+                    };
+                  });
+                  setSessionMessages(savedConvId, loadedMessages);
+                  setMode('chat');
+                  setPhase('result');
+                  const selMsg = detail.messages.find((m) => {
+                    const p2 = m.payloadJson as Record<string, unknown> | undefined;
+                    return p2?.type === 'plan_selected';
+                  });
+                  const selPayload = selMsg?.payloadJson as Record<string, unknown> | undefined;
+                  if (selPayload?.selectedOptionId) {
+                    setSelectedPlanId(selPayload.selectedOptionId as string);
+                  }
+                }
+              }).catch(() => {});
+            }
+          } else {
+            // Empty list from DB for logged-in user — try loading saved conversation directly
+            console.info("[FeaturesPage] DB conversations empty for logged-in user, trying active conversation fallback", { userId: user?.id });
+            const savedConvId = localStorage.getItem("pg_active_conversation_id");
+            if (savedConvId) {
+              getConversation(savedConvId).then((detail) => {
+                if (detail && detail.messages.length > 0) {
+                  const loadedMessages: ChatMessage[] = detail.messages.map((m) => {
+                    const payload = m.payloadJson as Record<string, unknown> | undefined;
+                    const payloadType = (payload?.type as string) || 'text';
+                    return {
+                      id: m.id,
+                      role: m.role as 'user' | 'assistant',
+                      content: m.content,
+                      createdAt: m.createdAt,
+                      status: 'done' as const,
+                      kind: payloadType as ChatMessageKind,
+                    };
+                  });
+                  const session: ChatSession = {
+                    id: detail.id,
+                    title: detail.title,
+                    messages: loadedMessages,
+                    city: detail.city,
+                    createdAt: detail.createdAt,
+                    updatedAt: detail.updatedAt,
+                  };
+                  setChatSessions([session]);
+                  setConversationId(detail.id);
+                  conversationIdRef.current = detail.id;
+                  setCurrentSessionId(detail.id);
+                  currentSessionIdRef.current = detail.id;
+                  setSessionMessages(detail.id, loadedMessages);
+                  setMode('chat');
+                  setPhase('result');
+                }
+              }).catch(() => {});
             }
           }
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.error("[FeaturesPage] Failed to load conversations:", err);
+        });
     } else {
       // Guest: load from localStorage
       const savedSessions = localStorage.getItem("pg_chat_sessions");
@@ -317,43 +438,6 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     }
   }, [mode]);
 
-  /* ── Message helpers ── */
-  const updateSessionMessages = useCallback((sessionId: string, updater: (prev: ChatMessage[]) => ChatMessage[]) => {
-    const prevSessionMessages = messagesBySessionRef.current.get(sessionId) ?? [];
-    const nextSessionMessages = updater(prevSessionMessages);
-    messagesBySessionRef.current.set(sessionId, nextSessionMessages);
-
-    setChatSessions((prev) =>
-      prev.map((session) =>
-        session.id === sessionId
-          ? { ...session, messages: nextSessionMessages, updatedAt: new Date().toISOString() }
-          : session,
-      ),
-    );
-
-    if (currentSessionIdRef.current === sessionId) {
-      setMessages(nextSessionMessages);
-    }
-  }, []);
-
-  const addMessage = useCallback((sessionId: string, msg: ChatMessage) => {
-    updateSessionMessages(sessionId, (prev) => [...prev, msg]);
-  }, [updateSessionMessages]);
-
-  const setSessionMessages = useCallback((sessionId: string, sessionMessages: ChatMessage[]) => {
-    messagesBySessionRef.current.set(sessionId, sessionMessages);
-    setChatSessions((prev) =>
-      prev.map((session) =>
-        session.id === sessionId
-          ? { ...session, messages: sessionMessages, updatedAt: new Date().toISOString() }
-          : session,
-      ),
-    );
-    if (currentSessionIdRef.current === sessionId) {
-      setMessages(sessionMessages);
-    }
-  }, []);
-
   const updateLastAssistant = useCallback((sessionId: string, patch: Partial<ChatMessage>) => {
     updateSessionMessages(sessionId, (prev) => {
       const next = [...prev];
@@ -447,7 +531,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
             signal: controller.signal,
             onChunk: (chunk) => {
               streamedContent += chunk;
-              updateLastAssistant(targetSessionId, {
+              updateLastAssistant(targetSessionId!, {
                 status: "streaming" as MessageStatus,
                 content: streamedContent,
                 chips: undefined,
@@ -493,22 +577,32 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
               messagesBySessionRef.current.set(respConversationId, existingMessages);
               messagesBySessionRef.current.delete(targetSessionId);
             }
+            // Update chatSessions to replace frontend UUID with backend conversation ID
+            setChatSessions((prev) => prev.map((s) =>
+              s.id === targetSessionId ? { ...s, id: respConversationId } : s
+            ));
+            targetSessionId = respConversationId;
           }
+          console.info("[FeaturesPage] active conversation set", { sessionId: currentSessionIdRef.current, conversationId: respConversationId });
         }
 
         // Refresh sidebar from backend for logged-in users
         if (user?.id) {
           listConversations({ limit: 50 }).then((convs) => {
-            const sessions: ChatSession[] = convs.map((cv) => ({
-              id: cv.id,
-              title: cv.title,
-              messages: messagesBySessionRef.current.get(cv.id) ?? [],
-              city: cv.city,
-              createdAt: cv.createdAt,
-              updatedAt: cv.updatedAt,
-            }));
-            setChatSessions(sessions);
-          }).catch(() => {});
+            if (convs.length > 0) {
+              const sessions: ChatSession[] = convs.map((cv) => ({
+                id: cv.id,
+                title: cv.title,
+                messages: messagesBySessionRef.current.get(cv.id) ?? [],
+                city: cv.city,
+                createdAt: cv.createdAt,
+                updatedAt: cv.updatedAt,
+              }));
+              setChatSessions(sessions);
+            }
+          }).catch((err) => {
+            console.error("[FeaturesPage] Failed to refresh conversations:", err);
+          });
         }
         apiTrackEvent({ eventName: "agent_response", payload: { type: respType, conversationId: respConversationId }, page: "features" }).catch(() => {});
 
@@ -557,6 +651,15 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
               actions: (planData?.executableActions as PlanningExecutableAction[]) ?? [],
               metadata: msgMetadata,
             });
+            // Update sidebar title from plan content
+            const planSummary2 = planData?.summary ?? (resp?.content as string) ?? "";
+            const destMatch2 = planSummary2.match(/(杭州|上海|北京|西湖|灵隐|外滩|故宫|杭师大)[^\n]{0,12}/);
+            if (destMatch2 && currentSessionIdRef.current) {
+              const autoTitle = destMatch2[0].slice(0, 20);
+              setChatSessions((prev) =>
+                prev.map((s) => s.id === targetSessionId ? { ...s, title: autoTitle } : s)
+              );
+            }
             setPhase("result");
             break;
           }
@@ -685,12 +788,26 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
 
   const handleSelectPlan = useCallback(
     async (planId: string) => {
+      console.info("[FeaturesPage] select plan clicked", { conversationId: conversationIdRef.current, selectedOptionId: planId });
       setSelectedPlanId(planId);
       setPhase("selected");
       apiTrackEvent({ eventName: "select_plan", payload: { planId, conversationId }, page: "features" }).catch(() => {});
 
       try {
         if (conversationIdRef.current) {
+          // Dedup: skip if already have a plan_selected message for this optionId
+          const existingSessionId = currentSessionIdRef.current;
+          if (existingSessionId) {
+            const currentMsgs = messagesBySessionRef.current.get(existingSessionId) ?? [];
+            const alreadySelected = currentMsgs.some(
+              (m) => m.kind === "plan_selected" && m.selectedOptionId === planId,
+            );
+            if (alreadySelected) {
+              console.info("[FeaturesPage] skip duplicate plan_selected", { conversationId: conversationIdRef.current, selectedOptionId: planId });
+              return;
+            }
+          }
+
           const result = await selectAgentPlan({
             conversationId: conversationIdRef.current,
             optionId: planId,
@@ -743,36 +860,70 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
   }, []);
 
   const handleSessionClick = useCallback(async (sessionId: string) => {
-    // Try to load from backend first
+    console.info("[FeaturesPage] click session", {
+      sessionId,
+      userId: user?.id,
+      currentSessionId: currentSessionIdRef.current,
+      conversationId: conversationIdRef.current,
+    });
+
+    // Try to load from backend first (DB messages)
     try {
       const detail = await getConversation(sessionId);
+      console.info("[FeaturesPage] getConversation result", {
+        sessionId,
+        messageCount: detail?.messages?.length,
+        title: detail?.title,
+        selectedOptionId: detail?.selectedOptionId,
+      });
+
       if (detail && detail.messages.length > 0) {
         const loadedMessages: ChatMessage[] = detail.messages.map((m) => {
-          const payload = m.payloadJson as Record<string, unknown> | undefined;
-          const payloadType = (payload?.type as string) ?? "text";
-          const metadata = payload?.metadata as Record<string, unknown> | undefined;
-          return {
-            id: m.id,
-            role: m.role as "user" | "assistant",
-            content: m.content,
-            createdAt: m.createdAt,
-            status: "done" as const,
-            kind: payloadType as ChatMessageKind,
-            metadata: metadata ? {
-              provider: metadata.provider as string | undefined,
-              model: metadata.model as string | undefined,
-              fallbackUsed: metadata.fallbackUsed as boolean | undefined,
-            } : undefined,
-            plans: payloadType === "plan" ? ((payload?.data as Record<string, unknown>)?.options as PlanningOption[]) ?? [] : undefined,
-            actions: payloadType === "plan" ? ((payload?.data as Record<string, unknown>)?.executableActions as PlanningExecutableAction[]) ?? [] : undefined,
-            chips: payloadType === "slot_question" ? ((payload?.missingSlots as string[]) ?? [])
-              : payloadType === "plan_selected" ? ((payload?.nextActions as NextActionItem[])?.map((a: NextActionItem) => a.label) ?? [])
-              : ((payload?.suggestions as string[]) ?? undefined),
-            nextActions: payloadType === "plan_selected" ? (payload?.nextActions as NextActionItem[]) : undefined,
-            selectedOptionId: payloadType === "plan_selected" ? (payload?.selectedOptionId as string) : undefined,
-            selectedPlanTitle: payloadType === "plan_selected" ? (payload?.selectedPlanTitle as string) : undefined,
-          };
+          try {
+            const payload = m.payloadJson as Record<string, unknown> | undefined;
+            const payloadType = (payload?.type as string) ?? "text";
+            const metadata = payload?.metadata as Record<string, unknown> | undefined;
+            return {
+              id: m.id,
+              role: m.role as "user" | "assistant",
+              content: m.content,
+              createdAt: m.createdAt,
+              status: "done" as const,
+              kind: payloadType as ChatMessageKind,
+              metadata: metadata ? {
+                provider: metadata.provider as string | undefined,
+                model: metadata.model as string | undefined,
+                fallbackUsed: metadata.fallbackUsed as boolean | undefined,
+              } : undefined,
+              plans: payloadType === "plan" ? ((payload?.data as Record<string, unknown>)?.options as PlanningOption[]) ?? [] : undefined,
+              actions: payloadType === "plan" ? ((payload?.data as Record<string, unknown>)?.executableActions as PlanningExecutableAction[]) ?? [] : undefined,
+              chips: payloadType === "slot_question" ? ((payload?.missingSlots as string[]) ?? [] as string[])
+                : payloadType === "plan_selected" ? ((payload?.nextActions as NextActionItem[])?.map((a: NextActionItem) => a.label) ?? [] as string[])
+                : ((payload?.suggestions as string[]) ?? undefined),
+              nextActions: payloadType === "plan_selected" ? (payload?.nextActions as NextActionItem[]) : undefined,
+              selectedOptionId: payloadType === "plan_selected" ? (payload?.selectedOptionId as string) : undefined,
+              selectedPlanTitle: payloadType === "plan_selected" ? (payload?.selectedPlanTitle as string) : undefined,
+            };
+          } catch (mapErr) {
+            // payloadJson parse error — degrade to plain text, never blank the whole conversation
+            console.warn("[FeaturesPage] payloadJson parse error, degrading to plain text", { messageId: m.id, error: String(mapErr) });
+            return {
+              id: m.id,
+              role: m.role as "user" | "assistant",
+              content: m.content,
+              createdAt: m.createdAt,
+              status: "done" as const,
+            };
+          }
         });
+
+        console.info("[FeaturesPage] loaded messages", {
+          sessionId,
+          loadedCount: loadedMessages.length,
+          firstMessage: loadedMessages[0]?.content,
+          lastMessage: loadedMessages.at(-1)?.content,
+        });
+
         setCurrentSessionId(sessionId);
         currentSessionIdRef.current = sessionId;
         setConversationId(sessionId);
@@ -780,6 +931,10 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
         setSessionMessages(sessionId, loadedMessages);
         setMode("chat");
         setPhase("result");
+        // Auto-scroll to latest message after restore
+        requestAnimationFrame(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        });
         // Restore selectedOptionId from conversation
         const selPayload = detail.messages.find((m) => {
           const p = m.payloadJson as Record<string, unknown> | undefined;
@@ -794,15 +949,22 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
         setInputValue("");
         return;
       }
-    } catch {
-      // fall through to localStorage
+    } catch (err) {
+      console.error("[FeaturesPage] getConversation failed", { sessionId, error: String(err) });
+      // Do NOT silently fall through for logged-in users — only fall to localStorage for guests
     }
 
-    // Fallback: localStorage sessions
+    // Fallback: localStorage sessions (mainly for guests)
+    if (user?.id) {
+      // For logged-in users, DB fetch failed or returned empty — log and stay in current view
+      console.warn("[FeaturesPage] DB fetch returned no messages for logged-in user, session:", sessionId);
+    }
     const session = chatSessions.find((s) => s.id === sessionId);
     if (!session) return;
     setCurrentSessionId(sessionId);
     currentSessionIdRef.current = sessionId;
+    setConversationId(sessionId);
+    conversationIdRef.current = sessionId;
     setSessionMessages(sessionId, session.messages);
     setMode("chat");
     const lastAssistant = [...session.messages].reverse().find((m) => m.role === "assistant");
@@ -815,6 +977,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     setInputValue("");
     requestAnimationFrame(() => textareaRef.current?.focus());
   }, [chatSessions, setSessionMessages]);
+
 
   /* ── Return to home ── */
   const handleReturnHome = useCallback(() => {

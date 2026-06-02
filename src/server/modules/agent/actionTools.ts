@@ -79,12 +79,16 @@ export const generateWeekendPlanToolDef = {
       properties: {
         city: { type: "string", description: "目的地城市" },
         origin: { type: "string", description: "出发地" },
+        destination: { type: "string", description: "具体目的地，如西湖、灵隐寺" },
         budget: { type: "number", description: "预算上限（元）" },
         partySize: { type: "number", description: "出行人数" },
         companions: { type: "string", description: "同行人类型，如 family/friends/couple/solo" },
         preference: { type: "string", description: "偏好描述" },
+        preferences: { type: "array", items: { type: "string" }, description: "多个偏好，如 [咖啡厅, 火锅, 午饭]" },
+        time: { type: "string", description: "具体时间，如明天上午9点" },
       },
       required: ["city"],
     },
   },
 };
+

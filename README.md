@@ -179,7 +179,7 @@ curl http://127.0.0.1:3001/api/auth/meituan/start
   "llm": {
     "configured": true,
     "provider": "mimo",
-    "model": "mimo-7b",
+    "model": "mimo-v2.5-pro",
     "mode": "llm"
   },
   "amap": { "configured": true },
@@ -399,7 +399,7 @@ docker run -d \
 ```bash
 curl -s http://localhost:3001/api/ready | jq '.llm'
 # 期望输出：
-# { "configured": true, "provider": "mimo", "model": "mimo-7b", "mode": "llm" }
+# { "configured": true, "provider": "mimo", "model": "mimo-v2.5-pro", "mode": "llm" }
 ```
 
 2. **设置 `LLM_PROVIDER_PRIORITY=mimo`**：确保 MiMo 优先级最高。

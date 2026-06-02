@@ -829,6 +829,8 @@ export interface MessageItem {
 export interface ConversationDetail extends ConversationItem {
   messages: MessageItem[];
   plans: Record<string, unknown>[];
+  selectedOptionId?: string | null;
+  agentStateJson?: Record<string, unknown> | null;
 }
 
 export async function createConversation(input?: {

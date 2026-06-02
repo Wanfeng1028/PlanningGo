@@ -28,6 +28,8 @@ export async function registerConversationRoutes(app: FastifyInstance) {
     const userId = optionalUid(request);
     const db: PrismaClient | null = app.db;
 
+    log.info({ route: "POST /api/conversations", userId, authenticated: Boolean(userId), title: body.title ?? null }, "[conversations:create] incoming");
+
     if (db) {
       try {
         const conv = await db.conversation.create({
@@ -67,12 +69,17 @@ export async function registerConversationRoutes(app: FastifyInstance) {
     const userId = optionalUid(request);
     const db: PrismaClient | null = app.db;
 
+    log.info({ route: "GET /api/conversations", userId, authenticated: Boolean(userId), limit: query.limit, guestId: query.guestId ?? null, db: db ? "connected" : "null" }, "[conversations:list] incoming");
+
     if (db) {
       try {
         const where: { userId?: string; guestId?: string } = {};
         if (userId) where.userId = userId;
         else if (query.guestId) where.guestId = query.guestId;
-        else return sendOk(reply, []);
+        else {
+          log.info(`[conversations:GET] No userId or guestId, returning empty`);
+          return sendOk(reply, []);
+        }
 
         const convs = await db.conversation.findMany({
           where,
@@ -80,7 +87,8 @@ export async function registerConversationRoutes(app: FastifyInstance) {
           take: query.limit,
           include: { _count: { select: { messages: true, plans: true } } },
         });
-        return sendOk(reply, convs);
+        log.info(`[conversations:GET] Found ${convs.length} conversations for userId=${userId ?? "ANON"}`);
+        log.info({ userId, count: convs.length, conversations: convs.map((c) => ({ id: c.id, title: c.title, userId: c.userId, updatedAt: c.updatedAt, messageCount: c._count?.messages })) }, "[conversations:list] result");
       } catch (err) {
         log.warn({ err }, "DB list conversations failed, falling back to memory");
       }
@@ -101,6 +109,14 @@ export async function registerConversationRoutes(app: FastifyInstance) {
     const guestId = userId ? null : ((request.query as Record<string, string | undefined>).guestId ?? null);
     const db: PrismaClient | null = app.db;
 
+
+    log.info({
+      route: "GET /api/conversations/:id",
+      userId: request.userId,
+      conversationId: id,
+      authenticated: Boolean(request.userId),
+    }, "[conversations:get] incoming");
+
     if (db) {
       try {
         const conv = await db.conversation.findUnique({
@@ -118,6 +134,12 @@ export async function registerConversationRoutes(app: FastifyInstance) {
         if (!conv.userId && conv.guestId && conv.guestId !== guestId) {
           return sendError(reply, 403, "FORBIDDEN", "无权访问此会话");
         }
+        log.info({
+          conversationId: conv?.id,
+          userId: conv?.userId,
+          messageCount: conv?.messages?.length ?? 0,
+          planCount: conv?.plans?.length ?? 0,
+        }, "[conversations:get] result");
         return sendOk(reply, conv);
       } catch (err) {
         log.warn({ err }, "DB get conversation failed, falling back to memory");

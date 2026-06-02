@@ -83,6 +83,16 @@ export function classifyAgentIntent(message: string, state?: AgentState | null):
     return "travel_question";
   }
 
+  // continuation — user says "生成完整方案/继续/就这个/安排吧" etc.
+  // If state already has planningDraft with info, treat as continuation (skip re-asking)
+  if (/生成.*方案|完整.*方案|继续|就这个|安排吧|帮我细化|重新规划|出.*方案|给.*方案|来.*方案/.test(trimmed)) {
+    const draft = state?.planningDraft;
+    if (draft && (draft.destination || draft.destinationCity || draft.origin || draft.budget)) {
+      return "continuation";
+    }
+    return "planning_request";
+  }
+
   // planning_request — explicit planning with enough info
   if (/安排|规划|计划|行程|帮我.*去|出发.*预算|带娃.*去|从.*出发|半天游|一日游|周末.*去/.test(trimmed)) {
     return "planning_request";
@@ -102,18 +112,38 @@ export function classifyAgentIntent(message: string, state?: AgentState | null):
   return "unknown";
 }
 
+// ─── Is Continuation Intent ─────────────────────────────────
+
+/** Check if the user's message is a continuation intent (generate/continue/arrange) */
+export function isContinuationIntent(message: string): boolean {
+  const trimmed = message.trim();
+  return /生成.*方案|完整.*方案|继续|就这个|安排吧|帮我细化|重新规划|出.*方案|给.*方案|来.*方案|可以了|够了|就这样/.test(trimmed);
+}
+
 // ─── Slot Extraction ────────────────────────────────────────
 
 export function extractPlanningSlots(message: string): PlanningSlots {
   const slots: PlanningSlots = {};
-  const normalized = message.replace(/[】\]）》〉」』】\u3000]/g, "").trim();
+  const normalized = message.replace(/[】\]）》〉」』\u3000]/g, "").trim();
 
   // origin
   const originMatch = normalized.match(/从(.+?)出发/) || normalized.match(/(.+?)出发/);
   if (originMatch) {
     const origin = originMatch[1].replace(/[，,。.！!？?、]/g, "").trim();
-    if (origin.length > 0 && origin.length < 20) {
+    if (origin.length > 0 && origin.length < 30) {
       slots.origin = origin;
+    }
+  }
+
+  // destination — "去西湖" / "去杭州西湖" / "目的地：西湖"
+  const destMatch = normalized.match(/去([^，,。.！!？?\s]{2,20})/) ||
+                    normalized.match(/目的地[：:]\s*(.+)/) ||
+                    normalized.match(/到([^，,。.！!？?\s]{2,20})/);
+  if (destMatch) {
+    const dest = destMatch[1].replace(/[，,。.！!？?、]/g, "").trim();
+    if (dest.length > 0 && dest.length < 30) {
+      slots.destination = dest;
+      slots.destinationCity = dest;
     }
   }
 
@@ -121,6 +151,11 @@ export function extractPlanningSlots(message: string): PlanningSlots {
   const budgetMatch = normalized.match(/预算\s*(\d+)/) || normalized.match(/(\d+)\s*[元块]/);
   if (budgetMatch) {
     slots.budget = Number(budgetMatch[1] ?? budgetMatch[2]);
+  }
+
+  // "预算我安排吧" — mark as flexible, don't set a number
+  if (/预算.*(我来|我安排|你安排|看着办|随意)/.test(normalized)) {
+    slots.budgetFlexible = true;
   }
 
   // partySize
@@ -153,44 +188,115 @@ export function extractPlanningSlots(message: string): PlanningSlots {
   else if (/明天/.test(normalized)) slots.date = "明天";
   else if (/下周/.test(normalized)) slots.date = "下周";
 
+  // time — extract specific time like "明天上午9点"
+  const timeMatch = normalized.match(/(明天|下周[一二三四五六日]?|周末|周[一二三四五六日])(上午|下午|晚上)?(\d{1,2}[点时:：]\d{0,2})?/) ||
+                    normalized.match(/(\d{1,2}[点时:：]\d{0,2})/);
+  if (timeMatch) {
+    const parts = [timeMatch[1], timeMatch[2], timeMatch[3]].filter(Boolean);
+    if (parts.length > 0) {
+      slots.time = parts.join("");
+    }
+  }
+
   // timeWindow
   if (/上午|早上/.test(normalized)) slots.timeWindow = "morning";
   else if (/下午/.test(normalized)) slots.timeWindow = "afternoon";
   else if (/晚上/.test(normalized)) slots.timeWindow = "evening";
   else if (/一天|整天/.test(normalized)) slots.timeWindow = "full_day";
 
-  // preferences
-  const preference: string[] = [];
-  if (/少排队|不要排队|排队少/.test(normalized)) preference.push("少排队");
-  if (/交通方便|地铁方便|好到达/.test(normalized)) preference.push("交通方便");
-  if (/室内|雨天|下雨/.test(normalized)) preference.push("室内优先");
-  if (/户外|公园|自然/.test(normalized)) preference.push("户外");
-  if (/少走|不要太累|轻松/.test(normalized)) preference.push("低负担");
-  if (preference.length) slots.preference = preference;
+  // preferences — extract specific items mentioned
+  const preferences: string[] = [];
+  if (/少排队|不要排队|排队少/.test(normalized)) preferences.push("少排队");
+  if (/交通方便|地铁方便|好到达/.test(normalized)) preferences.push("交通方便");
+  if (/室内|雨天|下雨/.test(normalized)) preferences.push("室内优先");
+  if (/户外|公园|自然/.test(normalized)) preferences.push("户外");
+  if (/少走|不要太累|轻松/.test(normalized)) preferences.push("低负担");
+  if (/咖啡|咖啡厅|cafe/.test(normalized)) preferences.push("咖啡厅");
+  if (/火锅/.test(normalized)) preferences.push("火锅");
+  if (/午饭|午餐|吃饭|吃午饭/.test(normalized)) preferences.push("午饭");
+  if (/晚饭|晚餐|吃晚饭/.test(normalized)) preferences.push("晚饭");
+  if (/拍照|摄影/.test(normalized)) preferences.push("拍照");
+  if (/看展|展览|博物馆/.test(normalized)) preferences.push("看展");
+  if (preferences.length) {
+    slots.preferences = preferences;
+    slots.preference = preferences; // backward compat
+  }
 
   return slots;
 }
+
+// ─── Slot Merge ─────────────────────────────────────────────
 
 export function mergeSlots(existing: PlanningSlots, incoming: PlanningSlots): PlanningSlots {
   const merged = { ...existing };
   for (const [key, value] of Object.entries(incoming)) {
     if (value !== undefined && value !== null && value !== "") {
-      if (key === "preference" && Array.isArray(value) && Array.isArray(merged.preference)) {
-        merged.preference = [...new Set([...merged.preference, ...value])];
+      // Array fields: merge and deduplicate
+      if ((key === "preference" || key === "preferences") && Array.isArray(value)) {
+        const existingArr = Array.isArray(merged.preference) ? merged.preference :
+                           Array.isArray(merged.preferences) ? merged.preferences : [];
+        const newArr = [...new Set([...existingArr, ...value])];
+        merged.preference = newArr;
+        merged.preferences = newArr;
+      } else if (key === "budgetFlexible") {
+        // budgetFlexible: only set true, never overwrite with false
+        if (value === true) merged.budgetFlexible = true;
       } else {
         (merged as Record<string, unknown>)[key] = value;
       }
     }
+  }
+  // Sync aliases
+  if (merged.destination && !merged.destinationCity) merged.destinationCity = merged.destination as string;
+  if (merged.destinationCity && !merged.destination) merged.destination = merged.destinationCity as string;
+  if (merged.preferences && !merged.preference) merged.preference = merged.preferences;
+  if (merged.preference && !merged.preferences) merged.preferences = merged.preference;
+  if (merged.time && !merged.date) {
+    // Extract date part from time like "明天上午9点" → date="明天"
+    const dateFromTime = (merged.time as string).match(/(明天|下周|周末|周[一二三四五六日])/);
+    if (dateFromTime) merged.date = dateFromTime[1];
   }
   return merged;
 }
 
 export function getMissingSlots(slots: PlanningSlots): PlanningSlotKey[] {
   const missing: PlanningSlotKey[] = [];
-  // Only companions/partySize is truly required for a basic plan.
-  // origin and budget can use defaults — don't block planning for them.
-  if (!slots.partySize && !slots.companions) missing.push("partySize");
+  // Very lenient: only require partySize/companions if nothing else is known.
+  // If user has provided destination or preferences, we have enough to plan.
+  const hasDestination = !!(slots.destination || slots.destinationCity);
+  const hasOrigin = !!slots.origin;
+  const hasBudget = !!slots.budget;
+  const hasParty = !!(slots.partySize || slots.companions);
+  const hasPrefs = !!(slots.preferences || slots.preference);
+
+  // If user has given us a destination and at least one other detail, we can plan
+  if (hasDestination && (hasOrigin || hasBudget || hasPrefs || hasParty)) {
+    return []; // enough info to generate a plan
+  }
+
+  // Otherwise only block on partySize/companions
+  if (!hasParty) missing.push("partySize");
   return missing;
+}
+
+// ─── Generate Conversation Title from Slots ─────────────────
+
+export function generateTitleFromSlots(slots: PlanningSlots): string | null {
+  const dest = String(slots.destination || slots.destinationCity || "").trim();
+  const prefs = slots.preferences || slots.preference;
+  const prefStr = Array.isArray(prefs) ? prefs.slice(0, 3).join("") : String(prefs || "");
+
+  if (dest && prefStr) {
+    return `${dest}${prefStr}游`;
+  }
+  if (dest) {
+    return `${dest}出行规划`;
+  }
+  const origin = String(slots.origin || "").trim();
+  if (origin && dest) {
+    return `${origin}到${dest}规划`;
+  }
+  return null;
 }
 
 // ─── Main Handler ───────────────────────────────────────────
@@ -253,6 +359,11 @@ export async function handleAgentMessage(
       response = replyActionConfirm(conversationId);
       break;
 
+    case "continuation":
+      // Continuation: use existing draft, don't re-ask
+      response = await handleContinuation(db, conversationId, input, state, providers, userId, log);
+      break;
+
     case "planning_request":
     case "slot_fill":
     case "modify_plan":
@@ -287,9 +398,9 @@ function replyIdentity(conversationId: string): AgentResponse {
 function replyCapabilities(conversationId: string): AgentResponse {
   const content =
     "我主要帮你规划本地出行，比如：\n\n" +
-    "“周末带娃半天，预算300” → 我帮你排路线\n" +
-    "“情侣约会，晚上，想拍照” → 推荐适合的去处\n" +
-    "“和朋友吃饭，别太贵” → 选地点 + 预估花费\n\n" +
+    '\u201c周末带娃半天，预算300\u201d → 我帮你排路线\n' +
+    '\u201c情侣约会，晚上，想拍照\u201d → 推荐适合的去处\n' +
+    '\u201c和朋友吃饭，别太贵\u201d → 选地点 + 预估花费\n\n' +
     "方案做好后还能帮你导航、写日历、分享给同行人。直接说需求就行！";
   return { type: "chat", content, conversationId };
 }
@@ -345,7 +456,6 @@ async function handlePlanSelectedByText(
 
   // No selected plan yet — check if there's a plan in state
   if (state?.lastPlanResult?.options?.length) {
-    // Try to parse which plan from the message
     const options = state.lastPlanResult.options as Array<{ id: string; title: string }>;
     let selected = options[0]; // default to first
 
@@ -357,7 +467,6 @@ async function handlePlanSelectedByText(
       selected = options[idx] ?? selected;
     }
 
-    // Also try "这/那" to select first or second
     if (/那套|那[个条]/.test(message) && options.length > 1) {
       selected = options[1];
     }
@@ -387,6 +496,39 @@ function replyActionConfirm(conversationId: string): AgentResponse {
   };
 }
 
+/** Handle continuation intent: user says "生成完整方案/继续/安排吧" etc. */
+async function handleContinuation(
+  db: PrismaClient | null,
+  conversationId: string,
+  input: AgentMessageInput,
+  state: AgentState | null,
+  providers: PlanningProviders | undefined,
+  userId: string | undefined,
+  log: HandlerContext["log"],
+): Promise<AgentResponse> {
+  const existingDraft = state?.planningDraft ?? {};
+
+  // Merge any new info from this message into the existing draft
+  const newSlots = extractPlanningSlots(input.message);
+  const mergedSlots = mergeSlots(existingDraft, newSlots);
+
+  log.info({
+    conversationId,
+    beforeDraft: existingDraft,
+    newSlots,
+    mergedDraft: mergedSlots,
+    intent: "continuation",
+  }, "[chatRouter] continuation draft merge");
+
+  // If we have enough info, go straight to plan generation
+  // Continuation intent NEVER re-asks — use defaults for anything missing
+  if (!mergedSlots.origin) mergedSlots.origin = "市中心";
+  if (!mergedSlots.budget && !mergedSlots.budgetFlexible) mergedSlots.budget = 300;
+  if (!mergedSlots.partySize && !mergedSlots.companions) mergedSlots.partySize = 1;
+
+  return generatePlanFromSlots(conversationId, input, mergedSlots, providers, userId, log);
+}
+
 async function handlePlanningIntent(
   db: PrismaClient | null,
   conversationId: string,
@@ -400,17 +542,30 @@ async function handlePlanningIntent(
   const newSlots = extractPlanningSlots(input.message);
   const mergedSlots = mergeSlots(state?.planningDraft ?? {}, newSlots);
 
+  log.info({
+    conversationId,
+    beforeDraft: state?.planningDraft,
+    newSlots,
+    mergedDraft: mergedSlots,
+    intent: "planning_request",
+  }, "[chatRouter] planning draft merge");
+
   // Check completeness — only ask when truly missing core info
   const missing = getMissingSlots(mergedSlots);
 
   if (missing.length > 0) {
-    // If we only need partySize/companions, ask concisely
     return askMissingSlots(conversationId, mergedSlots, missing);
   }
 
-  // Apply defaults for optional fields that are missing
+  // Apply defaults for optional fields that are missing — but NEVER override user budget
   if (!mergedSlots.origin) mergedSlots.origin = "市中心";
-  if (!mergedSlots.budget) mergedSlots.budget = 300;
+  // Only set budget default if user didn't specify one and didn't say "预算我安排吧"
+  if (!mergedSlots.budget && !mergedSlots.budgetFlexible) mergedSlots.budget = 300;
+
+  log.info({
+    conversationId,
+    finalSlotsUsedForPlan: mergedSlots,
+  }, "[chatRouter] generate plan slots");
 
   // Slots are complete — generate plan
   return generatePlanFromSlots(conversationId, input, mergedSlots, providers, userId, log);
@@ -423,16 +578,22 @@ function askMissingSlots(
 ): AgentResponse {
   const slotLabels: Record<PlanningSlotKey, string> = {
     origin: "从哪里出发",
+    destination: "去哪里",
     budget: "预算大概多少",
     partySize: "几个人、和谁一起去",
     date: "什么时候去",
+    time: "具体什么时间",
     timeWindow: "上午还是下午",
     preference: "有什么偏好",
+    preferences: "有什么偏好",
     companions: "和谁一起去",
   };
 
   // Only ask up to 2 questions to keep it conversational
-  const questions = missing.slice(0, 2).map((s) => slotLabels[s]).join("？");
+  const questions = missing
+    .slice(0, 2)
+    .map((k) => slotLabels[k] ?? k)
+    .join("、");
   const suffix = missing.length > 2 ? "，其他我来安排" : "";
   const content = `好的！${questions}？${suffix}`;
 
@@ -456,9 +617,26 @@ async function generatePlanFromSlots(
   try {
     const companions = (slots.companions as "family" | "friends" | "couple" | "solo") ?? undefined;
 
+    // Build a rich prompt that includes all slot info so the planner has full context
+    const slotSummary: string[] = [];
+    if (slots.destination || slots.destinationCity) slotSummary.push(`目的地：${slots.destination || slots.destinationCity}`);
+    if (slots.origin) slotSummary.push(`出发地：${slots.origin}`);
+    if (slots.time) slotSummary.push(`时间：${slots.time}`);
+    if (slots.date && !slots.time) slotSummary.push(`日期：${slots.date}`);
+    if (slots.timeWindow) slotSummary.push(`时段：${slots.timeWindow}`);
+    if (slots.partySize) slotSummary.push(`人数：${slots.partySize}人`);
+    if (slots.companions) slotSummary.push(`同行人：${slots.companions}`);
+    if (slots.budget) slotSummary.push(`预算：${slots.budget}元`);
+    const prefs = slots.preferences || slots.preference;
+    if (prefs) slotSummary.push(`偏好：${Array.isArray(prefs) ? prefs.join("、") : prefs}`);
+
+    const enrichedPrompt = slotSummary.length > 0
+      ? `${input.message}\n\n[规划信息] ${slotSummary.join("；")}`
+      : input.message;
+
     const result = await runPlanningPipeline({
-      prompt: input.message,
-      city: input.city ?? (typeof slots.origin === "string" ? slots.origin : undefined) ?? "北京",
+      prompt: enrichedPrompt,
+      city: input.city ?? (typeof (slots.destination || slots.origin) === "string" ? (slots.destination as string) || (slots.origin as string) : undefined) ?? "北京",
       startPoint: typeof slots.origin === "string" ? slots.origin : undefined,
       companions,
       budget: typeof slots.budget === "number" ? slots.budget : undefined,
@@ -484,18 +662,15 @@ async function generatePlanFromSlots(
 
     if (message.startsWith("MISSING_REQUIRED_SLOTS:")) {
       const missingKeys = message.replace("MISSING_REQUIRED_SLOTS:", "").split(",") as PlanningSlotKey[];
-      // Don't block — try again with defaults applied
       const withDefaults = { ...slots };
       for (const key of missingKeys) {
         if (key === "origin" && !withDefaults.origin) withDefaults.origin = "市中心";
         if (key === "budget" && !withDefaults.budget) withDefaults.budget = 300;
         if (key === "partySize" && !withDefaults.partySize && !withDefaults.companions) withDefaults.partySize = 2;
       }
-      // If we already had defaults and it still failed, ask user
       if (missingKeys.every((k) => withDefaults[k])) {
         return askMissingSlots(conversationId, slots, missingKeys);
       }
-      // Otherwise retry with defaults
       return generatePlanFromSlots(conversationId, input, withDefaults, providers, userId, log);
     }
 
@@ -531,6 +706,7 @@ function computeNewState(prev: AgentState | null | undefined, response: AgentRes
       return {
         ...base,
         phase: "plan_generated",
+        planningDraft: prev?.planningDraft, // preserve draft
         lastPlanResult: {
           planId: response.data.planId,
           options: response.data.options,
@@ -574,9 +750,18 @@ async function ensureConversation(
           where: { id: input.conversationId },
           select: { id: true },
         });
-        if (existing) return input.conversationId;
-      } catch {
-        log.warn("[chatRouter] Failed to verify conversationId");
+        if (existing) {
+          log.info(`[chatRouter] ensureConversation FOUND conv=${input.conversationId}`);
+          return input.conversationId;
+        }
+        log.warn(`[chatRouter] ensureConversation NOT FOUND in DB conv=${input.conversationId}, checking memory`);
+        const memConv = mem.getConversation(input.conversationId);
+        if (memConv) {
+          log.info(`[chatRouter] ensureConversation FOUND in MEMORY conv=${input.conversationId}`);
+          return input.conversationId;
+        }
+      } catch (err) {
+        log.error({ err }, "[chatRouter] Failed to verify conversationId");
       }
     } else {
       const existing = mem.getConversation(input.conversationId);
@@ -596,6 +781,7 @@ async function ensureConversation(
           modelMode: (input.modelMode as "flash" | "pro") ?? "flash",
         },
       });
+      log.info(`[chatRouter] ensureConversation CREATED DB conv=${conv.id} userId=${userId ?? "null"}`);
       return conv.id;
     } catch (err) {
       log.error({ err }, "[chatRouter] Failed to create conversation in DB");
@@ -629,7 +815,6 @@ async function loadAgentState(
       log.warn("[chatRouter] Failed to load agent state from DB");
     }
   }
-  // Memory store fallback — state stored in memory is not persisted across restarts
   return null;
 }
 
@@ -646,10 +831,11 @@ async function saveAgentState(
         data: {
           agentStateJson: state as any,
           selectedOptionId: state.selectedOptionId ?? null,
+          updatedAt: new Date(),
         },
       });
-    } catch {
-      log.warn("[chatRouter] Failed to save agent state to DB");
+    } catch (err) {
+      log.error({ err }, `[chatRouter] saveAgentState FAILED conv=${conversationId}`);
     }
   }
 }
@@ -664,13 +850,21 @@ async function saveMsg(
 ): Promise<void> {
   if (db) {
     try {
-      await db.message.create({
+      const msg = await db.message.create({
         data: { conversationId, role, content, payloadJson: payloadJson as any },
       });
-    } catch {
-      log?.warn("[chatRouter] Failed to save message to DB");
+      log?.info(`[chatRouter] saveMsg OK id=${msg.id} role=${role} conv=${conversationId}`);
+      try {
+        await db.conversation.update({
+          where: { id: conversationId },
+          data: { updatedAt: new Date() },
+        });
+      } catch { /* non-critical */ }
+      return;
+    } catch (err) {
+      log?.error({ err }, `[chatRouter] saveMsg DB FAILED role=${role} conv=${conversationId}, falling back to memory`);
     }
-  } else {
-    mem.addMessage({ conversationId, role, content, payloadJson });
   }
+  mem.addMessage({ conversationId, role, content, payloadJson });
+  log?.info(`[chatRouter] saveMsg MEMORY fallback role=${role} conv=${conversationId}`);
 }

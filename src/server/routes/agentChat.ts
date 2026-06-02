@@ -53,6 +53,8 @@ export async function registerAgentChatRoutes(app: FastifyInstance) {
         const userId = request.userId;
         const db: PrismaClient | null = app.db;
 
+        app.log.info({ route: "POST /api/agent/chat/stream", userId: userId ?? null, authenticated: Boolean(userId), conversationId: parsed.conversationId ?? null, method: "POST" }, "[agentChat:stream] incoming");
+
         // SSE headers (use raw.setHeader for reliable delivery with reply.raw.write)
         reply.raw.setHeader("Content-Type", "text/event-stream");
         reply.raw.setHeader("Cache-Control", "no-cache");
@@ -200,6 +202,8 @@ export async function registerAgentChatRoutes(app: FastifyInstance) {
         const userId = request.userId;
         const db: PrismaClient | null = app.db;
 
+        app.log.info({ route: "POST /api/agent/chat", userId: userId ?? null, authenticated: Boolean(userId), conversationId: parsed.conversationId ?? null, method: "POST" }, "[agentChat:chat] incoming");
+
         const agentResponse = await handleAgentMessage(
           {
             message: parsed.message,
@@ -231,6 +235,8 @@ export async function registerAgentChatRoutes(app: FastifyInstance) {
     async (request, reply) => {
       try {
         const parsed = planSelectBodySchema.parse(request.body);
+
+        app.log.info({ route: "POST /api/agent/plans/select", userId: request.userId ?? null, authenticated: Boolean(request.userId), conversationId: parsed.conversationId, optionId: parsed.optionId, method: "POST" }, "[agentChat:planSelect] incoming");
         const db: PrismaClient | null = app.db;
 
         // Verify conversation exists
@@ -240,7 +246,7 @@ export async function registerAgentChatRoutes(app: FastifyInstance) {
         if (db) {
           const conv = await db.conversation.findUnique({
             where: { id: parsed.conversationId },
-            select: { id: true, agentStateJson: true },
+            select: { id: true, agentStateJson: true, selectedOptionId: true },
           });
           conversationExists = !!conv;
 
@@ -252,6 +258,34 @@ export async function registerAgentChatRoutes(app: FastifyInstance) {
               const found = lastPlan.options.find((o) => o.id === parsed.optionId);
               if (found) selectedPlanTitle = found.title;
             }
+          }
+
+          // Dedup: check if already selected same option
+          const alreadySelected = conv?.selectedOptionId === parsed.optionId;
+          app.log.info({
+            conversationId: parsed.conversationId,
+            selectedOptionId: parsed.optionId,
+            alreadySelected,
+          }, "[agentChat:select] select plan");
+
+          if (alreadySelected) {
+            // Return existing selection without saving duplicate message
+            const nextActions = [
+              { key: "save", label: "\u4fdd\u5b58\u65b9\u6848" },
+              { key: "navigation", label: "\u6253\u5f00\u5bfc\u822a" },
+              { key: "calendar", label: "\u751f\u6210\u65e5\u5386" },
+              { key: "share", label: "\u5206\u4eab\u7ed9\u540c\u884c\u4eba" },
+              { key: "reservation", label: "\u67e5\u770b\u9884\u7ea6\u5efa\u8bae" },
+              { key: "modify", label: "\u7ee7\u7eed\u8c03\u6574" },
+            ];
+            return {
+              type: "plan_selected",
+              content: `\u5df2\u9009\u4e2d\u300c${selectedPlanTitle}\u300d\u3002\u4e0b\u4e00\u6b65\u4f60\u53ef\u4ee5\uff1a`,
+              selectedOptionId: parsed.optionId,
+              selectedPlanTitle,
+              nextActions,
+              conversationId: parsed.conversationId,
+            } satisfies AgentResponse;
           }
         } else {
           conversationExists = !!mem.getConversation(parsed.conversationId);
@@ -305,16 +339,32 @@ export async function registerAgentChatRoutes(app: FastifyInstance) {
           conversationId: parsed.conversationId,
         };
 
-        // Save assistant message
+        // Save assistant message (dedup check)
         if (db) {
-          await db.message.create({
+          // Check if a plan_selected message with this optionId already exists
+          const existingMsg = await db.message.findFirst({
+            where: {
+              conversationId: parsed.conversationId,
+              role: "assistant",
+              payloadJson: { path: ["selectedOptionId"], equals: parsed.optionId },
+            },
+          });
+
+          if (existingMsg) {
+            app.log.info({
+              conversationId: parsed.conversationId,
+              selectedOptionId: parsed.optionId,
+            }, "[agentChat:select] skip duplicate plan_selected message");
+          } else {
+            await db.message.create({
             data: {
               conversationId: parsed.conversationId,
               role: "assistant",
               content,
               payloadJson: { type: "plan_selected", selectedOptionId: parsed.optionId, selectedPlanTitle, nextActions },
             },
-          });
+            });
+          }
         } else {
           mem.addMessage({
             conversationId: parsed.conversationId,
@@ -335,4 +385,5 @@ export async function registerAgentChatRoutes(app: FastifyInstance) {
     },
   );
 }
+
 

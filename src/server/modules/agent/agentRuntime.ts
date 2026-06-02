@@ -17,7 +17,7 @@ import { chatStream, getChatModel } from "./modelClient.js";
 import { buildSystemPrompt } from "./prompts.js";
 import { AGENT_TOOLS, executeToolCall, type ToolCallContext } from "./tools.js";
 import { runPlanningPipeline } from "./orchestrator.js";
-import { extractPlanningSlots, getMissingSlots } from "./chatRouter.js";
+import { extractPlanningSlots, getMissingSlots, isContinuationIntent, generateTitleFromSlots, mergeSlots } from "./chatRouter.js";
 import * as mem from "../../services/memoryStore.js";
 
 // ─── Constants ──────────────────────────────────────────────
@@ -71,11 +71,29 @@ export async function runAgentChatStream(
   // 4. Load recent conversation history
   const history = await loadHistory(db, conversationId, log);
 
-  // 5. Build messages array
+  // ── Required logging ──
+  log.info({
+    route: "/api/agent/chat/stream",
+    userId,
+    conversationId,
+    message: input.message,
+  }, "[agent] incoming message");
+
+  log.info({
+    conversationId,
+    loadedHistoryCount: history.length,
+    lastMessages: history.slice(-5).map((m) => ({
+      role: m.role,
+      content: m.content,
+    })),
+  }, "[agent] loaded history");
+
+  // 5. Build messages array — include planningDraft in system prompt
   const modelInfo = getChatModel(input.modelMode);
   const systemPrompt = buildSystemPrompt({
     city: input.city,
     currentTime: new Date().toISOString(),
+    agentState: state ? { phase: state.phase, planningDraft: state.planningDraft as Record<string, unknown> | undefined } : undefined,
   });
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
@@ -173,9 +191,6 @@ export async function runAgentChatStream(
           shouldGeneratePlan = true;
           planParams = (sideEffect.result as Record<string, unknown>) ?? {};
         }
-        if (sideEffect?.shouldConfirmAction) {
-          // Will handle after the loop
-        }
 
         messages.push({
           role: "tool" as const,
@@ -193,19 +208,74 @@ export async function runAgentChatStream(
     }
   }
 
+  // ── Log draft merge ──
+  const newSlots = extractPlanningSlots(input.message);
+  const mergedDraft = currentDraft ? mergeSlots(currentDraft, newSlots) : (Object.keys(newSlots).length > 0 ? newSlots : currentDraft);
+  const missingSlots = mergedDraft ? getMissingSlots(mergedDraft) : [];
+  const intent = isContinuationIntent(input.message) ? "continuation" : "normal";
+
+  log.info({
+    conversationId,
+    beforeDraft: state?.planningDraft,
+    newSlots,
+    mergedDraft,
+    missingSlots,
+    intent,
+  }, "[agent] planning draft merge");
+
   // 7. If plan generation was requested, run the planning pipeline
   let planResponse: AgentResponse | null = null;
   if (shouldGeneratePlan) {
     try {
       const params = planParams ?? {};
+
+      // ── CRITICAL: Merge draft INTO planParams, draft takes precedence for user values ──
+      // The LLM's tool call params may be incomplete or wrong; the draft is the source of truth
+      const effectiveDraft = currentDraft ?? {};
       const city = (params.city as string) ?? input.city ?? "北京";
-      const origin = (params.origin as string) ?? currentDraft?.origin ?? "未知出发地";
-      const budget = (params.budget as number) ?? (typeof currentDraft?.budget === "number" ? currentDraft.budget : undefined);
-      const partySize = (params.partySize as number) ?? (typeof currentDraft?.partySize === "number" ? currentDraft.partySize : undefined);
-      const companions = (params.companions as string) ?? (typeof currentDraft?.companions === "string" ? currentDraft.companions : undefined);
+      const origin = (typeof effectiveDraft.origin === "string" ? effectiveDraft.origin : undefined)
+        ?? (params.origin as string) ?? "未知出发地";
+      // Budget: ALWAYS prefer draft (user's explicit value), never let LLM override
+      const budget = (typeof effectiveDraft.budget === "number" ? effectiveDraft.budget : undefined)
+        ?? (params.budget as number);
+      const partySize = (typeof effectiveDraft.partySize === "number" ? effectiveDraft.partySize : undefined)
+        ?? (params.partySize as number);
+      const companions = (typeof effectiveDraft.companions === "string" ? effectiveDraft.companions : undefined)
+        ?? (params.companions as string);
+      const destination = (typeof effectiveDraft.destination === "string" ? effectiveDraft.destination : undefined)
+        ?? (typeof effectiveDraft.destinationCity === "string" ? effectiveDraft.destinationCity : undefined)
+        ?? (params.city as string);
+
+      // Build enriched prompt with all slot info
+      const slotSummary: string[] = [];
+      if (destination) slotSummary.push(`目的地：${destination}`);
+      if (origin) slotSummary.push(`出发地：${origin}`);
+      if (effectiveDraft.time) slotSummary.push(`时间：${effectiveDraft.time}`);
+      if (effectiveDraft.date) slotSummary.push(`日期：${effectiveDraft.date}`);
+      if (effectiveDraft.timeWindow) slotSummary.push(`时段：${effectiveDraft.timeWindow}`);
+      if (partySize) slotSummary.push(`人数：${partySize}人`);
+      if (companions) slotSummary.push(`同行人：${companions}`);
+      if (budget) slotSummary.push(`预算：${budget}元`);
+      const prefs = effectiveDraft.preferences || effectiveDraft.preference;
+      if (prefs) slotSummary.push(`偏好：${Array.isArray(prefs) ? prefs.join("、") : prefs}`);
+      if (effectiveDraft.budgetFlexible) slotSummary.push(`预算灵活`);
+
+      const enrichedPrompt = slotSummary.length > 0
+        ? `${input.message}\n\n[已收集的规划信息] ${slotSummary.join("；")}`
+        : input.message;
+
+      log.info({
+        conversationId,
+        finalSlotsUsedForPlan: {
+          city, origin, budget, partySize, companions, destination,
+          time: effectiveDraft.time, date: effectiveDraft.date,
+          preferences: effectiveDraft.preferences || effectiveDraft.preference,
+          budgetFlexible: effectiveDraft.budgetFlexible,
+        },
+      }, "[agent] generate plan slots");
 
       const pipelineResult = await runPlanningPipeline({
-        prompt: input.message,
+        prompt: enrichedPrompt,
         city,
         startPoint: origin,
         budget,
@@ -216,7 +286,6 @@ export async function runAgentChatStream(
       });
 
       if (pipelineResult.responseType === "chat" || !pipelineResult.options || pipelineResult.options.length === 0) {
-        // Pipeline returned a chat response (not a plan)
         planResponse = {
           type: "chat",
           content: pipelineResult.summary || "你好！请告诉我更多出行信息，我来帮你规划。",
@@ -244,7 +313,6 @@ export async function runAgentChatStream(
       }
     } catch (err) {
       log.error({ err }, "[agentRuntime] Planning pipeline failed");
-      // If planning fails, return a friendly error
       if (!finalContent) {
         finalContent = "抱歉，生成方案时遇到了问题，请稍后重试或补充更多信息。";
         stream.writeText(finalContent);
@@ -263,12 +331,10 @@ export async function runAgentChatStream(
   if (planResponse) {
     agentResponse = planResponse;
   } else if (!finalContent) {
-    // LLM returned no content (edge case)
     finalContent = "我没有理解你的意思，能再说一次吗？";
     stream.writeText(finalContent);
     agentResponse = { type: "chat", content: finalContent, conversationId };
   } else {
-    // Determine the response type based on content and state
     agentResponse = classifyResponse(finalContent, currentDraft, state, conversationId);
   }
 
@@ -277,9 +343,18 @@ export async function runAgentChatStream(
   const payloadJson = { ...responsePayload, content: finalContent };
   await saveMsg(db, conversationId, "assistant", finalContent, payloadJson, log);
 
-  // 10. Update agent state
+  // 10. Update agent state (preserve draft across turns)
   const newState = computeAgentState(state, agentResponse, currentDraft);
   await saveAgentState(db, conversationId, newState, log);
+
+  // 11. Update conversation title if we have planning info
+  const titleSlots = currentDraft ?? (Object.keys(newSlots).length > 0 ? newSlots : undefined);
+  if (titleSlots) {
+    const newTitle = generateTitleFromSlots(titleSlots);
+    if (newTitle) {
+      await updateConversationTitle(db, conversationId, newTitle, log);
+    }
+  }
 
   return agentResponse;
 }
@@ -294,7 +369,6 @@ function classifyResponse(
 ): AgentResponse {
   const missing = draft ? getMissingSlots(draft) : [];
 
-  // If there are missing slots and the content seems to be asking about them
   if (missing.length > 0 && (
     /请问|告诉我|出发|预算|几个人|什么时候|哪天|喜欢/.test(content) ||
     state?.phase === "collecting_slots"
@@ -308,7 +382,6 @@ function classifyResponse(
     };
   }
 
-  // Default to chat
   return { type: "chat", content, conversationId };
 }
 
@@ -330,7 +403,7 @@ function computeAgentState(
       return {
         ...base,
         phase: "plan_generated",
-        planningDraft: draft,
+        planningDraft: draft, // preserve draft after plan generation
         lastPlanResult: {
           planId: response.data.planId,
           options: response.data.options,
@@ -347,21 +420,18 @@ function computeAgentState(
     case "error":
       return { ...base, lastAssistantType: "error" };
     default:
-      return { ...base, planningDraft: draft };
+      return base;
   }
 }
 
-// ─── DB Helpers (reused from chatRouter patterns) ───────────
+// ─── DB Helpers ─────────────────────────────────────────────
 
-interface HistoryMessage {
-  role: string;
-  content: string;
-}
+type HistoryMessage = { role: string; content: string };
 
 async function ensureConversation(
   db: PrismaClient | null,
   userId: string | undefined,
-  input: AgentMessageInput,
+  input: AgentChatInput,
   log: AgentChatContext["log"],
 ): Promise<string> {
   if (input.conversationId) {
@@ -371,9 +441,17 @@ async function ensureConversation(
           where: { id: input.conversationId },
           select: { id: true },
         });
-        if (existing) return input.conversationId;
-      } catch {
-        log.warn("[agentRuntime] Failed to verify conversationId");
+        if (existing) {
+          log.info(`[agentRuntime] ensureConversation FOUND conv=${input.conversationId}`);
+          return input.conversationId;
+        }
+        const memConv = mem.getConversation(input.conversationId);
+        if (memConv) {
+          log.info(`[agentRuntime] ensureConversation FOUND in MEMORY conv=${input.conversationId}`);
+          return input.conversationId;
+        }
+      } catch (err) {
+        log.error({ err }, "[agentRuntime] Failed to verify conversationId");
       }
     } else {
       const existing = mem.getConversation(input.conversationId);
@@ -393,9 +471,10 @@ async function ensureConversation(
           modelMode: (input.modelMode as "flash" | "pro") ?? "flash",
         },
       });
+      log.info(`[agentRuntime] ensureConversation CREATED DB conv=${conv.id} userId=${userId ?? "null"}`);
       return conv.id;
     } catch (err) {
-      log.error({ err }, "[agentRuntime] Failed to create conversation in DB");
+      log.error({ err }, "[agentRuntime] Failed to create conversation in DB, falling back to memory");
     }
   }
 
@@ -405,6 +484,7 @@ async function ensureConversation(
     city: input.city,
     modelMode: input.modelMode,
   });
+  log.info(`[agentRuntime] ensureConversation CREATED MEM conv=${conv.id} userId=${userId ?? "null"}`);
   return conv.id;
 }
 
@@ -442,12 +522,35 @@ async function saveAgentState(
         data: {
           agentStateJson: state as any,
           selectedOptionId: state.selectedOptionId ?? null,
+          updatedAt: new Date(),
         },
       });
-    } catch {
-      log.warn("[agentRuntime] Failed to save agent state to DB");
+      log.info(`[agentRuntime] saveAgentState OK conv=${conversationId} phase=${state.phase}`);
+    } catch (err) {
+      log.error({ err }, `[agentRuntime] saveAgentState FAILED conv=${conversationId}`);
     }
   }
+}
+
+async function updateConversationTitle(
+  db: PrismaClient | null,
+  conversationId: string,
+  title: string,
+  log: AgentChatContext["log"],
+): Promise<void> {
+  if (db) {
+    try {
+      await db.conversation.update({
+        where: { id: conversationId },
+        data: { title },
+      });
+      log.info(`[agentRuntime] updateTitle OK conv=${conversationId} title=${title}`);
+    } catch (err) {
+      log.warn({ err }, `[agentRuntime] updateTitle FAILED conv=${conversationId}`);
+    }
+  }
+  // Also update memory store
+  mem.updateConversationTitle?.(conversationId, title);
 }
 
 async function saveMsg(
@@ -460,15 +563,23 @@ async function saveMsg(
 ): Promise<void> {
   if (db) {
     try {
-      await db.message.create({
+      const msg = await db.message.create({
         data: { conversationId, role, content, payloadJson: payloadJson as any },
       });
-    } catch {
-      log?.warn("[agentRuntime] Failed to save message to DB");
+      log?.info(`[agentRuntime] saveMsg OK id=${msg.id} role=${role} conv=${conversationId}`);
+      try {
+        await db.conversation.update({
+          where: { id: conversationId },
+          data: { updatedAt: new Date() },
+        });
+      } catch { /* non-critical */ }
+      return;
+    } catch (err) {
+      log?.error({ err }, `[agentRuntime] saveMsg DB FAILED role=${role} conv=${conversationId}, falling back to memory`);
     }
-  } else {
-    mem.addMessage({ conversationId, role, content, payloadJson });
   }
+  mem.addMessage({ conversationId, role, content, payloadJson });
+  log?.info(`[agentRuntime] saveMsg MEMORY fallback role=${role} conv=${conversationId}`);
 }
 
 async function loadHistory(
@@ -480,17 +591,16 @@ async function loadHistory(
     try {
       const msgs = await db.message.findMany({
         where: { conversationId },
-        orderBy: { createdAt: "asc" },
+        orderBy: { createdAt: "desc" },
         take: MAX_HISTORY_MESSAGES,
         select: { role: true, content: true },
       });
-      return msgs;
+      return msgs.reverse();
     } catch {
       log.warn("[agentRuntime] Failed to load history from DB");
     }
   }
 
-  // Memory store fallback
   const memMsgs = mem.listMessages(conversationId);
   return memMsgs.slice(-MAX_HISTORY_MESSAGES).map((m: { role: string; content: string }) => ({
     role: m.role,

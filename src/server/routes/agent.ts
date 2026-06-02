@@ -130,10 +130,11 @@ export async function registerAgentRoutes(app: FastifyInstance) {
   ): Promise<void> {
     if (db) {
       try {
-        await db.message.create({
+        const msg = await db.message.create({
           data: { conversationId, role, content, payloadJson: payloadJson ?? undefined },
         });
         await db.conversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
+        log?.info(`[agent] saveMessage OK id=${msg.id} role=${role} conv=${conversationId}`);
         return;
       } catch (err) {
         log?.error({ err, conversationId }, "Failed to save message to DB, falling back to memory");
@@ -177,6 +178,8 @@ export async function registerAgentRoutes(app: FastifyInstance) {
         const parsed = agentPlanBodySchema.parse(request.body);
         const userId = request.userId;
         const db: PrismaClient | null = app.db;
+
+        app.log.info({ route: "POST /api/agent/plan", userId: userId ?? null, authenticated: Boolean(userId), conversationId: parsed.conversationId ?? null, method: "POST" }, "[agent:plan] incoming");
 
         // ── 1. 创建或获取会话 ──
         const conversationId = await ensureConversation(db, userId, {
@@ -253,6 +256,8 @@ export async function registerAgentRoutes(app: FastifyInstance) {
         const parsed = agentPlanBodySchema.parse(request.body);
         const userId = request.userId;
         const db: PrismaClient | null = app.db;
+
+        app.log.info({ route: "POST /api/agent/plan/stream", userId: userId ?? null, authenticated: Boolean(userId), conversationId: parsed.conversationId ?? null, method: "POST" }, "[agent:plan:stream] incoming");
 
         // Set SSE headers (use raw.setHeader for reliable delivery with reply.raw.write)
         reply.raw.setHeader("Content-Type", "text/event-stream");

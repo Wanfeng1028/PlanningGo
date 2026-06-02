@@ -50,6 +50,33 @@ const TOOL_CALLING_PROMPT = `你是"周末去哪儿"，一个懂本地生活和�
 3. **generate_weekend_plan** — 当信息足够时，生成完整的周末行程方案
 4. **prepare_action** — 准备执行动作（导航、预约、日历等），等待用户确认
 
+## 多轮上下文与续接意图
+
+### 关键规则：续接必须使用已有上下文
+当用户说以下类似的话时，你必须识别为"续接意图"，直接使用对话历史中已有的规划信息（planningDraft/slots）来生成方案，绝不允许重新追问已经收集过的信息：
+- "生成完整的方案" / "继续" / "就这个" / "安排吧" / "帮我细化" / "重新规划一下" / "出方案" / "可以了" / "够了" / "就这样"
+
+### 续接判断标准
+如果对话历史中已经包含以下任意信息，就视为信息已收集：
+- destination（目的地）
+- origin（出发地）
+- time / date（时间）
+- partySize / companions（人数/同行人）
+- preferences（偏好）
+- budget（预算）
+
+当用户触发续接意图且已有足够信息时，直接调用 generate_weekend_plan 生成方案，不要重复追问。
+
+### 如果信息明显不足
+只有当对话中完全没有规划相关信息时，才需要追问。追问时最多问 2 个最关键的问题。
+
+## 多轮对话上下文规则
+- 对话历史已经包含在消息中，请仔细阅读之前的消息
+- 如果用户之前已经提供了出发地、目的地、时间、预算、同行人等信息，在后续轮次中不要重复追问
+- 短句如「生成完整方案」「继续」「就这个」「安排吧」「帮我细化」「重新规划」等，必须结合上文已有信息理解
+- 只有当确实缺少必要信息且上下文中也没有时，才追问
+- 生成方案时，必须基于用户之前提供的所有信息，不要忽略之前的对话
+
 ## 约束
 - 你不会自动替用户下单或付款，涉及支付的动作必须明确告知并等待确认
 - 所有推荐的地点必须来自真实数据，不要编造不存在的地点
@@ -112,6 +139,13 @@ const TEXT_PLANNING_PROMPT = `你是"周末去哪儿"，一个懂本地生活和
 8. **雨天备选**：如果天气不好可以怎么调整
 9. **下一步行动**：用户可以做什么（如"选这套我帮你查具体营业时间"）
 
+### 多轮对话上下文规则
+- 对话历史已经包含在消息中，请仔细阅读之前的消息
+- 如果用户之前已提供出发地、目的地、时间、预算、同行人等信息，后续轮次不要重复追问
+- 短句如「生成完整方案」「继续」「就这个」「安排吧」等，必须结合上文已有信息理解
+- 只有当确实缺少必要信息时才追问
+- 生成方案时必须基于用户之前提供的所有信息
+
 ### 格式要求
 - 用 markdown 格式输出，层次清晰
 - 时间线用表格或列表
@@ -131,6 +165,7 @@ export interface SystemPromptContext {
   currentTime?: string;
   weather?: string;
   toolCallingEnabled?: boolean;
+  agentState?: { phase?: string; planningDraft?: Record<string, unknown> };
 }
 
 /**
@@ -145,6 +180,8 @@ export function buildSystemPrompt(context?: SystemPromptContext): string {
     if (context.city) extras.push(`用户当前城市：${context.city}`);
     if (context.currentTime) extras.push(`当前时间：${context.currentTime}`);
     if (context.weather) extras.push(`天气：${context.weather}`);
+    if (context.agentState) extras.push(`当前阶段：${context.agentState.phase ?? "idle"}`);
+    if (context.agentState?.planningDraft) extras.push(`已收集的规划信息：${JSON.stringify(context.agentState.planningDraft)}`);
     if (extras.length > 0) {
       prompt += `\n\n## 当前上下文\n${extras.join("\n")}`;
     }

@@ -18,21 +18,26 @@ export type AgentIntent =
   | "select_plan"
   | "execute_action"
   | "modify_plan"
+  | "continuation"
   | "unknown";
 
 // ─── Planning Slots ─────────────────────────────────────────
 
 export type PlanningSlotKey =
   | "origin"
+  | "destination"
   | "budget"
   | "partySize"
   | "date"
+  | "time"
   | "timeWindow"
   | "preference"
+  | "preferences"
   | "companions";
 
 export type PlanningSlots = Partial<Record<PlanningSlotKey, string | number | string[]>> & {
   destinationCity?: string;
+  budgetFlexible?: boolean;
 };
 
 // ─── Next Action & Pending Action ───────────────────────────
