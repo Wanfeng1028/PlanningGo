@@ -5,8 +5,7 @@
 import type { FastifyInstance } from "fastify";
 import type { PrismaClient } from "../../generated/prisma/client.js";
 import { z } from "zod";
-import { sendOk, sendCreated,  sendError } from "../common/response.js";
-import {  } from "../common/errors.js";
+import { sendOk, sendCreated, sendError } from "../common/response.js";
 import * as mem from "../services/memoryStore.js";
 import { optionalUserId } from "../common/uid.js";
 
@@ -87,8 +86,8 @@ export async function registerConversationRoutes(app: FastifyInstance) {
           take: query.limit,
           include: { _count: { select: { messages: true, plans: true } } },
         });
-        log.info(`[conversations:GET] Found ${convs.length} conversations for userId=${userId ?? "ANON"}`);
         log.info({ userId, count: convs.length, conversations: convs.map((c) => ({ id: c.id, title: c.title, userId: c.userId, updatedAt: c.updatedAt, messageCount: c._count?.messages })) }, "[conversations:list] result");
+        return sendOk(reply, convs);
       } catch (err) {
         log.warn({ err }, "DB list conversations failed, falling back to memory");
       }

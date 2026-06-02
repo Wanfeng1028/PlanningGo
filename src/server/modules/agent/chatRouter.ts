@@ -283,18 +283,18 @@ export function getMissingSlots(slots: PlanningSlots): PlanningSlotKey[] {
 
 export function generateTitleFromSlots(slots: PlanningSlots): string | null {
   const dest = String(slots.destination || slots.destinationCity || "").trim();
+  const origin = String(slots.origin || "").trim();
   const prefs = slots.preferences || slots.preference;
   const prefStr = Array.isArray(prefs) ? prefs.slice(0, 3).join("") : String(prefs || "");
 
   if (dest && prefStr) {
     return `${dest}${prefStr}游`;
   }
-  if (dest) {
-    return `${dest}出行规划`;
-  }
-  const origin = String(slots.origin || "").trim();
   if (origin && dest) {
     return `${origin}到${dest}规划`;
+  }
+  if (dest) {
+    return `${dest}出行规划`;
   }
   return null;
 }

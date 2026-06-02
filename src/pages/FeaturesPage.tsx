@@ -69,6 +69,64 @@ function toApiModelMode(mode: ModelMode): "flash" | "pro" {
   return mode.toLowerCase() as "flash" | "pro";
 }
 
+/** Safely map DB messages to ChatMessage[], degrading individual parse failures to plain text */
+function safeMapDbMessages(
+  dbMessages: Array<{ id: string; role: string; content: string; createdAt: string; payloadJson?: Record<string, unknown> }>,
+): ChatMessage[] {
+  return dbMessages.map((m) => {
+    try {
+      const payload = m.payloadJson as Record<string, unknown> | undefined;
+      const payloadType = (payload?.type as string) ?? "text";
+      const meta = payload?.metadata as Record<string, unknown> | undefined;
+      return {
+        id: m.id,
+        role: m.role as "user" | "assistant",
+        content: m.content,
+        createdAt: m.createdAt,
+        status: "done" as const,
+        kind: payloadType as ChatMessageKind,
+        metadata: meta
+          ? {
+              provider: meta.provider as string | undefined,
+              model: meta.model as string | undefined,
+              fallbackUsed: meta.fallbackUsed as boolean | undefined,
+            }
+          : undefined,
+        plans:
+          payloadType === "plan"
+            ? ((payload?.data as Record<string, unknown>)?.options as PlanningOption[]) ?? []
+            : undefined,
+        actions:
+          payloadType === "plan"
+            ? ((payload?.data as Record<string, unknown>)?.executableActions as PlanningExecutableAction[]) ?? []
+            : undefined,
+        chips:
+          payloadType === "slot_question"
+            ? ((payload?.missingSlots as string[]) ?? [] as string[])
+            : payloadType === "plan_selected"
+              ? ((payload?.nextActions as NextActionItem[])?.map((a: NextActionItem) => a.label) ?? [] as string[])
+              : ((payload?.suggestions as string[]) ?? undefined),
+        nextActions: payloadType === "plan_selected" ? (payload?.nextActions as NextActionItem[]) : undefined,
+        selectedOptionId: payloadType === "plan_selected" ? (payload?.selectedOptionId as string) : undefined,
+        selectedPlanTitle: payloadType === "plan_selected" ? (payload?.selectedPlanTitle as string) : undefined,
+      };
+    } catch (mapErr) {
+      // payloadJson parse error — degrade to plain text, never blank the whole conversation
+      console.warn("[FeaturesPage] payloadJson parse error, degrading to plain text", {
+        messageId: m.id,
+        error: String(mapErr),
+      });
+      return {
+        id: m.id,
+        role: m.role as "user" | "assistant",
+        content: m.content,
+        createdAt: m.createdAt,
+        status: "done" as const,
+      };
+    }
+  });
+}
+
 /** Generate a meaningful session title from the first user message */
 function generateSessionTitle(prompt: string): string {
   const trimmed = prompt.trim();
@@ -250,32 +308,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
               console.info("[FeaturesPage] active conversation set", { sessionId: savedConvId, conversationId: savedConvId });
               getConversation(savedConvId).then((detail) => {
                 if (detail && detail.messages.length > 0) {
-                  const loadedMessages: ChatMessage[] = detail.messages.map((m) => {
-                    const payload = m.payloadJson as Record<string, unknown> | undefined;
-                    const payloadType = (payload?.type as string) || 'text';
-                    const meta = payload?.metadata as Record<string, unknown> | undefined;
-                    return {
-                      id: m.id,
-                      role: m.role as 'user' | 'assistant',
-                      content: m.content,
-                      createdAt: m.createdAt,
-                      status: 'done' as const,
-                      kind: payloadType as ChatMessageKind,
-                      metadata: meta ? {
-                        provider: meta.provider as string | undefined,
-                        model: meta.model as string | undefined,
-                        fallbackUsed: meta.fallbackUsed as boolean | undefined,
-                      } : undefined,
-                      plans: payloadType === 'plan' ? ((payload?.data as Record<string, unknown>)?.options as PlanningOption[]) ?? [] : undefined,
-                      actions: payloadType === 'plan' ? ((payload?.data as Record<string, unknown>)?.executableActions as PlanningExecutableAction[]) ?? [] : undefined,
-                      chips: payloadType === 'slot_question' ? ((payload?.missingSlots as string[]) ?? [])
-                        : payloadType === 'plan_selected' ? ((payload?.nextActions as NextActionItem[])?.map((a: NextActionItem) => a.label) ?? [])
-                        : ((payload?.suggestions as string[]) ?? undefined),
-                      nextActions: payloadType === 'plan_selected' ? (payload?.nextActions as NextActionItem[]) : undefined,
-                      selectedOptionId: payloadType === 'plan_selected' ? (payload?.selectedOptionId as string) : undefined,
-                      selectedPlanTitle: payloadType === 'plan_selected' ? (payload?.selectedPlanTitle as string) : undefined,
-                    };
-                  });
+                  const loadedMessages = safeMapDbMessages(detail.messages);
                   setSessionMessages(savedConvId, loadedMessages);
                   setMode('chat');
                   setPhase('result');
@@ -287,6 +320,13 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
                   if (selPayload?.selectedOptionId) {
                     setSelectedPlanId(selPayload.selectedOptionId as string);
                   }
+                  // Auto-scroll to bottom after loading
+                  requestAnimationFrame(() => {
+                    messagesContainerRef.current?.scrollTo({
+                      top: messagesContainerRef.current.scrollHeight,
+                      behavior: "auto",
+                    });
+                  });
                 }
               }).catch(() => {});
             }
@@ -297,18 +337,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
             if (savedConvId) {
               getConversation(savedConvId).then((detail) => {
                 if (detail && detail.messages.length > 0) {
-                  const loadedMessages: ChatMessage[] = detail.messages.map((m) => {
-                    const payload = m.payloadJson as Record<string, unknown> | undefined;
-                    const payloadType = (payload?.type as string) || 'text';
-                    return {
-                      id: m.id,
-                      role: m.role as 'user' | 'assistant',
-                      content: m.content,
-                      createdAt: m.createdAt,
-                      status: 'done' as const,
-                      kind: payloadType as ChatMessageKind,
-                    };
-                  });
+                  const loadedMessages = safeMapDbMessages(detail.messages);
                   const session: ChatSession = {
                     id: detail.id,
                     title: detail.title,
@@ -867,116 +896,75 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
       conversationId: conversationIdRef.current,
     });
 
-    // Try to load from backend first (DB messages)
-    try {
-      const detail = await getConversation(sessionId);
-      console.info("[FeaturesPage] getConversation result", {
-        sessionId,
-        messageCount: detail?.messages?.length,
-        title: detail?.title,
-        selectedOptionId: detail?.selectedOptionId,
-      });
-
-      if (detail && detail.messages.length > 0) {
-        const loadedMessages: ChatMessage[] = detail.messages.map((m) => {
-          try {
-            const payload = m.payloadJson as Record<string, unknown> | undefined;
-            const payloadType = (payload?.type as string) ?? "text";
-            const metadata = payload?.metadata as Record<string, unknown> | undefined;
-            return {
-              id: m.id,
-              role: m.role as "user" | "assistant",
-              content: m.content,
-              createdAt: m.createdAt,
-              status: "done" as const,
-              kind: payloadType as ChatMessageKind,
-              metadata: metadata ? {
-                provider: metadata.provider as string | undefined,
-                model: metadata.model as string | undefined,
-                fallbackUsed: metadata.fallbackUsed as boolean | undefined,
-              } : undefined,
-              plans: payloadType === "plan" ? ((payload?.data as Record<string, unknown>)?.options as PlanningOption[]) ?? [] : undefined,
-              actions: payloadType === "plan" ? ((payload?.data as Record<string, unknown>)?.executableActions as PlanningExecutableAction[]) ?? [] : undefined,
-              chips: payloadType === "slot_question" ? ((payload?.missingSlots as string[]) ?? [] as string[])
-                : payloadType === "plan_selected" ? ((payload?.nextActions as NextActionItem[])?.map((a: NextActionItem) => a.label) ?? [] as string[])
-                : ((payload?.suggestions as string[]) ?? undefined),
-              nextActions: payloadType === "plan_selected" ? (payload?.nextActions as NextActionItem[]) : undefined,
-              selectedOptionId: payloadType === "plan_selected" ? (payload?.selectedOptionId as string) : undefined,
-              selectedPlanTitle: payloadType === "plan_selected" ? (payload?.selectedPlanTitle as string) : undefined,
-            };
-          } catch (mapErr) {
-            // payloadJson parse error — degrade to plain text, never blank the whole conversation
-            console.warn("[FeaturesPage] payloadJson parse error, degrading to plain text", { messageId: m.id, error: String(mapErr) });
-            return {
-              id: m.id,
-              role: m.role as "user" | "assistant",
-              content: m.content,
-              createdAt: m.createdAt,
-              status: "done" as const,
-            };
-          }
-        });
-
-        console.info("[FeaturesPage] loaded messages", {
-          sessionId,
-          loadedCount: loadedMessages.length,
-          firstMessage: loadedMessages[0]?.content,
-          lastMessage: loadedMessages.at(-1)?.content,
-        });
-
-        setCurrentSessionId(sessionId);
-        currentSessionIdRef.current = sessionId;
-        setConversationId(sessionId);
-        conversationIdRef.current = sessionId;
-        setSessionMessages(sessionId, loadedMessages);
-        setMode("chat");
-        setPhase("result");
-        // Auto-scroll to latest message after restore
-        requestAnimationFrame(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-        });
-        // Restore selectedOptionId from conversation
-        const selPayload = detail.messages.find((m) => {
-          const p = m.payloadJson as Record<string, unknown> | undefined;
-          return p?.type === "plan_selected";
-        })?.payloadJson as Record<string, unknown> | undefined;
-        if (selPayload?.selectedOptionId) {
-          setSelectedPlanId(selPayload.selectedOptionId as string);
-        } else {
-          setSelectedPlanId(null);
-        }
-        setSidebarOpen(false);
-        setInputValue("");
-        return;
-      }
-    } catch (err) {
-      console.error("[FeaturesPage] getConversation failed", { sessionId, error: String(err) });
-      // Do NOT silently fall through for logged-in users — only fall to localStorage for guests
-    }
-
-    // Fallback: localStorage sessions (mainly for guests)
-    if (user?.id) {
-      // For logged-in users, DB fetch failed or returned empty — log and stay in current view
-      console.warn("[FeaturesPage] DB fetch returned no messages for logged-in user, session:", sessionId);
-    }
-    const session = chatSessions.find((s) => s.id === sessionId);
-    if (!session) return;
+    // Set active session state immediately
     setCurrentSessionId(sessionId);
     currentSessionIdRef.current = sessionId;
     setConversationId(sessionId);
     conversationIdRef.current = sessionId;
+    localStorage.setItem("pg_active_conversation_id", sessionId);
+
+    if (user?.id) {
+      // Logged-in user: always load from DB
+      try {
+        const detail = await getConversation(sessionId);
+        console.info("[FeaturesPage] getConversation result", {
+          sessionId,
+          messageCount: detail?.messages?.length ?? 0,
+          title: detail?.title,
+        });
+
+        if (detail) {
+          const loadedMessages = safeMapDbMessages(detail.messages ?? []);
+          setSessionMessages(sessionId, loadedMessages);
+          setMessages(loadedMessages);
+          setMode("chat");
+          setPhase(loadedMessages.length > 0 ? "result" : "idle");
+
+          // Restore selectedOptionId
+          const selMsg = (detail.messages ?? []).find((m) => {
+            const p = m.payloadJson as Record<string, unknown> | undefined;
+            return p?.type === "plan_selected";
+          });
+          const selPayload = selMsg?.payloadJson as Record<string, unknown> | undefined;
+          setSelectedPlanId(selPayload?.selectedOptionId ? (selPayload.selectedOptionId as string) : null);
+
+          setSidebarOpen(false);
+          setInputValue("");
+
+          // Auto-scroll to bottom after messages load
+          requestAnimationFrame(() => {
+            messagesContainerRef.current?.scrollTo({
+              top: messagesContainerRef.current.scrollHeight,
+              behavior: "auto",
+            });
+          });
+          return;
+        }
+      } catch (err) {
+        console.error("[FeaturesPage] failed to load DB conversation", { sessionId, error: String(err) });
+        showToast("历史记录加载失败，请稍后重试", "error");
+        return;
+      }
+    }
+
+    // Guest fallback: load from local chatSessions
+    const session = chatSessions.find((s) => s.id === sessionId);
+    if (!session) return;
     setSessionMessages(sessionId, session.messages);
+    setMessages(session.messages);
     setMode("chat");
     const lastAssistant = [...session.messages].reverse().find((m) => m.role === "assistant");
-    if (lastAssistant && "status" in lastAssistant && lastAssistant.status === "success") {
-      setPhase("result");
-    } else {
-      setPhase("idle");
-    }
+    setPhase(lastAssistant?.status === "success" ? "result" : "idle");
+    setSelectedPlanId(null);
     setSidebarOpen(false);
     setInputValue("");
-    requestAnimationFrame(() => textareaRef.current?.focus());
-  }, [chatSessions, setSessionMessages]);
+    requestAnimationFrame(() => {
+      messagesContainerRef.current?.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: "auto",
+      });
+    });
+  }, [user?.id, chatSessions, setSessionMessages, showToast]);
 
 
   /* ── Return to home ── */

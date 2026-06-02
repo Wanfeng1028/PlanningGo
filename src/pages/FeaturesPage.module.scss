@@ -439,10 +439,12 @@ $green: #22c55e;
   flex: 1;
   min-width: 0;
   min-height: 0;
+  height: 100dvh;
   position: relative;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
 }
 
 /* ── ambient decorations (absolute, no layout) ── */
@@ -815,10 +817,14 @@ $green: #22c55e;
   width: min(960px, 100%);
   max-width: 100%;
   overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  box-sizing: border-box;
+  padding-bottom: 40px;
 }
 
 /* ── composer dock (absolute floating) ── */
@@ -1307,7 +1313,9 @@ $green: #22c55e;
   font-weight: 400;
   line-height: 1.6;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   word-break: break-word;
+  box-sizing: border-box;
 }
 
 /* ── assistant message ── */
@@ -1322,6 +1330,7 @@ $green: #22c55e;
   overflow-wrap: anywhere;
   word-break: break-word;
   overflow: hidden;
+  box-sizing: border-box;
   padding: 16px 20px;
   border-radius: 4px 18px 18px 18px;
   background: rgba(255, 255, 255, 0.75);
@@ -1417,6 +1426,8 @@ $green: #22c55e;
   overflow-wrap: anywhere;
   word-break: break-word;
   max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
   border-radius: 24px;
   background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(247,241,231,0.9) 100%);
   border: 1px solid rgba(255, 255, 255, 0.95);
@@ -1538,8 +1549,9 @@ $green: #22c55e;
 }
 
 .planCardTimeline {
-  overflow-x: auto;
+  overflow-x: hidden;
   overflow-wrap: anywhere;
+  min-width: 0;
   padding-left: 16px;
   margin-bottom: 10px;
   list-style: none;
@@ -1613,6 +1625,8 @@ $green: #22c55e;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 /* ── action buttons (shared) ── */
