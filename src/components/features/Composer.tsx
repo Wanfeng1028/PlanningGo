@@ -4,7 +4,7 @@ import {
   FeaturePopover,
   PopoverItem,
 } from "../../components/FeatureModal";
-import { MAX_INPUT_CHARS, MAX_INPUT_TOKENS, validateInputLength } from "../../lib/tokens";
+import { MAX_INPUT_CHARS, validateInputLength } from "../../lib/tokens";
 import { WorkspaceModal } from "../../components/WorkspaceModal";
 import type { ModalKey, SessionUser } from "../../types";
 import type {
@@ -69,6 +69,14 @@ export function Composer({
   const [cityStep, setCityStep] = useState<"city" | "district">("city");
   const [selectedCityName, setSelectedCityName] = useState<string>("");
   const inputValidation = useMemo(() => validateInputLength(value), [value]);
+  const remainingChars = Math.max(MAX_INPUT_CHARS - inputValidation.charCount, 0);
+  const shouldShowInputLimit =
+    !inputValidation.valid || inputValidation.charCount >= MAX_INPUT_CHARS * 0.8;
+  const inputLimitText = !inputValidation.valid
+    ? "内容有点长，请精简后再发送"
+    : remainingChars === 0
+      ? "已到输入上限"
+      : `还可输入 ${remainingChars} 字`;
 
   useEffect(() => {
     valueRef.current = value;
@@ -436,18 +444,15 @@ export function Composer({
         </button>
       </div>
 
-      <div className={styles.composerLimitRow}>
-        <span
-          className={`${styles.composerLimitItem} ${!inputValidation.valid ? styles.composerLimitExceeded : ""}`}
-        >
-          {inputValidation.charCount}/{MAX_INPUT_CHARS} 字符
-        </span>
-        <span
-          className={`${styles.composerLimitItem} ${!inputValidation.valid ? styles.composerLimitExceeded : ""}`}
-        >
-          约 {inputValidation.tokenCount}/{MAX_INPUT_TOKENS} tokens
-        </span>
-      </div>
+      {shouldShowInputLimit && (
+        <div className={styles.composerLimitRow} aria-live="polite">
+          <span
+            className={`${styles.composerLimitItem} ${!inputValidation.valid ? styles.composerLimitExceeded : ""}`}
+          >
+            {inputLimitText}
+          </span>
+        </div>
+      )}
 
       {showMeta && (
         <div className={styles.composerMetaRow}>

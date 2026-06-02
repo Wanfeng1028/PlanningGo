@@ -98,6 +98,7 @@ const AUTO_SLIDE_INTERVAL = 3600;
 
 export function HomePage({ onNavigate, onOpenModal, user: _user, onAuthRequiredNavigate }: HomePageProps) {
   const [activeSection, setActiveSection] = useState(0);
+  const currentSection = homeSections[activeSection];
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -235,54 +236,52 @@ export function HomePage({ onNavigate, onOpenModal, user: _user, onAuthRequiredN
           </div>
 
           <div className={styles.designCarouselViewport}>
-            <motion.div
-              className={styles.designCarouselTrack}
-              animate={{ x: `-${activeSection * 100}%` }}
-              transition={{ duration: 0.72, ease: [0.16, 1, 0.3, 1] }}
+            <motion.article
+              key={currentSection.title}
+              className={styles.designCarouselSlide}
+              initial={{ opacity: 0, x: 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -24 }}
+              transition={{ duration: 0.36, ease: [0.16, 1, 0.3, 1] }}
             >
-              {homeSections.map((section, sectionIndex) => (
-                <article className={styles.designCarouselSlide} key={section.title}>
-                  <div className={styles.sectionIntro}>
-                    <h2>{section.title}</h2>
-                    <p>{section.intro}</p>
-                  </div>
-                  <motion.div
-                    className={styles.designGrid}
-                    initial="hidden"
-                    whileInView="show"
-                    viewport={{ once: true, margin: "-120px" }}
+              <div className={styles.sectionIntro}>
+                <h2>{currentSection.title}</h2>
+                <p>{currentSection.intro}</p>
+              </div>
+              <motion.div
+                className={styles.designGrid}
+                initial="hidden"
+                animate="show"
+                variants={{
+                  hidden: {},
+                  show: {
+                    transition: {
+                      staggerChildren: 0.08,
+                    },
+                  },
+                }}
+              >
+                {currentSection.cards.map((card) => (
+                  <motion.article
+                    className={styles.designCard}
                     variants={{
-                      hidden: {},
+                      hidden: { opacity: 0, y: 18, scale: 0.98 },
                       show: {
-                        transition: {
-                          staggerChildren: 0.14,
-                        },
+                        opacity: 1,
+                        y: 0,
+                        scale: 1,
+                        transition: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
                       },
                     }}
+                    key={card.title}
                   >
-                    {section.cards.map((card) => (
-                      <motion.article
-                        className={styles.designCard}
-                        variants={{
-                          hidden: { opacity: 0, y: 28, scale: 0.96 },
-                          show: {
-                            opacity: 1,
-                            y: 0,
-                            scale: 1,
-                            transition: { duration: 0.44, ease: [0.16, 1, 0.3, 1] },
-                          },
-                        }}
-                        key={`${sectionIndex}-${card.title}`}
-                      >
-                        <span className={styles.designCardTag}>{card.label}</span>
-                        <h3 className={styles.designCardTitle}>{card.title}</h3>
-                        <p className={styles.designCardDesc}>{card.desc}</p>
-                      </motion.article>
-                    ))}
-                  </motion.div>
-                </article>
-              ))}
-            </motion.div>
+                    <span className={styles.designCardTag}>{card.label}</span>
+                    <h3 className={styles.designCardTitle}>{card.title}</h3>
+                    <p className={styles.designCardDesc}>{card.desc}</p>
+                  </motion.article>
+                ))}
+              </motion.div>
+            </motion.article>
           </div>
         </div>
       </section>

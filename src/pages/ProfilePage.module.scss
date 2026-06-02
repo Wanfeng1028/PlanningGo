@@ -8,10 +8,11 @@
 
 .profileLayout {
   display: flex;
-  min-height: calc(100vh - 80px);
+  min-height: calc(100dvh - 80px);
   width: 100%;
-  max-width: 1600px;
+  max-width: min(1600px, 100vw);
   margin: 0 auto;
+  overflow-x: clip;
 }
 
 // ── Sidebar ─────────────────────────────────────────────────────────────────
@@ -20,13 +21,13 @@
   position: sticky;
   top: 80px;
   flex-shrink: 0;
-  width: 280px;
-  height: calc(100vh - 80px);
+  width: min(var(--layout-sidebar-width), 100vw);
+  height: calc(100dvh - 80px);
   display: flex;
   flex-direction: column;
   background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
   border-radius: 0 var(--radius-panel) var(--radius-panel) 0;
-  padding: 32px 20px 24px;
+  padding: clamp(20px, 2vw, 32px) clamp(14px, 1.5vw, 20px) clamp(18px, 2vw, 24px);
   color: rgb(255 255 255 / 0.85);
   overflow-y: auto;
   scrollbar-width: thin;
@@ -212,7 +213,7 @@
 .contentPanel {
   flex: 1;
   min-width: 0;
-  padding: 32px 36px;
+  padding: clamp(20px, 2.4vw, 32px) clamp(16px, 2.8vw, 36px);
   overflow-y: auto;
   background: var(--color-page);
 }
@@ -322,6 +323,7 @@
 
 .fieldSlider {
   flex: 1;
+  min-width: 0;
   height: 6px;
   appearance: none;
   border-radius: 3px;
@@ -1642,8 +1644,8 @@
   bottom: 20px;
   left: 20px;
   z-index: 100;
-  width: 48px;
-  height: 48px;
+  width: var(--layout-control-size);
+  height: var(--layout-control-size);
   border-radius: 50%;
   border: none;
   background: #1a1a2e;
@@ -1661,15 +1663,23 @@
     flex-direction: column;
   }
 
+  .mobileToggle {
+    position: sticky;
+    top: 92px;
+    left: 16px;
+    display: flex;
+    margin: 16px 0 0 16px;
+  }
+
   .sidebar {
     position: fixed;
     top: 0;
-    left: 0;
+    left: calc(-1 * var(--layout-page-gutter));
     z-index: 90;
-    width: 280px;
-    height: 100vh;
+    width: min(var(--layout-sidebar-width), 100vw);
+    height: 100dvh;
     border-radius: 0;
-    transform: translateX(-100%);
+    transform: translateX(calc(-100% - 64px));
     transition: transform 300ms var(--ease-out);
   }
 
@@ -1686,11 +1696,7 @@
   }
 
   .contentPanel {
-    padding: 24px 16px;
-  }
-
-  .mobileToggle {
-    display: flex;
+    padding: clamp(16px, 3vw, 24px) clamp(12px, 2.5vw, 16px);
   }
 
   .personaGrid {
@@ -1708,7 +1714,33 @@
 
 @media (max-width: 600px) {
   .contentPanel {
-    padding: 16px 12px;
+    padding: clamp(12px, 4vw, 16px) clamp(8px, 3.5vw, 12px);
+  }
+
+  .budgetRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .budgetSlider {
+    width: 100%;
+    min-width: 0;
+    gap: 10px;
+  }
+
+  .budgetSlider:last-of-type .budgetValue {
+    order: -1;
+  }
+
+  .budgetValue {
+    flex: 0 0 64px;
+    min-width: 0;
+    text-align: left;
+  }
+
+  .budgetSep {
+    display: none;
   }
 
   .companionGrid {
@@ -1756,18 +1788,16 @@
   }
 
   .fieldSlider {
-    input[type="range"] {
-      height: 8px;
+    height: 8px;
 
-      &::-webkit-slider-thumb {
-        width: 28px;
-        height: 28px;
-      }
+    &::-webkit-slider-thumb {
+      width: 28px;
+      height: 28px;
+    }
 
-      &::-moz-range-thumb {
-        width: 28px;
-        height: 28px;
-      }
+    &::-moz-range-thumb {
+      width: 28px;
+      height: 28px;
     }
   }
 }

@@ -56,10 +56,13 @@
   --shadow-lg: 0 24px 36px rgb(var(--color-text-primary-rgb) / 0.14);
   --shadow-xl: 0 32px 64px rgb(var(--color-text-primary-rgb) / 0.22);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --layout-page-gutter: 400px;
-  --layout-content-gutter: clamp(16px, 2vw, 40px);
-  --layout-shell-width: calc(100vw - (var(--layout-page-gutter) * 2));
+  --layout-page-gutter: clamp(6px, 3vw, 80px);
+  --layout-content-gutter: clamp(10px, 2vw, 40px);
+  --layout-shell-width: min(var(--container-xl), calc(100vw - (var(--layout-page-gutter) * 2)));
   --layout-mobile-padding: 8px;
+  --layout-panel-padding: clamp(12px, 2vw, 28px);
+  --layout-sidebar-width: clamp(220px, 20vw, 280px);
+  --layout-control-size: clamp(38px, 4vw, 48px);
 }
 
 * {
@@ -76,7 +79,7 @@ body {
   font-family: var(--font-sans);
   color: var(--color-text-primary);
   background: var(--color-page);
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
   overflow-x: hidden;
 }
 
@@ -153,19 +156,5 @@ input:focus-visible {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 1ms !important;
-  }
-}
-
-@media (max-width: 900px) {
-  :root {
-    --layout-page-gutter: 10px;
-    --layout-content-gutter: 12px;
-  }
-}
-
-@media (max-width: 600px) {
-  :root {
-    --layout-page-gutter: 6px;
-    --layout-content-gutter: 10px;
   }
 }

@@ -32,7 +32,7 @@ export interface ChatMessage {
   content: string;
   createdAt: string;
   status?: "thinking" | "success" | "error" | MessageStatus;
-  /** Metadata from backend (provider, model, fallbackUsed) — dev-only display */
+  /** Metadata from backend for diagnostics and internal state handling. */
   metadata?: {
     provider?: string;
     model?: string;
@@ -59,9 +59,6 @@ export interface ChatSession {
   createdAt: string;
   updatedAt: string;
 }
-
-/** Whether we're in development mode (Vite sets this) */
-export const isDev = import.meta.env.DEV;
 
 export type AttachmentItem = {
   id: string;

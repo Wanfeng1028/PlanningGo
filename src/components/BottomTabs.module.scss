@@ -50,3 +50,9 @@
     background: var(--color-brand);
   }
 }
+
+@media (max-width: 900px) and (max-height: 420px) {
+  .tabs {
+    display: none;
+  }
+}
