@@ -32,7 +32,8 @@
     "smoke:llm": "node scripts/smoke-llm.mjs",
     "smoke:chat": "node scripts/smoke-chat.mjs",
     "smoke:plan": "node scripts/smoke-plan.mjs",
-    "smoke:all": "node scripts/smoke-all.mjs"
+    "smoke:all": "node scripts/smoke-all.mjs",
+    "smoke:auth-history": "node scripts/smoke-auth-history.mjs"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

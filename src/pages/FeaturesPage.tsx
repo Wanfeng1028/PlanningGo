@@ -294,9 +294,10 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     if (user?.id) {
       // Clear guest data when user is logged in
       localStorage.removeItem("pg_chat_sessions");
+      console.info("[FeaturesPage] loading DB conversations for user", { userId: user.id, pgActiveConvId: localStorage.getItem("pg_active_conversation_id") });
       listConversations({ limit: 50 })
         .then((convs) => {
-          console.info("[FeaturesPage] load DB conversations", { userId: user?.id, count: convs.length, titles: convs.map((c) => c.title) });
+          console.info("[FeaturesPage] load DB conversations", { userId: user?.id, count: convs.length, titles: convs.map((c) => c.title), ids: convs.map((c) => c.id) });
           if (convs.length > 0) {
             const sessions: ChatSession[] = convs.map((cv) => ({
               id: cv.id,

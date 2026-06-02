@@ -32,7 +32,8 @@
       "Bash(npx tsx *)",
       "Bash(npx vitest *)",
       "Bash(Get-ChildItem -Path \"E:\\\\code\\\\javascript\\\\project\\\\PlanningGo\\\\src\" -Recurse -Directory)",
-      "Bash(Select-Object FullName)"
+      "Bash(Select-Object FullName)",
+      "Bash(git push *)"
     ]
   }
 }

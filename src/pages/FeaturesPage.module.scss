@@ -1442,6 +1442,29 @@ $green: #22c55e;
   font-size: 15px;
   font-weight: 600;
   color: $text;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+
+  /* Prevent long unbroken strings (URLs, JSON) from expanding container */
+  :global(pre) {
+    overflow-x: auto;
+    max-width: 100%;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  :global(code) {
+    word-break: break-all;
+  }
+  :global(img) {
+    max-width: 100%;
+    height: auto;
+  }
+  :global(table) {
+    display: block;
+    overflow-x: auto;
+    max-width: 100%;
+  }
 }
 
 /* ── plan cards ── */
