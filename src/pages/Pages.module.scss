@@ -4,6 +4,7 @@
   --home-max: 1360px;
   position: relative;
   z-index: 1;
+  overflow: clip;
 }
 
 .homeStage {

@@ -70,7 +70,7 @@ export function validateInputLength(text: string): {
       valid: false,
       tokenCount,
       charCount,
-      error: `输入过长（${charCount} 字符，最多 ${MAX_INPUT_CHARS} 字符）`,
+      error: `输入内容太长，请控制在 ${MAX_INPUT_CHARS} 字以内。`,
     };
   }
 
@@ -79,7 +79,7 @@ export function validateInputLength(text: string): {
       valid: false,
       tokenCount,
       charCount,
-      error: `输入过长（约 ${tokenCount} tokens，最多 ${MAX_INPUT_TOKENS} tokens）`,
+      error: "输入内容太长，请精简后再发送。",
     };
   }
 

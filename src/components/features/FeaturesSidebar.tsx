@@ -72,7 +72,7 @@ export function FeaturesSidebar({
           {onReturnHome && (
             <button className={styles.returnHomeBtn} onClick={onReturnHome}>
               <ArrowLeft size={14} />
-              返回官网
+              返回首页
             </button>
           )}
         </div>
@@ -134,9 +134,6 @@ export function FeaturesSidebar({
           </div>
           <div className={styles.sidebarUserInfo}>
             <div className={styles.sidebarUserName}>{user?.name || "游客"}</div>
-            <div className={styles.sidebarUserTag}>
-              {user?.mode === "registered" ? "已注册" : "体验模式"}
-            </div>
           </div>
           <button className={styles.sidebarSettingsBtn} title="设置" onClick={() => setShowSettings(true)}>
             ⚙

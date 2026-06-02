@@ -23,7 +23,7 @@ import { WorkspaceModal } from "../components/WorkspaceModal";
 import { Button } from "../components/Button";
 import type { ModalKey, NavKey, SessionUser } from "../types";
 import type { ChatMessage, ChatSession, AttachmentItem, ModelMode, ChatMessageKind, NextActionItem, MessageStatus } from "../components/features/types";
-import { MODEL_MODES, isDev } from "../components/features/types";
+import { MODEL_MODES } from "../components/features/types";
 import { SUGGESTION_PROMPTS } from "../components/features/constants";
 import { AmbientBackground } from "../components/features/AmbientBackground";
 import { FeaturesSidebar } from "../components/features/FeaturesSidebar";
@@ -98,6 +98,8 @@ const HERO_PHRASES = [
   "把纠结变成安排",
 ] as const;
 
+const STREAM_FLUSH_INTERVAL_MS = 40;
+
 export default function FeaturesPage({ user, onOpenModal, onNavigate, location }: FeaturesPageProps) {
   const [mode, setMode] = useState<"idle" | "chat">("idle");
   const [inputValue, setInputValue] = useState("");
@@ -170,18 +172,24 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
   }, [phraseIndex, typedText, isDeleting]);
 
   /* ── Message helpers (declared before useEffects that reference them) ── */
-  const updateSessionMessages = useCallback((sessionId: string, updater: (prev: ChatMessage[]) => ChatMessage[]) => {
+  const updateSessionMessages = useCallback((
+    sessionId: string,
+    updater: (prev: ChatMessage[]) => ChatMessage[],
+    options?: { touchSession?: boolean },
+  ) => {
     const prevSessionMessages = messagesBySessionRef.current.get(sessionId) ?? [];
     const nextSessionMessages = updater(prevSessionMessages);
     messagesBySessionRef.current.set(sessionId, nextSessionMessages);
 
-    setChatSessions((prev) =>
-      prev.map((session) =>
-        session.id === sessionId
-          ? { ...session, messages: nextSessionMessages, updatedAt: new Date().toISOString() }
-          : session,
-      ),
-    );
+    if (options?.touchSession !== false) {
+      setChatSessions((prev) =>
+        prev.map((session) =>
+          session.id === sessionId
+            ? { ...session, messages: nextSessionMessages, updatedAt: new Date().toISOString() }
+            : session,
+        ),
+      );
+    }
 
     if (currentSessionIdRef.current === sessionId) {
       setMessages(nextSessionMessages);
@@ -438,7 +446,11 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     }
   }, [mode]);
 
-  const updateLastAssistant = useCallback((sessionId: string, patch: Partial<ChatMessage>) => {
+  const updateLastAssistant = useCallback((
+    sessionId: string,
+    patch: Partial<ChatMessage>,
+    options?: { touchSession?: boolean },
+  ) => {
     updateSessionMessages(sessionId, (prev) => {
       const next = [...prev];
       for (let i = next.length - 1; i >= 0; i--) {
@@ -448,7 +460,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
         }
       }
       return next;
-    });
+    }, options);
   }, [updateSessionMessages]);
 
   /* ── Core submit flow ── */
@@ -517,31 +529,78 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
       try {
         setPhase("planning");
         let streamedContent = "";
+        let renderedStreamedContent = "";
+        let streamFlushFrame: number | null = null;
+        let streamFlushTimer: number | null = null;
+        let lastStreamFlushAt = 0;
         let agentResponse: unknown = null;
 
-        await streamAgentMessage(
-          {
-            message: prompt,
-            city,
-            modelMode: toApiModelMode(modelMode),
-            conversationId: conversationIdRef.current ?? undefined,
-            selectedOptionId: selectedPlanId ?? undefined,
-          },
-          {
-            signal: controller.signal,
-            onChunk: (chunk) => {
-              streamedContent += chunk;
-              updateLastAssistant(targetSessionId!, {
-                status: "streaming" as MessageStatus,
-                content: streamedContent,
-                chips: undefined,
-              });
-            },
-            onFinalResult: (result: unknown) => {
-              agentResponse = result;
-            },
+        const cancelScheduledStreamFlush = () => {
+          if (streamFlushFrame !== null) {
+            window.cancelAnimationFrame(streamFlushFrame);
+            streamFlushFrame = null;
           }
-        );
+          if (streamFlushTimer !== null) {
+            window.clearTimeout(streamFlushTimer);
+            streamFlushTimer = null;
+          }
+        };
+
+        const flushStreamContent = () => {
+          streamFlushFrame = null;
+          streamFlushTimer = null;
+          lastStreamFlushAt = performance.now();
+
+          if (!targetSessionId || currentSessionIdRef.current !== targetSessionId) return;
+          if (renderedStreamedContent === streamedContent) return;
+
+          renderedStreamedContent = streamedContent;
+          updateLastAssistant(
+            targetSessionId,
+            {
+              status: "streaming" as MessageStatus,
+              content: renderedStreamedContent,
+              chips: undefined,
+            },
+            { touchSession: false },
+          );
+        };
+
+        const scheduleStreamFlush = () => {
+          if (streamFlushFrame !== null || streamFlushTimer !== null) return;
+
+          const elapsed = performance.now() - lastStreamFlushAt;
+          const delay = Math.max(0, STREAM_FLUSH_INTERVAL_MS - elapsed);
+          streamFlushTimer = window.setTimeout(() => {
+            streamFlushTimer = null;
+            streamFlushFrame = window.requestAnimationFrame(flushStreamContent);
+          }, delay);
+        };
+
+        try {
+          await streamAgentMessage(
+            {
+              message: prompt,
+              city,
+              modelMode: toApiModelMode(modelMode),
+              conversationId: conversationIdRef.current ?? undefined,
+              selectedOptionId: selectedPlanId ?? undefined,
+            },
+            {
+              signal: controller.signal,
+              onChunk: (chunk) => {
+                streamedContent += chunk;
+                scheduleStreamFlush();
+              },
+              onFinalResult: (result: unknown) => {
+                agentResponse = result;
+              },
+            }
+          );
+        } finally {
+          cancelScheduledStreamFlush();
+          flushStreamContent();
+        }
 
         // Validate session hasn't changed
         if (currentSessionIdRef.current !== targetSessionId) {
@@ -1250,8 +1309,8 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
             {msg.status === "streaming" && (
               <>
                 {msg.content && (
-                  <div className={styles.resultSummary}>
-                    <span dangerouslySetInnerHTML={{ __html: sanitizeMarkdown(msg.content) }} />
+                  <div className={`${styles.resultSummary} ${styles.streamingSummary}`}>
+                    <span className={styles.streamingText}>{msg.content}</span>
                     <span className={styles.streamingCursor} />
                   </div>
                 )}
@@ -1317,16 +1376,6 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
                   </div>
                 )}
 
-                {/* Dev-only metadata badge */}
-                {isDev && msg.metadata && (
-                  <div className={styles.devMetaBadge}>
-                    {msg.metadata.provider && <span>provider: {msg.metadata.provider}</span>}
-                    {msg.metadata.model && <span>model: {msg.metadata.model}</span>}
-                    {msg.metadata.fallbackUsed !== undefined && (
-                      <span>fallback: {msg.metadata.fallbackUsed ? "yes" : "no"}</span>
-                    )}
-                  </div>
-                )}
               </>
             )}
           </div>

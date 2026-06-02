@@ -7,8 +7,9 @@ import {
   CheckCircle2,
   AlertCircle,
   Navigation,
-  ChevronLeft,
-  ChevronRight,
+  LogIn,
+  Sparkles,
+  UserPlus,
 } from "lucide-react";
 import { Button } from "./Button";
 import { enterAsGuest, login, register, reverseGeocode, setRefreshToken, forgotPassword } from "../lib/api";
@@ -28,6 +29,17 @@ import type {
 import styles from "./AuthModal.module.scss";
 
 type AuthMode = Extract<ModalKey, "login" | "register" | "guest">;
+
+const MODE_OPTIONS: Array<{
+  key: AuthMode;
+  label: string;
+  helper: string;
+  Icon: typeof Sparkles;
+}> = [
+  { key: "login", label: "登录", helper: "继续计划", Icon: LogIn },
+  { key: "register", label: "注册", helper: "保存偏好", Icon: UserPlus },
+  { key: "guest", label: "游客", helper: "快速体验", Icon: Sparkles },
+];
 
 interface AuthModalProps {
   mode: AuthMode;
@@ -294,11 +306,6 @@ export function AuthModal({
     setError("");
     if (onSwitchMode) onSwitchMode(target);
   };
-
-  const MODE_ORDER: AuthMode[] = ["guest", "login", "register"];
-  const modeIndex = MODE_ORDER.indexOf(mode);
-  const goPrev = () => switchTo(MODE_ORDER[(modeIndex - 1 + 3) % 3]);
-  const goNext = () => switchTo(MODE_ORDER[(modeIndex + 1) % 3]);
 
   // ── 定位权限提示层 ──
   const renderLocationLayer = () => {
@@ -677,40 +684,31 @@ export function AuthModal({
           <X size={18} />
         </button>
 
-        {/* ── 轮播指示器 ── */}
-        <div className={styles.carouselDots}>
-          {MODE_ORDER.map((m, i) => (
-            <button
-              key={m}
-              type="button"
-              className={`${styles.carouselDot} ${i === modeIndex ? styles.carouselDotActive : ""}`}
-              onClick={() => switchTo(m)}
-              aria-label={m === "guest" ? "游客体验" : m === "login" ? "登录" : "注册"}
-            />
-          ))}
+        <div
+          className={styles.modeTabs}
+          role="tablist"
+          aria-label="选择访问方式"
+        >
+          {MODE_OPTIONS.map((option) => {
+            const Icon = option.Icon;
+            return (
+              <button
+                key={option.key}
+                type="button"
+                className={`${styles.modeTab} ${option.key === mode ? styles.modeTabActive : ""}`}
+                onClick={() => switchTo(option.key)}
+                role="tab"
+                aria-selected={option.key === mode}
+              >
+                <Icon size={16} aria-hidden="true" />
+                <span className={styles.modeTabText}>
+                  <span className={styles.modeTabLabel}>{option.label}</span>
+                  <small>{option.helper}</small>
+                </span>
+              </button>
+            );
+          })}
         </div>
-
-        {/* ── 轮播箭头 ── */}
-        <button
-          type="button"
-          className={`${styles.carouselArrow} ${styles.carouselArrowLeft}`}
-          onClick={goPrev}
-          aria-label="上一步"
-        >
-          <ChevronLeft size={20} />
-        </button>
-        <button
-          type="button"
-          className={`${styles.carouselArrow} ${styles.carouselArrowRight}`}
-          onClick={goNext}
-          aria-label="下一步"
-        >
-          <ChevronRight size={20} />
-        </button>
-
-        <span className={styles.modePill}>
-          {mode === "login" ? "登录" : mode === "register" ? "注册" : "游客"}
-        </span>
 
         <div className={styles.authHeader}>
           <h2 className={styles.authTitle} id="auth-title">
