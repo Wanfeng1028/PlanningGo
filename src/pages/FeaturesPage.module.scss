@@ -45,7 +45,9 @@ $green: #22c55e;
   backdrop-filter: blur(20px) saturate(140%);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
   z-index: 30;
   animation: sidebarEnter 580ms cubic-bezier(.2,.8,.2,1) both;
 
@@ -211,6 +213,9 @@ $green: #22c55e;
   background: transparent;
   width: 100%;
   text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 
   &:hover {
     background: rgba($text, 0.04);
@@ -796,8 +801,8 @@ $green: #22c55e;
   padding-top: clamp(32px, 6vh, 72px);
   padding-left: 16px;
   padding-right: 16px;
-  padding-bottom: clamp(100px, 14vh, 160px);
-  scroll-padding-bottom: clamp(100px, 14vh, 160px);
+  padding-bottom: clamp(160px, 22vh, 260px);
+  scroll-padding-bottom: clamp(160px, 22vh, 260px);
   scrollbar-width: thin;
   scrollbar-color: rgba($text, 0.12) transparent;
 
@@ -825,6 +830,26 @@ $green: #22c55e;
   gap: 16px;
   box-sizing: border-box;
   padding-bottom: 40px;
+
+  /* Ensure children cannot cause horizontal overflow */
+  & > * {
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+}
+
+.emptyMessagesHint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  gap: 0.5rem;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.95rem;
+  text-align: center;
+  padding: 2rem 1rem;
 }
 
 /* ── composer dock (absolute floating) ── */
@@ -840,6 +865,13 @@ $green: #22c55e;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
+  pointer-events: none;
+
+  /* Allow pointer events on children only */
+  & > * {
+    pointer-events: auto;
+  }
 }
 
 /* ─────────────────────────────────────────────
@@ -1316,6 +1348,7 @@ $green: #22c55e;
   overflow-wrap: anywhere;
   word-break: break-word;
   box-sizing: border-box;
+  min-width: 0;
 }
 
 /* ── assistant message ── */
@@ -1327,6 +1360,7 @@ $green: #22c55e;
 
 .messageAssistantBubble {
   max-width: 100%;
+  min-width: 0;
   overflow-wrap: anywhere;
   word-break: break-word;
   overflow: hidden;
@@ -1417,8 +1451,8 @@ $green: #22c55e;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  max-width: 100%;
-  overflow: hidden;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .planCard {
@@ -1457,6 +1491,9 @@ $green: #22c55e;
   font-weight: 700;
   color: $text;
   margin-bottom: 5px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
 }
 
 .planCardHeader {
@@ -1490,6 +1527,8 @@ $green: #22c55e;
   padding: 6px 10px;
   border-radius: 8px;
   background: rgba($text, 0.03);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .planCardAssumptions {
@@ -1546,6 +1585,8 @@ $green: #22c55e;
   color: $text-secondary;
   line-height: 1.5;
   margin-bottom: 10px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .planCardTimeline {
@@ -1562,6 +1603,10 @@ $green: #22c55e;
     line-height: 1.7;
     padding-left: 6px;
     position: relative;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    max-width: 100%;
+    text-overflow: ellipsis;
 
     &::before {
       content: "";
@@ -1591,6 +1636,8 @@ $green: #22c55e;
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 12px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .planMetaTag {
@@ -1626,7 +1673,9 @@ $green: #22c55e;
   flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
-  overflow: hidden;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
 }
 
 /* ── action buttons (shared) ── */
@@ -1637,6 +1686,11 @@ $green: #22c55e;
   font-weight: 600;
   cursor: pointer;
   border: none;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   transition:
     filter 0.15s,
     transform 0.1s,
@@ -1701,6 +1755,9 @@ $green: #22c55e;
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid rgba($text, 0.06);
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .actionChipBtn {
@@ -2182,13 +2239,29 @@ $green: #22c55e;
 
 /* ── Mobile keyboard viewport fix ── */
 @media (max-width: 860px) {
-  .featureChat {
+  .featureAppShell {
+    /* Ensure mobile viewport respects keyboard */
     height: 100dvh;
-    height: calc(var(--vh, 1vh) * 100);
+    overflow: hidden;
+  }
+
+  .featureChat {
+    /* flex: 1 + min-height: 0 already sizes this correctly; avoid explicit height: 100dvh
+       which would overflow when the location banner is visible */
+    height: auto;
+    max-height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .featureMessages {
-    padding-bottom: clamp(120px, 18vh, 200px);
+    padding-bottom: clamp(180px, 26vh, 280px);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .featureMessagesInner {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .featureComposerDock {
@@ -2198,6 +2271,42 @@ $green: #22c55e;
 
   .featureComposer {
     border-radius: 20px;
+    max-height: 200px;
+  }
+
+  .featureMain {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Prevent plan card horizontal overflow on mobile */
+  .planCard {
+    padding: 16px 14px;
+    border-radius: 18px;
+  }
+
+  .planCardActions,
+  .actionDock {
+    gap: 6px;
+  }
+
+  .actionChipBtn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  /* Prevent sidebar from being wider than 80vw on mobile */
+  .featureSidebar {
+    max-width: 80vw;
+  }
+
+  /* Ensure message bubbles don't overflow */
+  .messageUserBubble {
+    max-width: 85%;
+  }
+
+  .messageAssistantBubble {
+    max-width: 100%;
   }
 }
 

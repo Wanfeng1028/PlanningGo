@@ -134,13 +134,22 @@ export async function registerAgentRoutes(app: FastifyInstance) {
           data: { conversationId, role, content, payloadJson: payloadJson ?? undefined },
         });
         await db.conversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
-        log?.info(`[agent] saveMessage OK id=${msg.id} role=${role} conv=${conversationId}`);
+        log?.info({
+          conversationId,
+          role,
+          messageId: msg.id,
+        }, "[agent] message saved to DB");
         return;
       } catch (err) {
-        log?.error({ err, conversationId }, "Failed to save message to DB, falling back to memory");
+        log?.error({
+          conversationId,
+          role,
+          err,
+        }, "[agent] message DB write failed");
       }
     }
     mem.addMessage({ conversationId, role, content, payloadJson });
+    log?.warn({ conversationId, role }, "[agent] message saved to MEMORY only (DB unavailable)");
   }
 
   app.post(
@@ -211,6 +220,33 @@ export async function registerAgentRoutes(app: FastifyInstance) {
           type: "plan",
           data: { planId: result.planId, options: result.options, summary: result.summary },
         }, app.log);
+
+        // ── 5. 更新会话标题 ──
+        if (result.options && result.options.length > 0) {
+          try {
+            const summary = result.summary || "";
+            // Try to extract a meaningful title from the plan
+            const destMatch = summary.match(/(杭州|上海|北京|西湖|灵隐|外滩|故宫|杭师大|南京|成都|广州|深圳)[^\n]{0,15}/);
+            let newTitle: string | null = null;
+            if (destMatch) {
+              newTitle = destMatch[0].slice(0, 25);
+            } else if (parsed.prompt.length > 5) {
+              // Use the prompt if it's descriptive
+              const cleaned = parsed.prompt.replace(/(帮我|请|麻烦|安排|规划|计划)/g, "").trim();
+              if (cleaned.length > 3 && cleaned.length <= 25) {
+                newTitle = cleaned;
+              }
+            }
+            if (newTitle && db) {
+              await db.conversation.update({
+                where: { id: conversationId },
+                data: { title: newTitle },
+              });
+            }
+          } catch (titleErr) {
+            app.log.warn({ err: titleErr }, "Title update failed (non-critical)");
+          }
+        }
 
         return { ...result, conversationId };
       } catch (error) {
@@ -333,6 +369,33 @@ export async function registerAgentRoutes(app: FastifyInstance) {
           type: "plan",
           data: { planId: result.planId, options: result.options, summary: result.summary },
         }, app.log);
+
+        // ── 5. 更新会话标题 ──
+        if (result.options && result.options.length > 0) {
+          try {
+            const summaryText = result.summary || "";
+            // Try to extract a meaningful title from the plan
+            const destMatch = summaryText.match(/(杭州|上海|北京|西湖|灵隐|外滩|故宫|杭师大|南京|成都|广州|深圳)[^\n]{0,15}/);
+            let newTitle: string | null = null;
+            if (destMatch) {
+              newTitle = destMatch[0].slice(0, 25);
+            } else if (parsed.prompt.length > 5) {
+              // Use the prompt if it's descriptive
+              const cleaned = parsed.prompt.replace(/(帮我|请|麻烦|安排|规划|计划)/g, "").trim();
+              if (cleaned.length > 3 && cleaned.length <= 25) {
+                newTitle = cleaned;
+              }
+            }
+            if (newTitle && db) {
+              await db.conversation.update({
+                where: { id: conversationId },
+                data: { title: newTitle },
+              });
+            }
+          } catch (titleErr) {
+            app.log.warn({ err: titleErr }, "Title update failed (non-critical)");
+          }
+        }
 
         if (!clientDisconnected) {
           reply.raw.end();

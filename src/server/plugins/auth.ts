@@ -49,7 +49,7 @@ async function authPlugin(app: FastifyInstance) {
   });
 
   // 可选认证（guest 接口）
-  app.decorate("optionalAuthGuard", async (request: FastifyRequest, _reply: FastifyReply) => {
+  app.decorate("optionalAuthGuard", async (request: FastifyRequest, reply: FastifyReply) => {
     const token = extractToken(request);
     if (!token) return;
     try {
@@ -58,7 +58,9 @@ async function authPlugin(app: FastifyInstance) {
       request.userRole = payload.role;
       request.userEmail = payload.email;
     } catch {
-      // token 无效时不阻断，继续作为未登录处理
+      // token 无效 — 通过 header 通知前端刷新
+      // 不阻断请求（仍可作为未登录访问），但前端收到 header 后应主动 refresh
+      reply.header("x-token-expired", "1");
     }
   });
 

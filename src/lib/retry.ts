@@ -1,4 +1,5 @@
 import { API_BASE } from "./config";
+import { setAuthToken, setRefreshToken as storeRefreshToken } from "./api";
 
 export interface RetryOptions {
   maxRetries?: number;
@@ -74,9 +75,10 @@ export async function refreshToken(): Promise<string | null> {
       const accessToken = body.data?.accessToken ?? body.accessToken;
       const newRefreshToken = body.data?.refreshToken ?? body.refreshToken;
       if (!accessToken) return null;
-      localStorage.setItem("pg_token", accessToken);
+      // Update both module-level _authToken in api.ts AND localStorage
+      setAuthToken(accessToken);
       if (newRefreshToken) {
-        localStorage.setItem("pg_refresh_token", newRefreshToken);
+        storeRefreshToken(newRefreshToken);
       }
       return accessToken;
     }

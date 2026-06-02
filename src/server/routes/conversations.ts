@@ -40,6 +40,7 @@ export async function registerConversationRoutes(app: FastifyInstance) {
             modelMode: body.modelMode ?? "flash",
           },
         });
+        log.info({ conversationId: conv.id, userId: userId ?? null, title: conv.title }, "[conversations:create] DB conversation created");
         return sendCreated(reply, conv);
       } catch (err) {
         log.warn({ err }, "DB create conversation failed, falling back to memory");
@@ -86,10 +87,15 @@ export async function registerConversationRoutes(app: FastifyInstance) {
           take: query.limit,
           include: { _count: { select: { messages: true, plans: true } } },
         });
-        log.info({ userId, count: convs.length, conversations: convs.map((c) => ({ id: c.id, title: c.title, userId: c.userId, updatedAt: c.updatedAt, messageCount: c._count?.messages })) }, "[conversations:list] result");
+        log.info({ userId, count: convs.length, conversationIds: convs.map((c) => c.id), conversations: convs.map((c) => ({ id: c.id, title: c.title, userId: c.userId, updatedAt: c.updatedAt, messageCount: c._count?.messages })) }, "[conversations:list] result");
         return sendOk(reply, convs);
       } catch (err) {
-        log.warn({ err }, "DB list conversations failed, falling back to memory");
+        log.error({ err, userId }, "[conversations:list] DB query failed for authenticated user");
+        if (userId) {
+          // Authenticated users: never fall through to memory store
+          return sendError(reply, 500, "DB_ERROR", "无法加载历史记录，数据库连接异常");
+        }
+        log.warn({ err }, "[conversations:list] DB failed for guest, falling back to memory");
       }
     }
 
@@ -141,7 +147,12 @@ export async function registerConversationRoutes(app: FastifyInstance) {
         }, "[conversations:get] result");
         return sendOk(reply, conv);
       } catch (err) {
-        log.warn({ err }, "DB get conversation failed, falling back to memory");
+        log.error({ err, userId, conversationId: id }, "[conversations:get] DB query failed for authenticated user");
+        if (userId) {
+          // Authenticated users: never fall through to memory store
+          return sendError(reply, 500, "DB_ERROR", "无法加载会话详情，数据库连接异常");
+        }
+        log.warn({ err }, "[conversations:get] DB failed for guest, falling back to memory");
       }
     }
 

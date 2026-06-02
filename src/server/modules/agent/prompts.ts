@@ -166,6 +166,7 @@ export interface SystemPromptContext {
   weather?: string;
   toolCallingEnabled?: boolean;
   agentState?: { phase?: string; planningDraft?: Record<string, unknown> };
+  userMemory?: Record<string, unknown>;
 }
 
 /**
@@ -182,6 +183,9 @@ export function buildSystemPrompt(context?: SystemPromptContext): string {
     if (context.weather) extras.push(`天气：${context.weather}`);
     if (context.agentState) extras.push(`当前阶段：${context.agentState.phase ?? "idle"}`);
     if (context.agentState?.planningDraft) extras.push(`已收集的规划信息：${JSON.stringify(context.agentState.planningDraft)}`);
+    if (context.userMemory && Object.keys(context.userMemory).length > 0) {
+      extras.push(`用户历史偏好（仅供参考，不要覆盖用户本轮明确输入）：${JSON.stringify(context.userMemory)}`);
+    }
     if (extras.length > 0) {
       prompt += `\n\n## 当前上下文\n${extras.join("\n")}`;
     }

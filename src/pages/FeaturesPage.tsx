@@ -9,6 +9,7 @@ import {
   getConversation,
   trackEvent as apiTrackEvent,
   reportClientError,
+  trackAction,
   type PlanningOption,
   type PlanningExecutableAction,
   type PlanningResult,
@@ -22,7 +23,7 @@ import { streamAgentMessage } from "../lib/stream";
 import { WorkspaceModal } from "../components/WorkspaceModal";
 import { Button } from "../components/Button";
 import type { ModalKey, NavKey, SessionUser } from "../types";
-import type { ChatMessage, ChatSession, AttachmentItem, ModelMode, ChatMessageKind, NextActionItem, MessageStatus } from "../components/features/types";
+import type { ChatMessage, ChatSession, AttachmentItem, ModelMode, ChatMessageKind, NextActionItem, MessageStatus, PlanningAction } from "../components/features/types";
 import { MODEL_MODES, isDev } from "../components/features/types";
 import { SUGGESTION_PROMPTS } from "../components/features/constants";
 import { AmbientBackground } from "../components/features/AmbientBackground";
@@ -30,6 +31,7 @@ import { FeaturesSidebar } from "../components/features/FeaturesSidebar";
 import { Composer } from "../components/features/Composer";
 import { PlanCardView } from "../components/features/PlanCardView";
 import { ErrorCardView } from "../components/features/ErrorCardView";
+import { MobileHandoffQRCode } from "../components/features/MobileHandoffQRCode";
 import styles from "./FeaturesPage.module.scss";
 
 /* ═══════════════════════════════════════════════
@@ -99,6 +101,10 @@ function safeMapDbMessages(
         actions:
           payloadType === "plan"
             ? ((payload?.data as Record<string, unknown>)?.executableActions as PlanningExecutableAction[]) ?? []
+            : undefined,
+        planningActions:
+          payloadType === "plan"
+            ? ((payload?.data as Record<string, unknown>)?.planningActions as PlanningAction[]) ?? undefined
             : undefined,
         chips:
           payloadType === "slot_question"
@@ -192,6 +198,8 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
   const city = selectedCity || location?.city || user?.city || "选择城市";
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
+  const [showHandoffQR, setShowHandoffQR] = useState(false);
+  const [handoffPlanId, setHandoffPlanId] = useState<string | undefined>(undefined);
 
   const { toast: glassToast, show: showToast, dismiss: dismissToast } = useGlassToast();
 
@@ -284,6 +292,8 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     }
     // Load conversations: backend DB for logged-in users, localStorage for guests
     if (user?.id) {
+      // Clear guest data when user is logged in
+      localStorage.removeItem("pg_chat_sessions");
       listConversations({ limit: 50 })
         .then((convs) => {
           console.info("[FeaturesPage] load DB conversations", { userId: user?.id, count: convs.length, titles: convs.map((c) => c.title) });
@@ -297,6 +307,18 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
               updatedAt: cv.updatedAt,
             }));
             setChatSessions(sessions);
+            // Rebuild messagesBySessionRef from sessions (messages will be empty until loaded)
+            const msgMap = new Map<string, ChatMessage[]>();
+            sessions.forEach((s) => {
+              msgMap.set(s.id, s.messages);
+            });
+            // Preserve any already-loaded messages from previous ref
+            messagesBySessionRef.current.forEach((msgs, id) => {
+              if (msgMap.has(id) && msgs.length > 0) {
+                msgMap.set(id, msgs);
+              }
+            });
+            messagesBySessionRef.current = msgMap;
             // Restore last active conversation if it exists in the list
             const savedConvId = localStorage.getItem("pg_active_conversation_id");
             if (savedConvId && convs.some((cv) => cv.id === savedConvId)) {
@@ -322,45 +344,31 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
                   }
                   // Auto-scroll to bottom after loading
                   requestAnimationFrame(() => {
-                    messagesContainerRef.current?.scrollTo({
-                      top: messagesContainerRef.current.scrollHeight,
-                      behavior: "auto",
+                    requestAnimationFrame(() => {
+                      messagesContainerRef.current?.scrollTo({
+                        top: messagesContainerRef.current.scrollHeight,
+                        behavior: "auto",
+                      });
                     });
                   });
                 }
               }).catch(() => {});
             }
           } else {
-            // Empty list from DB for logged-in user — try loading saved conversation directly
-            console.info("[FeaturesPage] DB conversations empty for logged-in user, trying active conversation fallback", { userId: user?.id });
-            const savedConvId = localStorage.getItem("pg_active_conversation_id");
-            if (savedConvId) {
-              getConversation(savedConvId).then((detail) => {
-                if (detail && detail.messages.length > 0) {
-                  const loadedMessages = safeMapDbMessages(detail.messages);
-                  const session: ChatSession = {
-                    id: detail.id,
-                    title: detail.title,
-                    messages: loadedMessages,
-                    city: detail.city,
-                    createdAt: detail.createdAt,
-                    updatedAt: detail.updatedAt,
-                  };
-                  setChatSessions([session]);
-                  setConversationId(detail.id);
-                  conversationIdRef.current = detail.id;
-                  setCurrentSessionId(detail.id);
-                  currentSessionIdRef.current = detail.id;
-                  setSessionMessages(detail.id, loadedMessages);
-                  setMode('chat');
-                  setPhase('result');
-                }
-              }).catch(() => {});
-            }
+            // Empty list from DB for logged-in user — this is expected for new users
+            console.info("[FeaturesPage] DB conversations empty for logged-in user", { userId: user?.id });
+            // Clear any stale active conversation reference
+            localStorage.removeItem("pg_active_conversation_id");
+            setChatSessions([]);
+            messagesBySessionRef.current = new Map();
           }
         })
         .catch((err) => {
-          console.error("[FeaturesPage] Failed to load conversations:", err);
+          console.error("[FeaturesPage] Failed to load conversations from DB:", err);
+          console.info("[FeaturesPage] DB unavailable — login user history will be empty until next refresh");
+          // Do NOT fall back to localStorage for logged-in users
+          setChatSessions([]);
+          messagesBySessionRef.current = new Map();
         });
     } else {
       // Guest: load from localStorage
@@ -492,6 +500,14 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
         return;
       }
 
+      console.info("[FeaturesPage] submit", {
+        userId: user?.id,
+        currentSessionId: currentSessionIdRef.current,
+        conversationId: conversationIdRef.current,
+        message: prompt.slice(0, 100),
+        modelMode,
+      });
+
       const controller = new AbortController();
       setAbortController(controller);
 
@@ -514,6 +530,11 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
         currentSessionIdRef.current = targetSessionId;
         setChatSessions((prev) => [newSession, ...prev]);
         setSessionMessages(targetSessionId, []);
+        // For logged-in users, mark this as a pending local ID
+        // It will be migrated to the real DB conversationId when the backend responds
+        if (user?.id) {
+          console.info("[FeaturesPage] created pending local session", { localId: targetSessionId, userId: user?.id });
+        }
       }
       if (!targetSessionId) return;
 
@@ -613,6 +634,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
             targetSessionId = respConversationId;
           }
           console.info("[FeaturesPage] active conversation set", { sessionId: currentSessionIdRef.current, conversationId: respConversationId });
+          localStorage.setItem("pg_active_conversation_id", respConversationId);
         }
 
         // Refresh sidebar from backend for logged-in users
@@ -628,12 +650,34 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
                 updatedAt: cv.updatedAt,
               }));
               setChatSessions(sessions);
+              // Ensure currentSessionId still points to a valid session
+              const activeId = currentSessionIdRef.current;
+              if (activeId && !convs.some((cv) => cv.id === activeId)) {
+                // Active session was renamed or lost — try to recover
+                const lastConv = convs[0];
+                if (lastConv) {
+                  setCurrentSessionId(lastConv.id);
+                  currentSessionIdRef.current = lastConv.id;
+                  setConversationId(lastConv.id);
+                  conversationIdRef.current = lastConv.id;
+                }
+              }
             }
           }).catch((err) => {
             console.error("[FeaturesPage] Failed to refresh conversations:", err);
           });
         }
         apiTrackEvent({ eventName: "agent_response", payload: { type: respType, conversationId: respConversationId }, page: "features" }).catch(() => {});
+
+        console.info("[FeaturesPage] response", {
+          type: respType,
+          conversationId: respConversationId,
+          provider: metadata?.provider,
+          model: metadata?.model,
+          mode: metadata?.mode,
+          fallbackUsed: metadata?.fallbackUsed ?? false,
+          contentLength: (resp?.content as string)?.length ?? 0,
+        });
 
         // Branch by response type
         switch (respType) {
@@ -665,7 +709,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
             break;
           }
           case "plan": {
-            const planData = (resp as { data?: { options?: PlanningOption[]; summary?: string; executableActions?: PlanningExecutableAction[] } })?.data;
+            const planData = (resp as { data?: { options?: PlanningOption[]; summary?: string; executableActions?: PlanningExecutableAction[]; planningActions?: PlanningAction[] } })?.data;
             const options = planData?.options ?? [];
             const optionsWithIds = options.map((opt: PlanningOption, idx: number) => ({
               ...opt,
@@ -678,6 +722,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
               chips: undefined,
               plans: optionsWithIds,
               actions: (planData?.executableActions as PlanningExecutableAction[]) ?? [],
+              planningActions: (planData?.planningActions as PlanningAction[]) ?? undefined,
               metadata: msgMetadata,
             });
             // Update sidebar title from plan content
@@ -916,6 +961,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
         if (detail) {
           const loadedMessages = safeMapDbMessages(detail.messages ?? []);
           setSessionMessages(sessionId, loadedMessages);
+          messagesBySessionRef.current.set(sessionId, loadedMessages);
           setMessages(loadedMessages);
           setMode("chat");
           setPhase(loadedMessages.length > 0 ? "result" : "idle");
@@ -933,9 +979,11 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
 
           // Auto-scroll to bottom after messages load
           requestAnimationFrame(() => {
-            messagesContainerRef.current?.scrollTo({
-              top: messagesContainerRef.current.scrollHeight,
-              behavior: "auto",
+            requestAnimationFrame(() => {
+              messagesContainerRef.current?.scrollTo({
+                top: messagesContainerRef.current.scrollHeight,
+                behavior: "auto",
+              });
             });
           });
           return;
@@ -959,9 +1007,11 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     setSidebarOpen(false);
     setInputValue("");
     requestAnimationFrame(() => {
-      messagesContainerRef.current?.scrollTo({
-        top: messagesContainerRef.current.scrollHeight,
-        behavior: "auto",
+      requestAnimationFrame(() => {
+        messagesContainerRef.current?.scrollTo({
+          top: messagesContainerRef.current.scrollHeight,
+          behavior: "auto",
+        });
       });
     });
   }, [user?.id, chatSessions, setSessionMessages, showToast]);
@@ -1146,6 +1196,83 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     [city, addMemory, showToast, updateSessionMessages],
   );
 
+  const handleUnifiedAction = useCallback(async (action: PlanningAction) => {
+    console.info("[FeaturesPage] unified action", { type: action.type, label: action.label });
+
+    // Track the action click
+    try {
+      await trackAction({
+        conversationId: conversationIdRef.current ?? undefined,
+        actionType: action.type,
+        label: action.label,
+      });
+    } catch {
+      // tracking failure is non-fatal
+    }
+
+    switch (action.type) {
+      case "open_url":
+        window.open(action.url, action.target ?? "_blank");
+        break;
+      case "map_search": {
+        const query = encodeURIComponent(action.query);
+        const citySuffix = action.city ? `&city=${encodeURIComponent(action.city)}` : "";
+        if (action.provider === "amap") {
+          window.open(`https://www.amap.com/search?query=${query}${citySuffix}`, "_blank");
+        } else if (action.provider === "baidu") {
+          window.open(`https://map.baidu.com/search/${query}`, "_blank");
+        } else {
+          window.open(`https://www.google.com/maps/search/${query}`, "_blank");
+        }
+        break;
+      }
+      case "navigation": {
+        const dest = encodeURIComponent(action.destination);
+        const originParam = action.origin ? `&from=${encodeURIComponent(action.origin)}` : "";
+        const modeMap: Record<string, string> = { walking: "walk", driving: "drive", transit: "bus" };
+        const mode = modeMap[action.mode ?? "transit"];
+        if (action.provider === "amap") {
+          window.open(`https://www.amap.com/dir?type=${mode}&to=${dest}${originParam}`, "_blank");
+        } else {
+          window.open(`https://map.baidu.com/dir/${action.origin ? encodeURIComponent(action.origin) + "/" : ""}${dest}`, "_blank");
+        }
+        break;
+      }
+      case "copy_text":
+        await navigator.clipboard.writeText(action.text);
+        showToast("已复制到剪贴板", "success");
+        break;
+      case "calendar": {
+        // Use ICS file download
+        const icsContent = [
+          "BEGIN:VCALENDAR",
+          "VERSION:2.0",
+          "BEGIN:VEVENT",
+          `SUMMARY:${action.title}`,
+          action.startTime ? `DTSTART:${action.startTime.replace(/[-:]/g, "").replace(" ", "T")}` : "",
+          action.endTime ? `DTEND:${action.endTime.replace(/[-:]/g, "").replace(" ", "T")}` : "",
+          action.description ? `DESCRIPTION:${action.description}` : "",
+          "END:VEVENT",
+          "END:VCALENDAR",
+        ].filter(Boolean).join("\r\n");
+        const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${action.title}.ics`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast("日历文件已下载", "success");
+        break;
+      }
+      case "mobile_handoff":
+        // Show QR code modal for mobile handoff
+        setHandoffPlanId(action.planId);
+        setShowHandoffQR(true);
+        break;
+    }
+  }, [showToast]);
+
   const handleNextAction = useCallback(
     (label: string) => {
       switch (label) {
@@ -1299,6 +1426,8 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
                           planActions={planActions}
                           onExecuteAction={handleExecuteAction}
                           busyActionId={busyActionId}
+                          unifiedActions={msg.planningActions}
+                          onUnifiedAction={handleUnifiedAction}
                         />
                       );
                     })}
@@ -1321,7 +1450,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
         </div>
       );
     },
-    [selectedPlanId, handleRetryLast, handleNewChat, handleSelectPlan, handleExecuteAction, busyActionId],
+    [selectedPlanId, handleRetryLast, handleNewChat, handleSelectPlan, handleExecuteAction, busyActionId, handleUnifiedAction],
   );
 
   /* ═══════════════════════════════════════════════
@@ -1432,9 +1561,16 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
               onScroll={handleMessagesScroll}
             >
               <div className={styles.featureMessagesInner}>
-                {messages.map((msg) => (
-                  <div key={msg.id}>{renderMessageContent(msg)}</div>
-                ))}
+                {messages.length === 0 ? (
+                  <div className={styles.emptyMessagesHint}>
+                    <p>这个会话暂无消息</p>
+                    <p>发送一条消息开始规划吧</p>
+                  </div>
+                ) : (
+                  messages.map((msg) => (
+                    <div key={msg.id}>{renderMessageContent(msg)}</div>
+                  ))
+                )}
                 <div ref={messagesEndRef} />
               </div>
             </div>
@@ -1483,6 +1619,22 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
           知道了
         </Button>
       </WorkspaceModal>
+
+      {/* 手机扫码接续弹窗 */}
+      {showHandoffQR && conversationId && (
+        <WorkspaceModal
+          open={showHandoffQR}
+          onClose={() => setShowHandoffQR(false)}
+          title="手机扫码继续"
+          width="sm"
+        >
+          <MobileHandoffQRCode
+            conversationId={conversationId}
+            planId={handoffPlanId}
+            onClose={() => setShowHandoffQR(false)}
+          />
+        </WorkspaceModal>
+      )}
 
       <GlassToast toast={glassToast} onDismiss={dismissToast} />
     </section>

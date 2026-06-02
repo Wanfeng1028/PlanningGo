@@ -24,6 +24,8 @@ import type {
 } from "../../../shared/agentResponse.js";
 import type { PlanningProviders } from "../planning/schemas.js";
 import { runPlanningPipeline } from "./orchestrator.js";
+import { createPlanningActions } from "../execution/actionService.js";
+import { extractMemoryFromSlots, mergeMemoryProfile } from "./memoryExtractor.js";
 import * as mem from "../../services/memoryStore.js";
 
 // ─── Constants ──────────────────────────────────────────────
@@ -159,9 +161,11 @@ export function extractPlanningSlots(message: string): PlanningSlots {
   }
 
   // partySize
-  const sizeMatch = normalized.match(/(\d+)\s*人/);
+  const cnNumMap: Record<string, number> = { "一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9 };
+  const sizeMatch = normalized.match(/(\d+)\s*人/) || normalized.match(/([一二两三四五六七八九])\s*人/);
   if (sizeMatch) {
-    slots.partySize = Number(sizeMatch[1]);
+    const raw = sizeMatch[1]!;
+    slots.partySize = cnNumMap[raw] ?? Number(raw);
   } else if (/两个人|俩人/.test(normalized)) {
     slots.partySize = 2;
   } else if (/三个人|仨人/.test(normalized)) {
@@ -320,6 +324,20 @@ export async function handleAgentMessage(
   // 2. Load agent state
   const state = await loadAgentState(db, conversationId, log);
 
+  // 2.5 Load recent history for context-aware slot extraction
+  const recentHistory = await loadRecentHistory(db, conversationId, log);
+  // Merge slots from recent history into the state's planningDraft
+  if (recentHistory.length > 0 && state) {
+    for (const msg of recentHistory) {
+      if (msg.role === "user") {
+        const historicalSlots = extractPlanningSlots(msg.content);
+        if (Object.keys(historicalSlots).length > 0) {
+          state.planningDraft = mergeSlots(state.planningDraft ?? {}, historicalSlots);
+        }
+      }
+    }
+  }
+
   // 3. Save user message
   await saveMsg(db, conversationId, "user", input.message, undefined, log);
 
@@ -374,12 +392,82 @@ export async function handleAgentMessage(
       response = replyCasual(conversationId, input.message);
   }
 
+  // 4.5 Extract and persist memory profile after successful plan generation
+  if (response.type === "plan" && userId) {
+    try {
+      const newMemory = extractMemoryFromSlots(state?.planningDraft ?? {});
+      if (Object.keys(newMemory).length > 0) {
+        // Upsert as a single "planning_profile" memory entry
+        const existing = await db?.memory.findFirst({
+          where: { userId: userId!, category: "route", title: "planning_profile", deletedAt: null },
+        });
+        const memoryJson = existing
+          ? mergeMemoryProfile(JSON.parse(existing.detail), newMemory)
+          : newMemory;
+        if (existing) {
+          await db?.memory.update({
+            where: { id: existing.id },
+            data: { detail: JSON.stringify(memoryJson), weight: 0.9 },
+          });
+        } else {
+          await db?.memory.create({
+            data: {
+              userId: userId!,
+              category: "route",
+              title: "planning_profile",
+              detail: JSON.stringify(memoryJson),
+              weight: 0.9,
+            },
+          });
+        }
+        log.info({ userId, memoryJson }, "[chatRouter] Memory profile updated from planning slots");
+      }
+    } catch (memErr) {
+      log.warn({ err: memErr }, "[chatRouter] Failed to update memory profile");
+    }
+  }
+
   // 5. Save assistant message
   await saveMsg(db, conversationId, "assistant", response.content, { ...response }, log);
 
   // 6. Update agent state
   const newState = computeNewState(state, response);
   await saveAgentState(db, conversationId, newState, log);
+
+  // 7. Update conversation title if we have planning info
+  const currentDraft = newState?.planningDraft;
+  if (currentDraft) {
+    const titleSlots = currentDraft as Record<string, unknown>;
+    const dest = String(titleSlots.destination || titleSlots.destinationCity || "").trim();
+    const origin = String(titleSlots.origin || "").trim();
+    const prefs = titleSlots.preferences || titleSlots.preference;
+    const prefStr = Array.isArray(prefs) ? prefs.slice(0, 3).join("") : String(prefs || "");
+
+    let newTitle: string | null = null;
+    if (dest && prefStr) {
+      newTitle = `${dest}${prefStr}游`;
+    } else if (origin && dest) {
+      newTitle = `${origin}到${dest}规划`;
+    } else if (dest) {
+      newTitle = `${dest}出行规划`;
+    }
+
+    if (newTitle && db) {
+      try {
+        await db.conversation.update({
+          where: { id: conversationId },
+          data: { title: newTitle },
+        });
+        log.info({ conversationId, newTitle }, "[chatRouter] title updated");
+      } catch (err) {
+        log.warn({ err }, "[chatRouter] title update failed");
+      }
+    }
+    // Also update memory store
+    if (newTitle) {
+      mem.updateConversationTitle?.(conversationId, newTitle);
+    }
+  }
 
   return response;
 }
@@ -653,6 +741,12 @@ async function generatePlanFromSlots(
         options: result.options,
         summary: result.summary,
         executableActions: result.executableActions,
+        planningActions: createPlanningActions({
+          planId: result.planId,
+          conversationId,
+          options: result.options as import("../planning/schemas.js").ActivityPlan[],
+          intent: result.intent,
+        }),
         conversationId,
       },
       conversationId,
@@ -736,6 +830,31 @@ function computeNewState(prev: AgentState | null | undefined, response: AgentRes
 }
 
 // ─── DB Helpers ─────────────────────────────────────────────
+
+async function loadRecentHistory(
+  db: PrismaClient | null,
+  conversationId: string,
+  log: HandlerContext["log"],
+): Promise<Array<{ role: string; content: string }>> {
+  if (db) {
+    try {
+      const msgs = await db.message.findMany({
+        where: { conversationId },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        select: { role: true, content: true },
+      });
+      return msgs.reverse();
+    } catch {
+      log.warn("[chatRouter] Failed to load history from DB");
+    }
+  }
+  const memMsgs = mem.listMessages(conversationId);
+  return memMsgs.slice(-20).map((m: { role: string; content: string }) => ({
+    role: m.role,
+    content: m.content,
+  }));
+}
 
 async function ensureConversation(
   db: PrismaClient | null,
@@ -853,7 +972,11 @@ async function saveMsg(
       const msg = await db.message.create({
         data: { conversationId, role, content, payloadJson: payloadJson as any },
       });
-      log?.info(`[chatRouter] saveMsg OK id=${msg.id} role=${role} conv=${conversationId}`);
+      log?.info({
+        conversationId,
+        role,
+        messageId: msg.id,
+      }, "[chatRouter] message saved to DB");
       try {
         await db.conversation.update({
           where: { id: conversationId },
@@ -862,9 +985,13 @@ async function saveMsg(
       } catch { /* non-critical */ }
       return;
     } catch (err) {
-      log?.error({ err }, `[chatRouter] saveMsg DB FAILED role=${role} conv=${conversationId}, falling back to memory`);
+      log?.error({
+        conversationId,
+        role,
+        err,
+      }, "[chatRouter] message DB write failed");
     }
   }
   mem.addMessage({ conversationId, role, content, payloadJson });
-  log?.info(`[chatRouter] saveMsg MEMORY fallback role=${role} conv=${conversationId}`);
+  log?.warn({ conversationId, role }, "[chatRouter] message saved to MEMORY only (DB unavailable)");
 }

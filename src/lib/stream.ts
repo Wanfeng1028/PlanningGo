@@ -18,13 +18,40 @@ export async function streamFetch(
   const { onChunk, onFinalResult, onError, onComplete, signal, ...fetchOptions } = options;
 
   try {
-    const response = await fetch(url, {
+    let response = await fetch(url, {
       ...fetchOptions,
       signal,
     });
 
+    // Handle 401: refresh token and retry once
+    if (response.status === 401) {
+      const newToken = await refreshToken().catch(() => null);
+      if (newToken) {
+        // refreshToken() already called setAuthToken() internally
+        // Retry with refreshed token
+        const retryHeaders: Record<string, string> = {
+          ...(fetchOptions.headers as Record<string, string> ?? {}),
+          authorization: `Bearer ${newToken}`,
+        };
+        response = await fetch(url, {
+          ...fetchOptions,
+          headers: retryHeaders,
+          signal,
+        });
+      } else {
+        // Refresh failed — clear stale token and signal auth error
+        setAuthToken(null);
+        throw new Error("登录已过期，请重新登录");
+      }
+    }
+
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
+    }
+
+    // Proactively refresh token if optionalAuthGuard signalled expiration
+    if (response.headers.get("x-token-expired") === "1") {
+      refreshToken().then((t) => { if (t) setAuthToken(t); }).catch(() => {});
     }
 
     const reader = response.body?.getReader();

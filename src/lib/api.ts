@@ -153,7 +153,7 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
     if (response.status === 401) {
       const newToken = await refreshToken();
       if (newToken) {
-        setAuthToken(newToken);
+        // refreshToken() already called setAuthToken() internally
         // Retry with new token
         headers.authorization = `Bearer ${newToken}`;
         response = await fetch(`${API_BASE}${path}`, {
@@ -166,6 +166,14 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
         setAuthToken(null);
         throw new Error("请重新登录");
       }
+    }
+
+    // Handle optionalAuthGuard signal: token was present but invalid
+    // Proactively refresh in the background for next request
+    if (response.headers.get("x-token-expired") === "1" && _authToken) {
+      refreshToken().then((newToken) => {
+        if (newToken) setAuthToken(newToken);
+      }).catch(() => {});
     }
 
     let body: unknown;
@@ -899,6 +907,22 @@ export async function cancelExecAction(actionId: string): Promise<Record<string,
 }
 
 // ═══════════════════════════════════════════════════
+// Action Tracking API
+// ═══════════════════════════════════════════════════
+
+export async function trackAction(input: {
+  conversationId?: string;
+  planId?: string;
+  actionType: string;
+  label: string;
+}): Promise<{ success: boolean }> {
+  return apiJson("/api/actions/track", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+// ═══════════════════════════════════════════════════
 // Events & Error Logging API
 // ═══════════════════════════════════════════════════
 
@@ -940,3 +964,54 @@ export async function reportClientError(input: {
     body: JSON.stringify(input),
   });
 }
+
+// ── Handoff Code API ──
+
+export interface HandoffCodeResult {
+  code: string;
+  continueUrl: string;
+  qrSvg: string;
+  expiresAt: string;
+}
+
+export async function createHandoffCode(input: {
+  conversationId: string;
+  planId?: string;
+}): Promise<HandoffCodeResult> {
+  const resp = await apiJson<{ data: HandoffCodeResult }>("/api/handoff/create", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return resp.data;
+}
+
+export async function getHandoffCode(code: string): Promise<{
+  code: string;
+  conversationId: string;
+  planId: string | null;
+  userId: string | null;
+  status: string;
+  expiresAt: string;
+} | null> {
+  try {
+    const resp = await apiJson<{ data: any }>(`/api/handoff/${encodeURIComponent(code)}`);
+    return resp.data;
+  } catch {
+    return null;
+  }
+}
+
+export async function claimHandoffCode(code: string, deviceId: string): Promise<{
+  success: boolean;
+  conversationId: string;
+  planId: string | null;
+}> {
+  const resp = await apiJson<{ data: any }>(`/api/handoff/${encodeURIComponent(code)}/claim`, {
+    method: "POST",
+    body: JSON.stringify({ deviceId }),
+  });
+  return resp.data;
+}
+
+// ── Shared type re-exports ──
+export type { PlanningAction, UserMemoryProfile } from "../shared/agentResponse";

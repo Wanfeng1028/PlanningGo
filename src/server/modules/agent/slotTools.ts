@@ -39,8 +39,9 @@ export function executeUpdatePlanningDraft(
   if (input.origin) incoming.origin = input.origin;
   if (input.destination) incoming.destination = input.destination;
   if (input.destinationCity) incoming.destinationCity = input.destinationCity;
-  if (input.budget) incoming.budget = input.budget;
-  if (input.partySize) incoming.partySize = input.partySize;
+  // budget/partySize: use explicit check so 0 is not silently dropped
+  if (input.budget !== undefined && input.budget !== null) incoming.budget = input.budget;
+  if (input.partySize !== undefined && input.partySize !== null) incoming.partySize = input.partySize;
   if (input.date) incoming.date = input.date;
   if (input.time) incoming.time = input.time;
   if (input.timeWindow) incoming.timeWindow = input.timeWindow;
@@ -59,7 +60,10 @@ export function executeUpdatePlanningDraft(
       incoming.preference = prefs;
     }
   }
-  incoming.preferences = incoming.preference;
+  // Sync preferences alias — only if preference was actually set
+  if (incoming.preference) {
+    incoming.preferences = incoming.preference;
+  }
   if (input.companions) incoming.companions = input.companions;
 
   // Sync destination aliases

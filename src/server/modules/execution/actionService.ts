@@ -1,5 +1,6 @@
 import { createId, createIdempotencyKey } from "../../common/id";
 import type { ActivityPlan, ExecutionAction, UserIntent } from "../planning/schemas";
+import type { PlanningAction } from "../../../shared/agentResponse.js";
 
 /**
  * 为方案生成可执行动作（预约、锁座、日历、分享等）。
@@ -128,4 +129,76 @@ function createShareAction(
 function buildShareText(option: ActivityPlan): string {
   const lines = option.timeline.map((step) => `${step.startTime}-${step.endTime} ${step.title}`);
   return [`我让周末去哪儿排了一个方案：${option.title}`, ...lines, "你看可以吗？"].join("\n");
+}
+
+// ─── Unified PlanningAction[] Generator ─────────────────────
+
+/**
+ * Generate a unified PlanningAction[] array for a plan result.
+ * These actions are frontend-renderable action cards (map, navigation, copy, calendar, handoff).
+ */
+export function createPlanningActions(input: {
+  planId: string;
+  conversationId?: string;
+  options: ActivityPlan[];
+  intent: UserIntent;
+}): PlanningAction[] {
+  const actions: PlanningAction[] = [];
+  const firstOption = input.options[0];
+  if (!firstOption) return actions;
+
+  // Derive destination and city from intent
+  const destination = input.intent.city || "目的地";
+  const city = input.intent.city;
+
+  // 1. map_search — open map to search the destination/POIs
+  actions.push({
+    type: "map_search",
+    label: `打开高德搜索${destination}`,
+    provider: "amap",
+    query: destination,
+    city,
+  });
+
+  // 2. navigation — navigate to the first POI
+  const firstPOI = firstOption.timeline.find((step) => step.poiName)?.poiName;
+  if (firstPOI) {
+    actions.push({
+      type: "navigation",
+      label: `导航到${firstPOI}`,
+      provider: "amap",
+      destination: firstPOI,
+    });
+  }
+
+  // 3. copy_text — copy the full plan text
+  const shareText = buildShareText(firstOption);
+  actions.push({
+    type: "copy_text",
+    label: "复制完整行程",
+    text: shareText,
+  });
+
+  // 4. calendar — generate a calendar event for the plan
+  const startTime = firstOption.timeline[0]?.startTime;
+  const endTime = firstOption.timeline[firstOption.timeline.length - 1]?.endTime;
+  actions.push({
+    type: "calendar",
+    label: "生成日程",
+    title: firstOption.title,
+    startTime,
+    endTime,
+  });
+
+  // 5. mobile_handoff — QR code to continue on mobile
+  if (input.conversationId) {
+    actions.push({
+      type: "mobile_handoff",
+      label: "手机继续查看",
+      conversationId: input.conversationId,
+      planId: input.planId,
+    });
+  }
+
+  return actions;
 }

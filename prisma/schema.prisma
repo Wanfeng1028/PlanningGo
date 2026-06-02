@@ -802,3 +802,53 @@ model ErrorLog {
   @@index([createdAt])
   @@map("error_logs")
 }
+
+// ============================================================================
+// Handoff Session — QR Code Mobile Handoff (legacy, kept for backward compat)
+// ============================================================================
+
+model HandoffSession {
+  id               String    @id @default(uuid()) @db.Uuid
+  tokenHash        String    @unique @map("token_hash")
+  conversationId   String    @map("conversation_id") @db.Uuid
+  planId           String?   @map("plan_id") @db.Uuid
+  selectedOptionId String?   @map("selected_option_id")
+  userId           String?   @map("user_id") @db.Uuid
+  guestId          String?   @map("guest_id")
+  scopes           Json      @default("[]")
+  status           String    @default("waiting_scan")
+  claimedDeviceId  String?   @map("claimed_device_id")
+  claimedAt        DateTime? @map("claimed_at")
+  consumedAt       DateTime? @map("consumed_at")
+  expiresAt        DateTime  @map("expires_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  @@index([conversationId])
+  @@index([userId])
+  @@index([status])
+  @@map("handoff_sessions")
+}
+
+// ============================================================================
+// Handoff Code — Short-lived one-time QR code for mobile handoff
+// ============================================================================
+
+model HandoffCode {
+  id             String    @id @default(uuid()) @db.Uuid
+  code           String    @unique
+  conversationId String    @map("conversation_id") @db.Uuid
+  planId         String?   @map("plan_id") @db.Uuid
+  userId         String?   @map("user_id") @db.Uuid
+  guestId        String?   @map("guest_id")
+  status         String    @default("active")
+  claimedDeviceId String?  @map("claimed_device_id")
+  claimedAt      DateTime? @map("claimed_at")
+  expiresAt      DateTime  @map("expires_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([conversationId])
+  @@index([userId])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("handoff_codes")
+}

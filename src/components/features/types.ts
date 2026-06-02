@@ -1,7 +1,7 @@
-import type { PlanningOption, PlanningExecutableAction } from "../../lib/api";
+import type { PlanningOption, PlanningExecutableAction, PlanningAction } from "../../lib/api";
 
 /* ── Re-export API types used by extracted feature components ── */
-export type { PlanningOption, PlanningExecutableAction };
+export type { PlanningOption, PlanningExecutableAction, PlanningAction };
 
 export type ChatMessageKind =
   | "text"
@@ -40,6 +40,7 @@ export interface ChatMessage {
   chips?: string[];
   plans?: PlanningOption[];
   actions?: PlanningExecutableAction[];
+  planningActions?: PlanningAction[];
   actionQuotingId?: string;
   actionQuotedPreview?: string;
   nextActions?: NextActionItem[];

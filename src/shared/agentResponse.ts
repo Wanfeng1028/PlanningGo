@@ -93,6 +93,66 @@ export interface AgentState {
   }>;
 }
 
+// ─── Unified Planning Action ─────────────────────────────────
+
+/** 统一的可执行动作类型，前端可直接渲染 */
+export type PlanningAction =
+  | {
+      type: "open_url";
+      label: string;
+      url: string;
+      target?: "_blank";
+    }
+  | {
+      type: "map_search";
+      label: string;
+      provider: "amap" | "baidu" | "google";
+      query: string;
+      city?: string;
+    }
+  | {
+      type: "navigation";
+      label: string;
+      provider: "amap" | "baidu";
+      origin?: string;
+      destination: string;
+      mode?: "walking" | "driving" | "transit";
+    }
+  | {
+      type: "copy_text";
+      label: string;
+      text: string;
+    }
+  | {
+      type: "calendar";
+      label: string;
+      title: string;
+      startTime?: string;
+      endTime?: string;
+      description?: string;
+    }
+  | {
+      type: "mobile_handoff";
+      label: string;
+      conversationId: string;
+      planId?: string;
+      actionId?: string;
+    };
+
+// ─── User Memory Profile (前端画像摘要) ─────────────────────
+
+/** 从对话中提取并持久化的用户偏好画像 */
+export interface UserMemoryProfile {
+  homeOrigin?: string;
+  commonCity?: string;
+  budgetRange?: [number, number];
+  companionsPreference?: string;
+  foodPreferences?: string[];
+  activityPreferences?: string[];
+  timePreferences?: string[];
+  riskPreferences?: string[];
+}
+
 // ─── Agent Response (backend → frontend) ────────────────────
 
 export interface AgentResponseMetadata {
@@ -139,6 +199,7 @@ export type AgentResponse =
         options: unknown[];
         summary: string;
         executableActions?: unknown[];
+        planningActions?: PlanningAction[];
         conversationId?: string;
       };
       conversationId: string;

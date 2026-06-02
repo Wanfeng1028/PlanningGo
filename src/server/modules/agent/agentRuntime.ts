@@ -17,7 +17,9 @@ import { chatStream, getChatModel } from "./modelClient.js";
 import { buildSystemPrompt } from "./prompts.js";
 import { AGENT_TOOLS, executeToolCall, type ToolCallContext } from "./tools.js";
 import { runPlanningPipeline } from "./orchestrator.js";
+import { createPlanningActions } from "../execution/actionService.js";
 import { extractPlanningSlots, getMissingSlots, isContinuationIntent, generateTitleFromSlots, mergeSlots } from "./chatRouter.js";
+import { extractMemoryFromSlots, mergeMemoryProfile } from "./memoryExtractor.js";
 import * as mem from "../../services/memoryStore.js";
 
 // ─── Constants ──────────────────────────────────────────────
@@ -90,10 +92,27 @@ export async function runAgentChatStream(
 
   // 5. Build messages array — include planningDraft in system prompt
   const modelInfo = getChatModel(input.modelMode);
+
+  // Load user memory profile to inform planning context
+  let userMemory: Record<string, unknown> | undefined;
+  if (userId && db) {
+    try {
+      const memRow = await db.memory.findFirst({
+        where: { userId, category: "route", title: "planning_profile", deletedAt: null },
+      });
+      if (memRow?.detail) {
+        userMemory = JSON.parse(memRow.detail);
+      }
+    } catch {
+      log.warn("[agentRuntime] Failed to load user memory profile");
+    }
+  }
+
   const systemPrompt = buildSystemPrompt({
     city: input.city,
     currentTime: new Date().toISOString(),
     agentState: state ? { phase: state.phase, planningDraft: state.planningDraft as Record<string, unknown> | undefined } : undefined,
+    userMemory,
   });
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
@@ -300,6 +319,12 @@ export async function runAgentChatStream(
             options: pipelineResult.options,
             summary: pipelineResult.summary,
             executableActions: pipelineResult.executableActions,
+            planningActions: createPlanningActions({
+              planId: pipelineResult.planId,
+              conversationId,
+              options: pipelineResult.options as import("../planning/schemas.js").ActivityPlan[],
+              intent: pipelineResult.intent,
+            }),
             conversationId,
           },
           conversationId,
@@ -310,6 +335,40 @@ export async function runAgentChatStream(
       if (planResponse.content && !finalContent) {
         stream.writeText(planResponse.content);
         finalContent = planResponse.content;
+      }
+
+      // Extract and persist memory profile after successful plan generation
+      if (planResponse.type === "plan" && userId) {
+        try {
+          const newMemory = extractMemoryFromSlots(currentDraft ?? {});
+          if (Object.keys(newMemory).length > 0) {
+            const existing = await db?.memory.findFirst({
+              where: { userId: userId!, category: "route", title: "planning_profile", deletedAt: null },
+            });
+            const memoryJson = existing
+              ? mergeMemoryProfile(JSON.parse(existing.detail), newMemory)
+              : newMemory;
+            if (existing) {
+              await db?.memory.update({
+                where: { id: existing.id },
+                data: { detail: JSON.stringify(memoryJson), weight: 0.9 },
+              });
+            } else {
+              await db?.memory.create({
+                data: {
+                  userId: userId!,
+                  category: "route",
+                  title: "planning_profile",
+                  detail: JSON.stringify(memoryJson),
+                  weight: 0.9,
+                },
+              });
+            }
+            log.info({ userId, memoryJson }, "[agentRuntime] Memory profile updated from planning slots");
+          }
+        } catch (memErr) {
+          log.warn({ err: memErr }, "[agentRuntime] Failed to update memory profile");
+        }
       }
     } catch (err) {
       log.error({ err }, "[agentRuntime] Planning pipeline failed");
@@ -566,7 +625,11 @@ async function saveMsg(
       const msg = await db.message.create({
         data: { conversationId, role, content, payloadJson: payloadJson as any },
       });
-      log?.info(`[agentRuntime] saveMsg OK id=${msg.id} role=${role} conv=${conversationId}`);
+      log?.info({
+        conversationId,
+        role,
+        messageId: msg.id,
+      }, "[agentRuntime] message saved to DB");
       try {
         await db.conversation.update({
           where: { id: conversationId },
@@ -575,11 +638,15 @@ async function saveMsg(
       } catch { /* non-critical */ }
       return;
     } catch (err) {
-      log?.error({ err }, `[agentRuntime] saveMsg DB FAILED role=${role} conv=${conversationId}, falling back to memory`);
+      log?.error({
+        conversationId,
+        role,
+        err,
+      }, "[agentRuntime] message DB write failed");
     }
   }
   mem.addMessage({ conversationId, role, content, payloadJson });
-  log?.info(`[agentRuntime] saveMsg MEMORY fallback role=${role} conv=${conversationId}`);
+  log?.warn({ conversationId, role }, "[agentRuntime] message saved to MEMORY only (DB unavailable)");
 }
 
 async function loadHistory(
