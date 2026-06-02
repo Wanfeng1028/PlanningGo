@@ -62,6 +62,7 @@ export interface AgentMessageInput {
   modelMode?: string;
   conversationId?: string;
   selectedOptionId?: string;
+  guestId?: string;
 }
 
 // ─── Agent State (persisted per conversation) ───────────────
@@ -227,4 +228,46 @@ export type AgentResponse =
       code?: string;
       conversationId?: string;
       metadata?: AgentResponseMetadata;
+    };
+
+// ─── Agent Visible Events (execution process) ───────────────
+
+export type AgentVisibleEvent =
+  | {
+      type: "stage";
+      stage:
+        | "understanding"
+        | "slot_extracting"
+        | "slot_merging"
+        | "weather_checking"
+        | "place_searching"
+        | "route_planning"
+        | "plan_generating"
+        | "action_generating"
+        | "finalizing";
+      title: string;
+      detail?: string;
+      status: "pending" | "running" | "success" | "error" | "skipped";
+      timestamp: string;
+    }
+  | {
+      type: "slot_update";
+      title: string;
+      slots: Record<string, unknown>;
+      timestamp: string;
+    }
+  | {
+      type: "tool";
+      toolName: string;
+      title: string;
+      status: "running" | "success" | "error" | "fallback";
+      detail?: string;
+      fallbackUsed?: boolean;
+      timestamp: string;
+    }
+  | {
+      type: "warning";
+      title: string;
+      detail?: string;
+      timestamp: string;
     };

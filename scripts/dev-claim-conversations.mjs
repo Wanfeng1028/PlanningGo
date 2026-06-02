@@ -3,13 +3,13 @@
  * dev-claim-conversations.mjs — 开发期对话归属修复脚本
  *
  * 用法：
- *   node scripts/dev-claim-conversations.mjs --email xiaoming@example.com [--before 2026-06-01] [--after 2026-05-01] [--ids uuid1,uuid2] [--confirm]
+ *   node scripts/dev-claim-conversations.mjs --email xiaoming@example.com [--before 2026-06-01] [--after 2026-05-01] [--ids uuid1,uuid2] [--contains keyword] [--limit 50] [--dry-run] [--confirm]
  *
  * 功能：
  *   1. 按 email 查找用户
- *   2. 按 updatedAt 范围或指定 ID 筛选 conversations
- *   3. 打印将要修改的对话列表
- *   4. 只有带 --confirm 才真正执行 UPDATE
+ *   2. 按 updatedAt 范围、指定 ID 或消息内容筛选 conversations
+ *   3. 打印将要修改的对话列表及统计信息
+ *   4. 只有带 --confirm 才真正执行 UPDATE（默认 dry-run）
  *
  * ⚠️ 仅供本地开发使用，切勿在生产环境运行
  */
@@ -32,11 +32,14 @@ const email = getArg("email");
 const before = getArg("before");
 const after = getArg("after");
 const idsRaw = getArg("ids");
+const contains = getArg("contains");
+const limit = parseInt(getArg("limit") ?? "50", 10) || 50;
 const confirm = hasFlag("confirm");
+const dryRun = hasFlag("dry-run") || !confirm; // --dry-run is explicit; also implied when --confirm is absent
 
 if (!email) {
   console.error("❌ 缺少 --email 参数");
-  console.error("   用法: node scripts/dev-claim-conversations.mjs --email xiaoming@example.com [--before 2026-06-01] [--after 2026-05-01] [--ids uuid1,uuid2] [--confirm]");
+  console.error("   用法: node scripts/dev-claim-conversations.mjs --email xiaoming@example.com [--before 2026-06-01] [--after 2026-05-01] [--ids uuid1,uuid2] [--contains keyword] [--limit 50] [--dry-run] [--confirm]");
   process.exit(1);
 }
 
@@ -66,8 +69,8 @@ try {
      WHERE c.user_id = $1
      GROUP BY c.id
      ORDER BY c.updated_at DESC
-     LIMIT 50`,
-    [user.id],
+     LIMIT $2`,
+    [user.id, limit],
   );
   console.log(`📊 当前归属于该用户的 conversations: ${myRes.rows.length}`);
   for (const row of myRes.rows) {
@@ -75,15 +78,44 @@ try {
   }
 
   // 3. 查询所有 conversations（含匿名）
-  console.log("\n📋 全部 conversations（最近 100 条）:");
+  console.log(`\n📋 全部 conversations（最近 ${limit} 条）:`);
   const allRes = await client.query(
     `SELECT c.id, c.user_id, c.guest_id, c.title, c.updated_at, COUNT(m.id) AS message_count
      FROM conversations c
      LEFT JOIN messages m ON m.conversation_id = c.id
      GROUP BY c.id
      ORDER BY c.updated_at DESC
-     LIMIT 100`,
+     LIMIT $1`,
+    [limit],
   );
+
+  // Statistics: date range, total message count, ownership breakdown
+  let totalMessages = 0;
+  let oldestDate = null;
+  let newestDate = null;
+  let ownedByUser = 0;
+  let ownedByOthers = 0;
+  let guestOwned = 0;
+  let anonymous = 0;
+  for (const row of allRes.rows) {
+    const msgCount = parseInt(row.message_count, 10) || 0;
+    totalMessages += msgCount;
+    const d = row.updated_at;
+    if (!oldestDate || d < oldestDate) oldestDate = d;
+    if (!newestDate || d > newestDate) newestDate = d;
+    if (row.user_id === user.id) ownedByUser++;
+    else if (row.user_id) ownedByOthers++;
+    else if (row.guest_id) guestOwned++;
+    else anonymous++;
+  }
+
+  console.log(`   ── 统计 ──`);
+  console.log(`   总计: ${allRes.rows.length} conversations, ${totalMessages} messages`);
+  if (oldestDate && newestDate) {
+    console.log(`   日期范围: ${oldestDate.toISOString().slice(0, 10)} ~ ${newestDate.toISOString().slice(0, 10)}`);
+  }
+  console.log(`   归属: 本人=${ownedByUser}, 其他用户=${ownedByOthers}, 访客=${guestOwned}, 匿名=${anonymous}`);
+  console.log(`   ── 列表 ──`);
   for (const row of allRes.rows) {
     const owner = row.user_id ? (row.user_id === user.id ? "👤 本人" : `🔒 ${row.user_id.slice(0, 8)}…`) : (row.guest_id ? `👻 guest:${row.guest_id.slice(0, 8)}…` : "❓ anonymous");
     console.log(`   ${row.id.slice(0, 8)}… | ${owner.padEnd(18)} | ${row.title.padEnd(25)} | msgs=${row.message_count} | updated=${row.updated_at.toISOString().slice(0, 16)}`);
@@ -96,7 +128,7 @@ try {
     targetIds = idsRaw.split(",").map((s) => s.trim());
     console.log(`\n🎯 指定认领 ${targetIds.length} 个 conversation ID`);
   } else {
-    // 按时间范围筛选 user_id IS NULL 的 conversations
+    // 按时间范围或消息内容筛选 user_id IS NULL 的 conversations
     let whereClause = "c.user_id IS NULL";
     const params = [];
     let paramIdx = 1;
@@ -109,6 +141,10 @@ try {
       whereClause += ` AND c.updated_at > $${paramIdx++}`;
       params.push(after);
     }
+    if (contains) {
+      whereClause += ` AND EXISTS (SELECT 1 FROM messages m2 WHERE m2.conversation_id = c.id AND m2.content ILIKE $${paramIdx++})`;
+      params.push(`%${contains}%`);
+    }
 
     const candidatesRes = await client.query(
       `SELECT c.id, c.user_id, c.guest_id, c.title, c.updated_at, COUNT(m.id) AS message_count
@@ -117,8 +153,8 @@ try {
        WHERE ${whereClause}
        GROUP BY c.id
        ORDER BY c.updated_at DESC
-       LIMIT 50`,
-      params,
+       LIMIT $${paramIdx}`,
+      [...params, limit],
     );
 
     if (candidatesRes.rows.length === 0) {
@@ -139,9 +175,11 @@ try {
   }
 
   // 5. 执行认领
-  if (!confirm) {
-    console.log(`\n⚠️  将要认领 ${targetIds.length} 个 conversations 给 ${user.name} (${user.id})`);
-    console.log("   添加 --confirm 参数来执行更新");
+  if (dryRun) {
+    console.log(`\n🔎 [DRY-RUN] 将要认领 ${targetIds.length} 个 conversations 给 ${user.name} (${user.id})`);
+    if (!hasFlag("dry-run") && !confirm) {
+      console.log("   当前为预览模式。添加 --confirm 参数来执行更新，或添加 --dry-run 显式预览。");
+    }
     process.exit(0);
   }
 
@@ -160,8 +198,8 @@ try {
      WHERE c.user_id = $1
      GROUP BY c.id
      ORDER BY c.updated_at DESC
-     LIMIT 50`,
-    [user.id],
+     LIMIT $2`,
+    [user.id, limit],
   );
   console.log(`\n📊 认领后该用户共有 ${verifyRes.rows.length} 个 conversations:`);
   for (const row of verifyRes.rows) {

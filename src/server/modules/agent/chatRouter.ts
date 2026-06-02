@@ -87,7 +87,7 @@ export function classifyAgentIntent(message: string, state?: AgentState | null):
 
   // continuation — user says "生成完整方案/继续/就这个/安排吧" etc.
   // If state already has planningDraft with info, treat as continuation (skip re-asking)
-  if (/生成.*方案|完整.*方案|继续|就这个|安排吧|帮我细化|重新规划|出.*方案|给.*方案|来.*方案/.test(trimmed)) {
+  if (/生成.*方案|完整.*方案|继续|就这个|安排吧|帮我细化|重新规划|出.*方案|给.*方案|来.*方案|可以了|够了|就这样|安排一下|出方案|生成完整|帮我安排/.test(trimmed)) {
     const draft = state?.planningDraft;
     if (draft && (draft.destination || draft.destinationCity || draft.origin || draft.budget)) {
       return "continuation";
@@ -119,7 +119,7 @@ export function classifyAgentIntent(message: string, state?: AgentState | null):
 /** Check if the user's message is a continuation intent (generate/continue/arrange) */
 export function isContinuationIntent(message: string): boolean {
   const trimmed = message.trim();
-  return /生成.*方案|完整.*方案|继续|就这个|安排吧|帮我细化|重新规划|出.*方案|给.*方案|来.*方案|可以了|够了|就这样/.test(trimmed);
+  return /生成.*方案|完整.*方案|继续|就这个|安排吧|帮我细化|重新规划|出.*方案|给.*方案|来.*方案|可以了|够了|就这样|安排一下|出方案|生成完整|帮我安排/.test(trimmed);
 }
 
 // ─── Slot Extraction ────────────────────────────────────────
@@ -145,7 +145,13 @@ export function extractPlanningSlots(message: string): PlanningSlots {
     const dest = destMatch[1].replace(/[，,。.！!？?、]/g, "").trim();
     if (dest.length > 0 && dest.length < 30) {
       slots.destination = dest;
-      slots.destinationCity = dest;
+      // Infer city from well-known destinations
+      const cityMap: Record<string, string> = {
+        "西湖": "杭州", "灵隐寺": "杭州", "西溪": "杭州", "千岛湖": "杭州",
+        "外滩": "上海", "南京路": "上海", "迪士尼": "上海",
+        "故宫": "北京", "天安门": "北京", "长城": "北京",
+      };
+      slots.destinationCity = cityMap[dest] ?? undefined;
     }
   }
 
@@ -250,9 +256,8 @@ export function mergeSlots(existing: PlanningSlots, incoming: PlanningSlots): Pl
       }
     }
   }
-  // Sync aliases
-  if (merged.destination && !merged.destinationCity) merged.destinationCity = merged.destination as string;
-  if (merged.destinationCity && !merged.destination) merged.destination = merged.destinationCity as string;
+  // Sync aliases — do NOT blindly copy destination ↔ destinationCity
+  // destination = specific place (西湖), destinationCity = city (杭州)
   if (merged.preferences && !merged.preference) merged.preference = merged.preferences;
   if (merged.preference && !merged.preferences) merged.preferences = merged.preference;
   if (merged.time && !merged.date) {
@@ -601,10 +606,9 @@ async function handleContinuation(
     intent: "continuation",
   }, "[chatRouter] continuation draft merge");
 
-  // If we have enough info, go straight to plan generation
-  // Continuation intent NEVER re-asks — use defaults for anything missing
-  if (!mergedSlots.origin) mergedSlots.origin = "市中心";
-  if (!mergedSlots.budget && !mergedSlots.budgetFlexible) mergedSlots.budget = 300;
+  // Continuation: only fill truly missing defaults, NEVER override user values
+  // origin: 不默认填 "市中心"，缺 origin 时方案中标注"出发地未提供"
+  // budget: 不默认填 300，缺 budget 时在方案中标注"预算未提供"
   if (!mergedSlots.partySize && !mergedSlots.companions) mergedSlots.partySize = 1;
 
   return generatePlanFromSlots(conversationId, input, mergedSlots, providers, userId, log);
@@ -631,24 +635,26 @@ async function handlePlanningIntent(
     intent: "planning_request",
   }, "[chatRouter] planning draft merge");
 
-  // Check completeness — only ask when truly missing core info
+  // Check completeness — ask when missing core info
   const missing = getMissingSlots(mergedSlots);
 
-  if (missing.length > 0) {
-    return askMissingSlots(conversationId, mergedSlots, missing);
+  // Filter: origin is not a hard blocker — we can generate a "light" plan without it
+  const hardMissing = missing.filter((k) => k !== "origin");
+
+  if (hardMissing.length > 0) {
+    return askMissingSlots(conversationId, mergedSlots, hardMissing);
   }
 
-  // Apply defaults for optional fields that are missing — but NEVER override user budget
-  if (!mergedSlots.origin) mergedSlots.origin = "市中心";
-  // Only set budget default if user didn't specify one and didn't say "预算我安排吧"
-  if (!mergedSlots.budget && !mergedSlots.budgetFlexible) mergedSlots.budget = 300;
+  // NEVER override user's budget with defaults
+  // budget: only use default if user didn't specify and didn't say "预算我安排吧"
+  // origin: don't fill "市中心" — let planner handle missing origin gracefully
 
   log.info({
     conversationId,
     finalSlotsUsedForPlan: mergedSlots,
   }, "[chatRouter] generate plan slots");
 
-  // Slots are complete — generate plan
+  // Generate plan — planner will handle missing origin/budget gracefully
   return generatePlanFromSlots(conversationId, input, mergedSlots, providers, userId, log);
 }
 
@@ -749,13 +755,15 @@ async function generatePlanFromSlots(
 
     if (message.startsWith("MISSING_REQUIRED_SLOTS:")) {
       const missingKeys = message.replace("MISSING_REQUIRED_SLOTS:", "").split(",") as PlanningSlotKey[];
+      // Don't fill defaults silently — ask the user for truly required slots
+      // Only fill partySize as it's safe to default
       const withDefaults = { ...slots };
       for (const key of missingKeys) {
-        if (key === "origin" && !withDefaults.origin) withDefaults.origin = "市中心";
-        if (key === "budget" && !withDefaults.budget) withDefaults.budget = 300;
         if (key === "partySize" && !withDefaults.partySize && !withDefaults.companions) withDefaults.partySize = 2;
       }
-      if (missingKeys.every((k) => withDefaults[k])) {
+      // If all missing keys can be defaulted, proceed; otherwise ask
+      const unfillable = missingKeys.filter((k) => !withDefaults[k]);
+      if (unfillable.length > 0) {
         return askMissingSlots(conversationId, slots, missingKeys);
       }
       return generatePlanFromSlots(conversationId, input, withDefaults, providers, userId, log);
@@ -888,12 +896,13 @@ async function ensureConversation(
       const conv = await db.conversation.create({
         data: {
           userId: userId ?? undefined,
+          guestId: !userId ? (input.guestId ?? undefined) : undefined,
           title,
           city: input.city ?? "北京",
           modelMode: (input.modelMode as "flash" | "pro") ?? "flash",
         },
       });
-      log.info(`[chatRouter] ensureConversation CREATED DB conv=${conv.id} userId=${userId ?? "null"}`);
+      log.info(`[chatRouter] ensureConversation CREATED DB conv=${conv.id} userId=${userId ?? "null"} guestId=${input.guestId ?? "null"}`);
       return conv.id;
     } catch (err) {
       log.error({ err }, "[chatRouter] Failed to create conversation in DB");

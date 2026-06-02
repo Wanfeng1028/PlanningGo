@@ -6,6 +6,7 @@ import { API_BASE } from "./config";
 export interface StreamOptions {
   onChunk?: (chunk: string) => void;
   onFinalResult?: (result: PlanningResult) => void;
+  onAgentEvent?: (event: unknown) => void;
   onError?: (error: Error) => void;
   onComplete?: () => void;
   signal?: AbortSignal;
@@ -15,7 +16,7 @@ export async function streamFetch(
   url: string,
   options: RequestInit & StreamOptions
 ): Promise<void> {
-  const { onChunk, onFinalResult, onError, onComplete, signal, ...fetchOptions } = options;
+  const { onChunk, onFinalResult, onAgentEvent, onError, onComplete, signal, ...fetchOptions } = options;
 
   try {
     let response = await fetch(url, {
@@ -90,9 +91,13 @@ export async function streamFetch(
               continue;
             }
             try {
-              const parsed = JSON.parse(data) as { content?: string; error?: string; done?: boolean; result?: PlanningResult };
+              const parsed = JSON.parse(data) as { content?: string; error?: string; done?: boolean; result?: PlanningResult; type?: string; event?: unknown };
               if (typeof parsed.error === "string") {
                 throw new Error(parsed.error);
+              }
+              if (parsed.type === "agent_event" && parsed.event) {
+                onAgentEvent?.(parsed.event);
+                continue;
               }
               if (typeof parsed.content === "string") {
                 onChunk?.(parsed.content);
@@ -160,6 +165,7 @@ export async function streamPlanningRequest(
 export interface AgentStreamOptions {
   onChunk?: (chunk: string) => void;
   onFinalResult?: (result: unknown) => void;
+  onAgentEvent?: (event: unknown) => void;
   onError?: (error: Error) => void;
   onComplete?: () => void;
   signal?: AbortSignal;

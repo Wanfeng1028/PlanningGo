@@ -801,8 +801,7 @@ $green: #22c55e;
   padding-top: clamp(32px, 6vh, 72px);
   padding-left: 16px;
   padding-right: 16px;
-  padding-bottom: clamp(160px, 22vh, 260px);
-  scroll-padding-bottom: clamp(160px, 22vh, 260px);
+  padding-bottom: 24px;
   scrollbar-width: thin;
   scrollbar-color: rgba($text, 0.12) transparent;
 
@@ -821,7 +820,7 @@ $green: #22c55e;
 .featureMessagesInner {
   width: min(960px, 100%);
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
   overflow-wrap: anywhere;
   word-break: break-word;
   margin: 0 auto;
@@ -829,7 +828,7 @@ $green: #22c55e;
   flex-direction: column;
   gap: 16px;
   box-sizing: border-box;
-  padding-bottom: 40px;
+  padding-bottom: calc(var(--composer-height, 112px) + 48px);
 
   /* Ensure children cannot cause horizontal overflow */
   & > * {
@@ -852,26 +851,20 @@ $green: #22c55e;
   padding: 2rem 1rem;
 }
 
-/* ── composer dock (absolute floating) ── */
+/* ── composer dock (normal flex child — no longer overlays messages) ── */
 .featureComposerDock {
-  position: absolute;
-  left: 50%;
-  bottom: clamp(20px, 3vh, 40px);
-  bottom: clamp(calc(20px + env(safe-area-inset-bottom, 0px)), 3vh, calc(40px + env(safe-area-inset-bottom, 0px)));
-  transform: translateX(-50%);
-  z-index: 30;
+  position: relative;
+  z-index: 20;
   width: min(960px, calc(100% - 48px));
+  margin: 0 auto;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  pointer-events: none;
-
-  /* Allow pointer events on children only */
-  & > * {
-    pointer-events: auto;
-  }
+  padding: 8px 0 clamp(12px, 2vh, 24px);
+  /* --composer-height is used by featureMessagesInner for bottom padding */
 }
 
 /* ─────────────────────────────────────────────
@@ -1205,6 +1198,9 @@ $green: #22c55e;
   cursor: pointer;
   transition: all 0.15s;
   margin-bottom: 8px;
+  max-width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0;
 
   &:hover {
     background: rgba(239, 68, 68, 0.12);
@@ -1363,7 +1359,7 @@ $green: #22c55e;
   min-width: 0;
   overflow-wrap: anywhere;
   word-break: break-word;
-  overflow: hidden;
+  overflow: visible;
   box-sizing: border-box;
   padding: 16px 20px;
   border-radius: 4px 18px 18px 18px;
@@ -1445,6 +1441,7 @@ $green: #22c55e;
   overflow-wrap: anywhere;
   word-break: break-word;
   max-width: 100%;
+  box-sizing: border-box;
 
   /* Prevent long unbroken strings (URLs, JSON) from expanding container */
   :global(pre) {
@@ -1470,7 +1467,7 @@ $green: #22c55e;
 /* ── plan cards ── */
 .planCards {
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -1479,7 +1476,7 @@ $green: #22c55e;
 }
 
 .planCard {
-  overflow: hidden;
+  overflow: visible;
   overflow-wrap: anywhere;
   word-break: break-word;
   max-width: 100%;
@@ -1614,8 +1611,10 @@ $green: #22c55e;
 
 .planCardTimeline {
   overflow-x: hidden;
+  overflow-y: visible;
   overflow-wrap: anywhere;
   min-width: 0;
+  max-height: none;
   padding-left: 16px;
   margin-bottom: 10px;
   list-style: none;
@@ -2278,7 +2277,7 @@ $green: #22c55e;
   }
 
   .featureMessages {
-    padding-bottom: clamp(180px, 26vh, 280px);
+    padding-bottom: 16px;
     -webkit-overflow-scrolling: touch;
   }
 
@@ -2289,7 +2288,7 @@ $green: #22c55e;
 
   .featureComposerDock {
     width: calc(100% - 24px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
   }
 
   .featureComposer {
@@ -2376,5 +2375,107 @@ $green: #22c55e;
   span {
     opacity: 0.7;
   }
+}
+
+/* ─────────────────────────────────────────────
+   I. Agent Execution Events Panel
+   ───────────────────────────────────────────── */
+
+.agentEventsPanel {
+  position: absolute;
+  right: 16px;
+  top: 80px;
+  width: 280px;
+  max-height: calc(100dvh - 200px);
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 12px 16px;
+  z-index: 15;
+  font-size: 13px;
+  animation: featureFadeUp 0.25s ease-out;
+  scrollbar-width: thin;
+  scrollbar-color: rgba($text, 0.12) transparent;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba($text, 0.12);
+    border-radius: 4px;
+  }
+
+  @media (max-width: 860px) {
+    position: fixed;
+    right: 8px;
+    top: 60px;
+    width: calc(100vw - 16px);
+    max-width: 320px;
+    max-height: 200px;
+    font-size: 12px;
+  }
+}
+
+.agentEventsHeader {
+  font-weight: 600;
+  color: $text;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+
+  &:hover {
+    color: color.adjust($text, $lightness: 10%);
+  }
+}
+
+.agentEventsToggle {
+  font-size: 11px;
+  color: $text-secondary;
+}
+
+.agentEventsList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.agentEventItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+  animation: featureFadeIn 0.2s ease-out;
+
+  &.eventSuccess {
+    color: $green;
+  }
+
+  &.eventRunning {
+    color: $text-secondary;
+  }
+
+  &.eventError {
+    color: #ef4444;
+  }
+}
+
+.agentEventIcon {
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+  font-size: 12px;
+}
+
+.agentEventTitle {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.4;
 }
 

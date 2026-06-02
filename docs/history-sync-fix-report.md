@@ -87,17 +87,20 @@ if (_authToken) {
 
 ### 7. 新建消息后 conversation.userId 是否正确
 
-`agentRuntime.ts` 和 `chatRouter.ts` 的 `ensureConversation` 函数都正确传递 `userId`：
+`agentRuntime.ts` 和 `chatRouter.ts` 的 `ensureConversation` 函数现在同时传递 `userId` 和 `guestId`：
 ```typescript
 const conv = await db.conversation.create({
   data: {
-    userId: userId ?? undefined,  // ✅ 正确
+    userId: userId ?? undefined,
+    guestId: !userId ? (input.guestId ?? undefined) : undefined,
     ...
   },
 });
 ```
 
-如果 `userId` 有值（用户已登录），conversation 会正确关联。
+如果 `userId` 有值（用户已登录），conversation 会正确关联到用户。
+如果 `userId` 为空但 `guestId` 存在（访客模式），conversation 会关联到 guest session。
+避免出现 `userId=null` 且 `guestId=null` 的孤立 conversation。
 
 ### 8. 点击历史是否从 DB 拉 messages
 
@@ -164,11 +167,90 @@ const budget = (typeof effectiveDraft.budget === "number" ? effectiveDraft.budge
 | UI 滚动 | `FeaturesPage.module.scss` | resultSummary 添加 overflow 保护 |
 | 登录用户 fallback | `FeaturesPage.tsx` | 已有防护，DB 失败不会 fallback 到 localStorage |
 
+## 第二轮修复（DB user attribution / ownership hardening）
+
+### 13. 匿名孤儿 conversation 访问控制
+
+**问题**：`userId=null` 且 `guestId=null` 的历史匿名 conversation 可以被任何登录用户访问，存在数据泄露风险。
+
+**修复**：在 `conversations.ts` 的三个端点中添加匿名孤儿检查：
+
+```typescript
+// Anonymous orphan conversations (userId=null, guestId=null) are not accessible by logged-in users
+if (!conv.userId && !conv.guestId && userId) {
+  return sendError(reply, 403, "FORBIDDEN",
+    "此会话为历史匿名数据，需要通过 dev-claim 脚本认领后才能访问");
+}
+```
+
+受影响的端点：
+- `GET /api/conversations/:id`
+- `POST /api/conversations/:id/messages`
+- `GET /api/conversations/:id/messages`（同时修复了 select 遗漏 `guestId` 的问题）
+
+### 14. Agent chat 流 conversation 创建时 guestId 传递
+
+**问题**：`ensureConversation` 在 `chatRouter.ts` 和 `agentRuntime.ts` 中创建 conversation 时未传递 `guestId`，导致访客用户的 conversation 也是匿名孤儿（`userId=null, guestId=null`）。
+
+**修复**：
+- `AgentMessageInput`（`shared/agentResponse.ts`）和 `AgentChatInput`（`agentRuntime.ts`）新增 `guestId?: string` 字段
+- `agentChat.ts` 将请求体中的 `guestId` 传递给 `runAgentChatStream` 和 `handleAgentMessage`
+- `ensureConversation` 在 `chatRouter.ts` 和 `agentRuntime.ts` 中，当 `userId` 为空时设置 `guestId`
+
+### 15. 认领脚本增强
+
+`scripts/dev-claim-conversations.mjs` 新增功能：
+
+| 参数 | 说明 |
+|------|------|
+| `--contains <keyword>` | 按消息内容搜索筛选 conversation |
+| `--limit <n>` | 控制返回数量（默认 50） |
+| `--dry-run` | 显式预览模式（不传 --confirm 时也是 dry-run） |
+
+统计输出增强：
+- 日期范围（oldest ~ newest）
+- 总消息数
+- 归属分类统计（本人/其他用户/访客/匿名）
+
+### 16. 冒烟测试增强
+
+`scripts/smoke-auth-history.mjs` 新增三个测试场景：
+
+| 测试 | 说明 |
+|------|------|
+| Cross-user isolation | 其他用户的 token 无法访问此 conversation（返回 403） |
+| Guest isolation | 无 token 的游客不能看到认证用户的 conversations |
+| plan_selected dedup | 重复选择同一方案不会重复写入消息 |
+
+### 17. 前端 conversation ID 迁移
+
+`FeaturesPage.tsx` 的 `doSubmit` 流程已正确处理：
+- 当 `respConversationId !== targetSessionId` 时，将前端 UUID 迁移为后端 conversation ID
+- 同步更新 `currentSessionId`、`conversationId`、`messagesBySessionRef`、`chatSessions`
+- 侧边栏通过 `listConversations()` 刷新确保一致性
+
+### 18. 登录用户空历史日志优化
+
+`FeaturesPage.tsx` 在 DB conversations 为空时输出更清晰的日志：
+```typescript
+console.info("[FeaturesPage] DB conversations empty for userId=" + user?.id + ", showing empty history");
+```
+
+### 19. 登录用户 localStorage 隔离
+
+`FeaturesPage.tsx` 对已登录用户始终使用 API 获取 conversations：
+- `user?.id` 存在时调用 `listConversations()` API
+- 访客使用 `localStorage`
+- API 失败时登录用户显示空历史，**不会**回退到 localStorage（防止数据混乱）
+
 ## 运行认领脚本
 
 ```bash
-# 查看匿名 conversations
+# 预览匿名 conversations（dry-run）
 node scripts/dev-claim-conversations.mjs --email xiaoming@example.com
+
+# 按消息内容搜索
+node scripts/dev-claim-conversations.mjs --email xiaoming@example.com --contains "西湖"
 
 # 按时间范围认领
 node scripts/dev-claim-conversations.mjs --email xiaoming@example.com --before 2026-06-02 --confirm

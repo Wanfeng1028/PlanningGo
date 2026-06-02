@@ -16,6 +16,7 @@ import {
     selectAgentPlan,
   type AgentPlanSelectResponse,
 } from "../lib/api";
+import type { AgentVisibleEvent } from "../shared/agentResponse";
 import { GlassToast, useGlassToast } from "../components/GlassToast";
 import { validateInputLength } from "../lib/tokens";
 import { sanitizeMarkdown } from "../lib/sanitize";
@@ -186,6 +187,8 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [typedText, setTypedText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [agentEvents, setAgentEvents] = useState<AgentVisibleEvent[]>([]);
+  const [agentEventsCollapsed, setAgentEventsCollapsed] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -344,20 +347,13 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
                     setSelectedPlanId(selPayload.selectedOptionId as string);
                   }
                   // Auto-scroll to bottom after loading
-                  requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                      messagesContainerRef.current?.scrollTo({
-                        top: messagesContainerRef.current.scrollHeight,
-                        behavior: "auto",
-                      });
-                    });
-                  });
+                  forceScrollToBottom("auto");
                 }
               }).catch(() => {});
             }
           } else {
             // Empty list from DB for logged-in user — this is expected for new users
-            console.info("[FeaturesPage] DB conversations empty for logged-in user", { userId: user?.id });
+            console.info("[FeaturesPage] DB conversations empty for userId=" + user?.id + ", showing empty history");
             // Clear any stale active conversation reference
             localStorage.removeItem("pg_active_conversation_id");
             setChatSessions([]);
@@ -422,6 +418,19 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     []
   );
 
+  /** Force scroll to bottom regardless of user scroll position — use for explicit actions */
+  const forceScrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = messagesContainerRef.current;
+        if (el) {
+          el.scrollTo({ top: el.scrollHeight, behavior });
+          setShouldAutoScroll(true);
+        }
+      });
+    });
+  }, []);
+
   const scrollToBottom = useCallback(() => {
     if (!shouldAutoScroll) return; // Respect user's scroll intent
 
@@ -430,6 +439,15 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
       if (el) el.scrollTop = el.scrollHeight;
     });
   }, [shouldAutoScroll]);
+
+  /** Utility: unconditionally scroll messages container to bottom via rAF */
+  function scrollMessagesToBottom(reason: string, behavior: ScrollBehavior = "auto") {
+    requestAnimationFrame(() => {
+      const el = messagesContainerRef.current;
+      if (!el) return;
+      el.scrollTo({ top: el.scrollHeight, behavior });
+    });
+  }
 
   // Auto-scroll only when user is at bottom
   useEffect(() => {
@@ -515,6 +533,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
       setMode("chat");
       setIsBusy(true);
       setPhase("understanding");
+      setAgentEvents([]); // Clear events from previous request
 
       let targetSessionId = currentSessionIdRef.current;
       if (!targetSessionId) {
@@ -548,6 +567,8 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
       };
       addMessage(targetSessionId, userMsg);
       setInputValue("");
+      setShouldAutoScroll(true); // Reset auto-scroll when user sends a message
+      forceScrollToBottom("auto"); // Scroll to see the user message immediately
 
       // 2) Add assistant thinking placeholder
       const thinkingId = uuid();
@@ -587,6 +608,9 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
                 content: streamedContent,
                 chips: undefined,
               });
+            },
+            onAgentEvent: (event) => {
+              setAgentEvents((prev) => [...prev, event as AgentVisibleEvent]);
             },
             onFinalResult: (result: unknown) => {
               agentResponse = result;
@@ -736,6 +760,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
               );
             }
             setPhase("result");
+            forceScrollToBottom("smooth");
             break;
           }
           case "plan_selected": {
@@ -754,6 +779,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
             });
             setSelectedPlanId(selOptId ?? null);
             setPhase("selected");
+            forceScrollToBottom("smooth");
             break;
           }
           case "action_confirm": {
@@ -821,7 +847,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
         setAbortController(null);
       }
     },
-    [isBusy, city, modelMode, addMessage, setSessionMessages, showToast, updateLastAssistant],
+    [isBusy, city, modelMode, addMessage, setSessionMessages, showToast, updateLastAssistant, forceScrollToBottom],
   );
 
   const handleStopGeneration = useCallback(() => {
@@ -906,13 +932,14 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
               selectedPlanTitle: planTitle,
             };
             addMessage(currentSessionIdRef.current, confirmMsg);
+            forceScrollToBottom("smooth");
           }
         }
       } catch (err) {
         console.error("Failed to select plan:", err);
       }
     },
-    [conversationId, messages, addMessage],
+    [conversationId, messages, addMessage, forceScrollToBottom],
   );
 
   const handleRetryLast = useCallback(() => {
@@ -926,6 +953,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     setPhase("idle");
     setInputValue("");
     setSelectedPlanId(null);
+    setAgentEvents([]);
     setCurrentSessionId(null);
     currentSessionIdRef.current = null;
     setConversationId(null);
@@ -979,14 +1007,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
           setInputValue("");
 
           // Auto-scroll to bottom after messages load
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              messagesContainerRef.current?.scrollTo({
-                top: messagesContainerRef.current.scrollHeight,
-                behavior: "auto",
-              });
-            });
-          });
+          forceScrollToBottom("auto");
           return;
         }
       } catch (err) {
@@ -1007,15 +1028,8 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     setSelectedPlanId(null);
     setSidebarOpen(false);
     setInputValue("");
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        messagesContainerRef.current?.scrollTo({
-          top: messagesContainerRef.current.scrollHeight,
-          behavior: "auto",
-        });
-      });
-    });
-  }, [user?.id, chatSessions, setSessionMessages, showToast]);
+    forceScrollToBottom("auto");
+  }, [user?.id, chatSessions, setSessionMessages, showToast, forceScrollToBottom]);
 
 
   /* ── Return to home ── */
@@ -1321,6 +1335,58 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     [selectedPlanId, messages, city, showToast],
   );
 
+  /* ── Render: agent execution events panel ── */
+  const renderAgentEvent = useCallback(
+    (evt: AgentVisibleEvent, _index: number) => {
+      let icon = "•";
+      let statusClass = styles.eventRunning;
+
+      if (evt.type === "stage") {
+        if (evt.status === "running") {
+          icon = "◌";
+          statusClass = styles.eventRunning;
+        } else if (evt.status === "success") {
+          icon = "✓";
+          statusClass = styles.eventSuccess;
+        } else if (evt.status === "error") {
+          icon = "✗";
+          statusClass = styles.eventError;
+        } else if (evt.status === "skipped") {
+          icon = "–";
+          statusClass = styles.eventRunning;
+        }
+      } else if (evt.type === "tool") {
+        if (evt.status === "running") {
+          icon = "⟳";
+          statusClass = styles.eventRunning;
+        } else if (evt.status === "success") {
+          icon = "✓";
+          statusClass = styles.eventSuccess;
+        } else if (evt.status === "error") {
+          icon = "✗";
+          statusClass = styles.eventError;
+        } else if (evt.status === "fallback") {
+          icon = "↻";
+          statusClass = styles.eventRunning;
+        }
+      } else if (evt.type === "slot_update") {
+        icon = "▸";
+        statusClass = styles.eventSuccess;
+      } else if (evt.type === "warning") {
+        icon = "!";
+        statusClass = styles.eventError;
+      }
+
+      return (
+        <div key={`${evt.type}-${evt.timestamp}-${_index}`} className={`${styles.agentEventItem} ${statusClass}`}>
+          <span className={styles.agentEventIcon}>{icon}</span>
+          <span className={styles.agentEventTitle}>{evt.title}</span>
+        </div>
+      );
+    },
+    [],
+  );
+
   /* ── Render: message content ── */
   const renderMessageContent = useCallback(
     (msg: ChatMessage) => {
@@ -1575,6 +1641,26 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
                 <div ref={messagesEndRef} />
               </div>
             </div>
+
+            {/* Agent execution process panel */}
+            {agentEvents.length > 0 && (
+              <div className={styles.agentEventsPanel}>
+                <div
+                  className={styles.agentEventsHeader}
+                  onClick={() => setAgentEventsCollapsed((v) => !v)}
+                >
+                  <span>执行过程</span>
+                  <span className={styles.agentEventsToggle}>
+                    {agentEventsCollapsed ? "▸" : "▾"}
+                  </span>
+                </div>
+                {!agentEventsCollapsed && (
+                  <div className={styles.agentEventsList}>
+                    {agentEvents.map((evt, i) => renderAgentEvent(evt, i))}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className={styles.featureComposerDock} ref={composerDockRef}>
               {isBusy && (

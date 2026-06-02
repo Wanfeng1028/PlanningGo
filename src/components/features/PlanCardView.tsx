@@ -1,4 +1,5 @@
 import type { PlanningOption, PlanningExecutableAction, PlanningAction } from "../../lib/api";
+import { formatMatchScore } from "./formatMatchScore";
 import styles from "../../pages/FeaturesPage.module.scss";
 
 /* ── Plan Card — structured view ── */
@@ -39,7 +40,7 @@ export function PlanCardView({
       <div className={styles.planCardHeader}>
         <div className={styles.planCardTitle}>{plan.title}</div>
         {plan.score > 0 && (
-          <span className={styles.planCardScore}>{Math.round(plan.score * 100)}%匹配</span>
+          <span className={styles.planCardScore}>{formatMatchScore(plan.score)} 匹配</span>
         )}
       </div>
 

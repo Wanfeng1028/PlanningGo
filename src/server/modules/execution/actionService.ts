@@ -39,6 +39,7 @@ function createBookingAction(
 ): ExecutionAction {
   const isMeal = step.type === "meal";
   const type = isMeal ? "restaurant_reservation" : "ticket_lock";
+  const poiLabel = step.poiName ?? "待选择";
 
   return {
     id: createId(isMeal ? "act_restaurant" : "act_ticket"),
@@ -47,7 +48,7 @@ function createBookingAction(
     userId,
     type,
     status: "waiting_confirm",
-    title: isMeal ? `预约 ${step.poiName}` : `锁定 ${step.poiName}`,
+    title: isMeal ? `预约 ${poiLabel}` : `锁定 ${poiLabel}`,
     description: isMeal
       ? `${step.startTime} 为 ${intent.partySize} 人预约，提交前需要你确认。`
       : `${step.startTime} 场次先锁定库存，不自动付款。`,
@@ -65,6 +66,12 @@ function createBookingAction(
 }
 
 function createNavigationAction(planId: string, optionId: string, option: ActivityPlan, userId: string): ExecutionAction {
+  // Filter out null/empty POI names and deduplicate consecutive identical points
+  const points = option.timeline
+    .map((step) => step.poiName)
+    .filter((name): name is string => !!name && name !== "null");
+  const dedupedPoints = points.filter((name, i) => i === 0 || name !== points[i - 1]);
+
   return {
     id: createId("act_nav"),
     planId,
@@ -77,7 +84,7 @@ function createNavigationAction(planId: string, optionId: string, option: Activi
     confirmationRequired: false,
     idempotencyKey: createIdempotencyKey([planId, optionId, "navigation"]),
     payload: {
-      points: option.timeline.filter((step) => step.poiName).map((step) => step.poiName),
+      points: dedupedPoints.length > 0 ? dedupedPoints : undefined,
     },
   };
 }
@@ -160,13 +167,15 @@ export function createPlanningActions(input: {
     city,
   });
 
-  // 2. navigation — navigate to the first POI
-  const firstPOI = firstOption.timeline.find((step) => step.poiName)?.poiName;
-  if (firstPOI) {
+  // 2. navigation — navigate to the first POI (skip if POI is null or same as origin)
+  const firstPOI = firstOption.timeline.find((step) => step.poiName && step.poiName !== "null")?.poiName;
+  const originLabel = input.intent.origin?.label;
+  if (firstPOI && firstPOI !== originLabel) {
     actions.push({
       type: "navigation",
       label: `导航到${firstPOI}`,
       provider: "amap",
+      origin: originLabel ?? undefined,
       destination: firstPOI,
     });
   }

@@ -139,6 +139,10 @@ export async function registerConversationRoutes(app: FastifyInstance) {
         if (!conv.userId && conv.guestId && conv.guestId !== guestId) {
           return sendError(reply, 403, "FORBIDDEN", "无权访问此会话");
         }
+        // Anonymous orphan conversations (userId=null, guestId=null) are not accessible by logged-in users
+        if (!conv.userId && !conv.guestId && userId) {
+          return sendError(reply, 403, "FORBIDDEN", "此会话为历史匿名数据，需要通过 dev-claim 脚本认领后才能访问");
+        }
         log.info({
           conversationId: conv?.id,
           userId: conv?.userId,
@@ -187,6 +191,10 @@ export async function registerConversationRoutes(app: FastifyInstance) {
         if (!conv) return sendError(reply, 404, "NOT_FOUND", "会话不存在");
         if (conv.userId && conv.userId !== userId) {
           return sendError(reply, 403, "FORBIDDEN", "无权向此会话添加消息");
+        }
+        // Anonymous orphan conversations (userId=null, guestId=null) are not accessible by logged-in users
+        if (!conv.userId && !conv.guestId && userId) {
+          return sendError(reply, 403, "FORBIDDEN", "此会话为历史匿名数据，需要通过 dev-claim 脚本认领后才能访问");
         }
       } catch (err) {
         log.warn({ err }, "DB ownership check failed, continuing to fallback");
@@ -237,10 +245,14 @@ export async function registerConversationRoutes(app: FastifyInstance) {
     // 校验会话所有权
     if (db) {
       try {
-        const conv = await db.conversation.findUnique({ where: { id }, select: { userId: true } });
+        const conv = await db.conversation.findUnique({ where: { id }, select: { userId: true, guestId: true } });
         if (!conv) return sendError(reply, 404, "NOT_FOUND", "会话不存在");
         if (conv.userId && conv.userId !== userId) {
           return sendError(reply, 403, "FORBIDDEN", "无权访问此会话消息");
+        }
+        // Anonymous orphan conversations (userId=null, guestId=null) are not accessible by logged-in users
+        if (!conv.userId && !conv.guestId && userId) {
+          return sendError(reply, 403, "FORBIDDEN", "此会话为历史匿名数据，需要通过 dev-claim 脚本认领后才能访问");
         }
         const msgs = await db.message.findMany({
           where: { conversationId: id },

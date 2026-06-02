@@ -66,9 +66,17 @@ export function executeUpdatePlanningDraft(
   }
   if (input.companions) incoming.companions = input.companions;
 
-  // Sync destination aliases
-  if (incoming.destination && !incoming.destinationCity) incoming.destinationCity = incoming.destination as string;
-  if (incoming.destinationCity && !incoming.destination) incoming.destination = incoming.destinationCity;
+  // Do NOT blindly sync destination ↔ destinationCity
+  // destination = specific place (西湖), destinationCity = city (杭州)
+  // Only infer city from known mappings
+  if (incoming.destination && !incoming.destinationCity) {
+    const cityMap: Record<string, string> = {
+      "西湖": "杭州", "灵隐寺": "杭州", "西溪": "杭州", "千岛湖": "杭州",
+      "外滩": "上海", "南京路": "上海", "迪士尼": "上海",
+      "故宫": "北京", "天安门": "北京", "长城": "北京",
+    };
+    incoming.destinationCity = cityMap[incoming.destination as string] ?? undefined;
+  }
 
   const merged = mergeSlots(currentDraft ?? {}, incoming);
   const missing = getMissingSlots(merged);

@@ -11,6 +11,7 @@ import type {
   AgentMessageInput,
   AgentState,
   PlanningSlots,
+  AgentVisibleEvent,
 } from "../../../shared/agentResponse.js";
 import type { PlanningProviders } from "../planning/schemas.js";
 import { chatStream, getChatModel } from "./modelClient.js";
@@ -35,6 +36,7 @@ interface AgentChatInput {
   modelMode: "flash" | "pro";
   conversationId?: string;
   selectedOptionId?: string;
+  guestId?: string;
 }
 
 interface AgentChatContext {
@@ -50,6 +52,7 @@ interface AgentChatContext {
 
 interface StreamCallbacks {
   writeText: (delta: string) => void;
+  writeEvent?: (event: AgentVisibleEvent) => void;
 }
 
 // ─── Main Entry: Streaming Agent Chat ──────────────────────
@@ -131,6 +134,22 @@ export async function runAgentChatStream(
   let planParams: Record<string, unknown> | null = null;
   let pendingAction: AgentResponse & { type: "action_confirm" } | null = null;
 
+  // Collected visible events for persistence and streaming
+  const collectedEvents: AgentVisibleEvent[] = [];
+  const emitEvent = (event: AgentVisibleEvent) => {
+    collectedEvents.push(event);
+    stream.writeEvent?.(event);
+  };
+
+  // Emit understanding stage before LLM call
+  emitEvent({
+    type: "stage",
+    stage: "understanding",
+    title: "正在理解你的出行需求",
+    status: "running",
+    timestamp: new Date().toISOString(),
+  });
+
   while (toolRounds < MAX_TOOL_ROUNDS) {
     const toolCtx: ToolCallContext = {
       conversationId,
@@ -199,8 +218,26 @@ export async function runAgentChatStream(
 
     // Execute each tool call and add results
     for (const [, tc] of toolCalls) {
+      // Emit tool running event
+      emitEvent({
+        type: "tool",
+        toolName: tc.name,
+        title: getToolDisplayName(tc.name),
+        status: "running",
+        timestamp: new Date().toISOString(),
+      });
+
       try {
         const { resultStr, sideEffect } = await executeToolCall(tc.name, tc.arguments, toolCtx);
+
+        // Emit tool success event
+        emitEvent({
+          type: "tool",
+          toolName: tc.name,
+          title: getToolDisplayName(tc.name),
+          status: "success",
+          timestamp: new Date().toISOString(),
+        });
 
         // Handle side effects
         if (sideEffect?.updatedDraft) {
@@ -218,6 +255,17 @@ export async function runAgentChatStream(
         });
       } catch (err) {
         log.warn({ err }, `[agentRuntime] Tool ${tc.name} failed`);
+
+        // Emit tool error event
+        emitEvent({
+          type: "tool",
+          toolName: tc.name,
+          title: getToolDisplayName(tc.name),
+          status: "error",
+          detail: err instanceof Error ? err.message : String(err),
+          timestamp: new Date().toISOString(),
+        });
+
         messages.push({
           role: "tool" as const,
           tool_call_id: tc.id,
@@ -233,6 +281,16 @@ export async function runAgentChatStream(
   const missingSlots = mergedDraft ? getMissingSlots(mergedDraft) : [];
   const intent = isContinuationIntent(input.message) ? "continuation" : "normal";
 
+  // Emit slot_update event if slots were extracted
+  if (Object.keys(newSlots).length > 0) {
+    emitEvent({
+      type: "slot_update",
+      title: "已识别出行信息",
+      slots: newSlots as Record<string, unknown>,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   log.info({
     conversationId,
     beforeDraft: state?.planningDraft,
@@ -245,6 +303,15 @@ export async function runAgentChatStream(
   // 7. If plan generation was requested, run the planning pipeline
   let planResponse: AgentResponse | null = null;
   if (shouldGeneratePlan) {
+    // Emit plan_generating stage event
+    emitEvent({
+      type: "stage",
+      stage: "plan_generating",
+      title: "正在生成出行方案",
+      status: "running",
+      timestamp: new Date().toISOString(),
+    });
+
     try {
       const params = planParams ?? {};
 
@@ -398,28 +465,31 @@ export async function runAgentChatStream(
   }
 
   // 9. Save assistant message with full payload for history restoration
+  // Emit finalizing stage event
+  emitEvent({
+    type: "stage",
+    stage: "finalizing",
+    title: "方案已完成",
+    status: "success",
+    timestamp: new Date().toISOString(),
+  });
+
   const { conversationId: _respCid, ...responsePayload } = agentResponse;
-  const payloadJson = { ...responsePayload, content: finalContent };
+  const payloadJson = { ...responsePayload, content: finalContent, events: collectedEvents };
   await saveMsg(db, conversationId, "assistant", finalContent, payloadJson, log);
 
   // 10. Update agent state (preserve draft across turns)
   const newState = computeAgentState(state, agentResponse, currentDraft);
   await saveAgentState(db, conversationId, newState, log);
 
-  // 11. Update conversation title if we have planning info
-  // Always try to update title from accumulated draft (not just new slots)
+  // 11. Update conversation title from accumulated draft
+  //     currentDraft already contains all merged slots (from tool calls + extractPlanningSlots),
+  //     so a single call covers both normal turns and plan-generation turns.
   const titleSlots = currentDraft ?? (Object.keys(newSlots).length > 0 ? newSlots : undefined);
   if (titleSlots) {
     const newTitle = generateTitleFromSlots(titleSlots);
     if (newTitle) {
       await updateConversationTitle(db, conversationId, newTitle, log);
-    }
-  }
-  // Also update title after plan generation with richer info
-  if (planResponse?.type === "plan" && currentDraft) {
-    const planTitle = generateTitleFromSlots(currentDraft);
-    if (planTitle) {
-      await updateConversationTitle(db, conversationId, planTitle, log);
     }
   }
 
@@ -533,12 +603,13 @@ async function ensureConversation(
       const conv = await db.conversation.create({
         data: {
           userId: userId ?? undefined,
+          guestId: !userId ? (input.guestId ?? undefined) : undefined,
           title,
           city: input.city ?? "北京",
           modelMode: (input.modelMode as "flash" | "pro") ?? "flash",
         },
       });
-      log.info(`[agentRuntime] ensureConversation CREATED DB conv=${conv.id} userId=${userId ?? "null"}`);
+      log.info(`[agentRuntime] ensureConversation CREATED DB conv=${conv.id} userId=${userId ?? "null"} guestId=${input.guestId ?? "null"}`);
       return conv.id;
     } catch (err) {
       log.error({ err }, "[agentRuntime] Failed to create conversation in DB, falling back to memory");
@@ -681,4 +752,16 @@ async function loadHistory(
     role: m.role,
     content: m.content,
   }));
+}
+
+// ─── Tool Display Name Helper ───────────────────────────────
+
+function getToolDisplayName(name: string): string {
+  const map: Record<string, string> = {
+    update_planning_draft: "记录规划信息",
+    search_places: "搜索地点",
+    generate_weekend_plan: "生成出行方案",
+    prepare_action: "准备执行动作",
+  };
+  return map[name] ?? name;
 }

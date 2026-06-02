@@ -94,11 +94,17 @@ export async function registerAgentChatRoutes(app: FastifyInstance) {
                   modelMode: parsed.modelMode ?? 'flash',
                   conversationId: parsed.conversationId,
                   selectedOptionId: parsed.selectedOptionId,
+                  guestId: parsed.guestId,
                 },
                 { db, providers: app.providers ?? undefined, userId, log: app.log },
                 {
                   writeText: (delta) => {
                     if (!clientDisconnected) reply.raw.write(`data: ${JSON.stringify({ content: delta })}\n\n`);
+                  },
+                  writeEvent: (event) => {
+                    if (!clientDisconnected) {
+                      reply.raw.write(`data: ${JSON.stringify({ type: "agent_event", event })}\n\n`);
+                    }
                   },
                 },
               );
@@ -131,6 +137,7 @@ export async function registerAgentChatRoutes(app: FastifyInstance) {
                 modelMode: parsed.modelMode,
                 conversationId: parsed.conversationId,
                 selectedOptionId: parsed.selectedOptionId,
+                guestId: parsed.guestId,
               },
               { db, providers: app.providers ?? undefined, userId, log: app.log },
             );
@@ -225,6 +232,7 @@ export async function registerAgentChatRoutes(app: FastifyInstance) {
             modelMode: parsed.modelMode,
             conversationId: parsed.conversationId,
             selectedOptionId: parsed.selectedOptionId,
+            guestId: parsed.guestId,
           },
           { db, providers: app.providers ?? undefined, userId, log: app.log },
         );
