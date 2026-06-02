@@ -407,11 +407,19 @@ export async function runAgentChatStream(
   await saveAgentState(db, conversationId, newState, log);
 
   // 11. Update conversation title if we have planning info
+  // Always try to update title from accumulated draft (not just new slots)
   const titleSlots = currentDraft ?? (Object.keys(newSlots).length > 0 ? newSlots : undefined);
   if (titleSlots) {
     const newTitle = generateTitleFromSlots(titleSlots);
     if (newTitle) {
       await updateConversationTitle(db, conversationId, newTitle, log);
+    }
+  }
+  // Also update title after plan generation with richer info
+  if (planResponse?.type === "plan" && currentDraft) {
+    const planTitle = generateTitleFromSlots(currentDraft);
+    if (planTitle) {
+      await updateConversationTitle(db, conversationId, planTitle, log);
     }
   }
 
@@ -601,7 +609,7 @@ async function updateConversationTitle(
     try {
       await db.conversation.update({
         where: { id: conversationId },
-        data: { title },
+        data: { title, updatedAt: new Date() },
       });
       log.info(`[agentRuntime] updateTitle OK conv=${conversationId} title=${title}`);
     } catch (err) {

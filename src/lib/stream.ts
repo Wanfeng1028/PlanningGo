@@ -192,6 +192,12 @@ export async function streamAgentMessage(
     headers.authorization = `Bearer ${token}`;
   }
 
+  console.info("[stream] streamAgentMessage", {
+    hasToken: Boolean(token),
+    conversationId: input.conversationId ?? null,
+    messagePreview: input.message.slice(0, 60),
+  });
+
   // Reuse streamFetch but with generic onFinalResult
   const { onFinalResult, ...restOptions } = options;
 

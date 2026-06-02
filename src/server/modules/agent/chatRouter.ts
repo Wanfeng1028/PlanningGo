@@ -291,6 +291,10 @@ export function generateTitleFromSlots(slots: PlanningSlots): string | null {
   const prefs = slots.preferences || slots.preference;
   const prefStr = Array.isArray(prefs) ? prefs.slice(0, 3).join("") : String(prefs || "");
 
+  if (origin && dest && prefStr) {
+    // Best title: "杭师大仓前到西湖咖啡火锅游"
+    return `${origin}到${dest}${prefStr}游`;
+  }
   if (dest && prefStr) {
     return `${dest}${prefStr}游`;
   }
@@ -430,33 +434,22 @@ export async function handleAgentMessage(
   // 5. Save assistant message
   await saveMsg(db, conversationId, "assistant", response.content, { ...response }, log);
 
-  // 6. Update agent state
-  const newState = computeNewState(state, response);
+  // 6. Update agent state — re-merge draft from this turn to ensure planningDraft is current
+  const latestSlots = mergeSlots(state?.planningDraft ?? {}, extractPlanningSlots(input.message));
+  const hasSlotData = Object.keys(latestSlots).length > 0;
+  const newState = computeNewState(state, response, hasSlotData ? latestSlots : undefined);
   await saveAgentState(db, conversationId, newState, log);
 
   // 7. Update conversation title if we have planning info
-  const currentDraft = newState?.planningDraft;
-  if (currentDraft) {
-    const titleSlots = currentDraft as Record<string, unknown>;
-    const dest = String(titleSlots.destination || titleSlots.destinationCity || "").trim();
-    const origin = String(titleSlots.origin || "").trim();
-    const prefs = titleSlots.preferences || titleSlots.preference;
-    const prefStr = Array.isArray(prefs) ? prefs.slice(0, 3).join("") : String(prefs || "");
-
-    let newTitle: string | null = null;
-    if (dest && prefStr) {
-      newTitle = `${dest}${prefStr}游`;
-    } else if (origin && dest) {
-      newTitle = `${origin}到${dest}规划`;
-    } else if (dest) {
-      newTitle = `${dest}出行规划`;
-    }
+  const currentDraftForTitle = newState?.planningDraft;
+  if (currentDraftForTitle) {
+    const newTitle = generateTitleFromSlots(currentDraftForTitle);
 
     if (newTitle && db) {
       try {
         await db.conversation.update({
           where: { id: conversationId },
-          data: { title: newTitle },
+          data: { title: newTitle, updatedAt: new Date() },
         });
         log.info({ conversationId, newTitle }, "[chatRouter] title updated");
       } catch (err) {
@@ -780,27 +773,27 @@ async function generatePlanFromSlots(
 
 // ─── State Management ───────────────────────────────────────
 
-function computeNewState(prev: AgentState | null | undefined, response: AgentResponse): AgentState {
+function computeNewState(prev: AgentState | null | undefined, response: AgentResponse, currentDraft?: PlanningSlots): AgentState {
   const base: AgentState = prev ?? { phase: "idle" };
 
   switch (response.type) {
     case "chat":
     case "identity":
-      return { ...base, phase: "chatting", lastAssistantType: response.type };
+      return { ...base, phase: "chatting", lastAssistantType: response.type, planningDraft: currentDraft ?? base.planningDraft };
     case "travel_advice":
-      return { ...base, phase: "chatting", lastAssistantType: "travel_advice" };
+      return { ...base, phase: "chatting", lastAssistantType: "travel_advice", planningDraft: currentDraft ?? base.planningDraft };
     case "slot_question":
       return {
         ...base,
         phase: "collecting_slots",
-        planningDraft: response.knownSlots,
+        planningDraft: response.knownSlots ?? currentDraft ?? base.planningDraft,
         lastAssistantType: "slot_question",
       };
     case "plan":
       return {
         ...base,
         phase: "plan_generated",
-        planningDraft: prev?.planningDraft, // preserve draft
+        planningDraft: currentDraft ?? base.planningDraft, // always use latest merged draft
         lastPlanResult: {
           planId: response.data.planId,
           options: response.data.options,

@@ -861,11 +861,19 @@ export async function listConversations(opts?: {
   if (opts?.guestId) params.set("guestId", opts.guestId);
   if (opts?.limit) params.set("limit", String(opts.limit));
   const qs = params.toString();
-  return apiJson<ConversationItem[]>(`/api/conversations${qs ? "?" + qs : ""}`);
+  const token = getAuthToken();
+  console.info("[api] listConversations", { hasToken: Boolean(token), guestId: opts?.guestId ?? null, limit: opts?.limit ?? 50 });
+  const result = await apiJson<ConversationItem[]>(`/api/conversations${qs ? "?" + qs : ""}`);
+  console.info("[api] listConversations result", { count: Array.isArray(result) ? result.length : "not-array", items: Array.isArray(result) ? result.map((c) => ({ id: c.id, title: c.title, userId: c.userId, updatedAt: c.updatedAt, messageCount: c._count?.messages })) : [] });
+  return result;
 }
 
 export async function getConversation(id: string): Promise<ConversationDetail> {
-  return apiJson<ConversationDetail>(`/api/conversations/${id}`);
+  const token = getAuthToken();
+  console.info("[api] getConversation", { id, hasToken: Boolean(token) });
+  const result = await apiJson<ConversationDetail>(`/api/conversations/${id}`);
+  console.info("[api] getConversation result", { id: result?.id, title: result?.title, userId: result?.userId, messageCount: result?.messages?.length ?? 0 });
+  return result;
 }
 
 export async function addConversationMessage(
