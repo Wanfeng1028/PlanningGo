@@ -61,6 +61,7 @@ export default tseslint.config(
       "react-hooks/set-state-in-effect": "off",
       "react-hooks/purity": "off",
       "react-hooks/exhaustive-deps": "warn",
+      "react-hooks/preserve-manual-memoization": "warn",
 
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
     },

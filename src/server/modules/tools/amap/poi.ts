@@ -33,7 +33,7 @@ registerTool({
     ),
     count: z.number(),
   }),
-  async execute(input: AmapSearchPoiTextInput, ctx: ToolExecutionContext) {
+  async execute(input: AmapSearchPoiTextInput, _ctx: ToolExecutionContext) {
     const client = getAmapClient();
 
     // Mock fallback if AMap not configured
@@ -104,7 +104,7 @@ registerTool({
     ),
     count: z.number(),
   }),
-  async execute(input: AmapSearchPoiAroundInput, ctx: ToolExecutionContext) {
+  async execute(input: AmapSearchPoiAroundInput, _ctx: ToolExecutionContext) {
     const client = getAmapClient();
 
     // Mock fallback if AMap not configured

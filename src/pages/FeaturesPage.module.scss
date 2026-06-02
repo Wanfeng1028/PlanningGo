@@ -49,7 +49,9 @@ $green: #22c55e;
   backdrop-filter: blur(20px) saturate(140%);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
   z-index: 30;
   animation: sidebarEnter 580ms cubic-bezier(.2,.8,.2,1) both;
 
@@ -227,6 +229,9 @@ $green: #22c55e;
   background: transparent;
   width: 100%;
   text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 
   &:hover {
     background: rgba($text, 0.04);
@@ -452,10 +457,12 @@ $green: #22c55e;
   flex: 1;
   min-width: 0;
   min-height: 0;
+  height: 100dvh;
   position: relative;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
 }
 
 /* ── ambient decorations (absolute, no layout) ── */
@@ -807,8 +814,7 @@ $green: #22c55e;
   padding-top: clamp(32px, 6vh, 72px);
   padding-left: 16px;
   padding-right: 16px;
-  padding-bottom: clamp(100px, 14vh, 160px);
-  scroll-padding-bottom: clamp(100px, 14vh, 160px);
+  padding-bottom: 24px;
   scrollbar-width: thin;
   scrollbar-color: rgba($text, 0.12) transparent;
 
@@ -827,14 +833,38 @@ $green: #22c55e;
 .featureMessagesInner {
   width: min(960px, 100%);
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  box-sizing: border-box;
+  padding-bottom: calc(var(--composer-height, 112px) + 48px);
+
+  /* Ensure children cannot cause horizontal overflow */
+  & > * {
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
 }
 
-/* ── composer dock (absolute floating) ── */
+.emptyMessagesHint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  gap: 0.5rem;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.95rem;
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+/* ── composer dock (normal flex child — no longer overlays messages) ── */
 .featureComposerDock {
   position: absolute;
   left: 50%;
@@ -843,10 +873,18 @@ $green: #22c55e;
   transform: translateX(-50%);
   z-index: 30;
   width: min(960px, calc(100% - clamp(24px, 4vw, 48px)));
+  position: relative;
+  z-index: 20;
+  width: min(960px, calc(100% - 48px));
+  margin: 0 auto;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
+  padding: 8px 0 clamp(12px, 2vh, 24px);
+  /* --composer-height is used by featureMessagesInner for bottom padding */
 }
 
 /* ─────────────────────────────────────────────
@@ -1180,6 +1218,9 @@ $green: #22c55e;
   cursor: pointer;
   transition: all 0.15s;
   margin-bottom: 8px;
+  max-width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0;
 
   &:hover {
     background: rgba(239, 68, 68, 0.12);
@@ -1320,7 +1361,10 @@ $green: #22c55e;
   font-weight: 400;
   line-height: 1.6;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   word-break: break-word;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 /* ── assistant message ── */
@@ -1332,9 +1376,11 @@ $green: #22c55e;
 
 .messageAssistantBubble {
   max-width: 100%;
+  min-width: 0;
   overflow-wrap: anywhere;
   word-break: break-word;
-  overflow: hidden;
+  overflow: visible;
+  box-sizing: border-box;
   padding: 16px 20px;
   border-radius: 4px 18px 18px 18px;
   background: rgba(255, 255, 255, 0.75);
@@ -1412,6 +1458,30 @@ $green: #22c55e;
   font-size: 15px;
   font-weight: 600;
   color: $text;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+  box-sizing: border-box;
+
+  /* Prevent long unbroken strings (URLs, JSON) from expanding container */
+  :global(pre) {
+    overflow-x: auto;
+    max-width: 100%;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  :global(code) {
+    word-break: break-all;
+  }
+  :global(img) {
+    max-width: 100%;
+    height: auto;
+  }
+  :global(table) {
+    display: block;
+    overflow-x: auto;
+    max-width: 100%;
+  }
 }
 
 .streamingSummary {
@@ -1426,19 +1496,21 @@ $green: #22c55e;
 /* ── plan cards ── */
 .planCards {
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  max-width: 100%;
-  overflow: hidden;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .planCard {
-  overflow: hidden;
+  overflow: visible;
   overflow-wrap: anywhere;
   word-break: break-word;
   max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
   border-radius: 24px;
   background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(247,241,231,0.9) 100%);
   border: 1px solid rgba(255, 255, 255, 0.95);
@@ -1468,6 +1540,9 @@ $green: #22c55e;
   font-weight: 700;
   color: $text;
   margin-bottom: 5px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
 }
 
 .planCardHeader {
@@ -1501,6 +1576,8 @@ $green: #22c55e;
   padding: 6px 10px;
   border-radius: 8px;
   background: rgba($text, 0.03);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .planCardAssumptions {
@@ -1557,11 +1634,16 @@ $green: #22c55e;
   color: $text-secondary;
   line-height: 1.5;
   margin-bottom: 10px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .planCardTimeline {
-  overflow-x: auto;
+  overflow-x: hidden;
+  overflow-y: visible;
   overflow-wrap: anywhere;
+  min-width: 0;
+  max-height: none;
   padding-left: 16px;
   margin-bottom: 10px;
   list-style: none;
@@ -1572,6 +1654,10 @@ $green: #22c55e;
     line-height: 1.7;
     padding-left: 6px;
     position: relative;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    max-width: 100%;
+    text-overflow: ellipsis;
 
     &::before {
       content: "";
@@ -1601,6 +1687,8 @@ $green: #22c55e;
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 12px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .planMetaTag {
@@ -1635,6 +1723,10 @@ $green: #22c55e;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
 }
 
 /* ── action buttons (shared) ── */
@@ -1645,6 +1737,11 @@ $green: #22c55e;
   font-weight: 600;
   cursor: pointer;
   border: none;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   transition:
     filter 0.15s,
     transform 0.1s,
@@ -1709,6 +1806,9 @@ $green: #22c55e;
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid rgba($text, 0.06);
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .actionChipBtn {
@@ -2190,22 +2290,74 @@ $green: #22c55e;
 
 /* ── Mobile keyboard viewport fix ── */
 @media (max-width: 860px) {
-  .featureChat {
+  .featureAppShell {
+    /* Ensure mobile viewport respects keyboard */
     height: 100dvh;
-    height: calc(var(--vh, 1vh) * 100);
+    overflow: hidden;
+  }
+
+  .featureChat {
+    /* flex: 1 + min-height: 0 already sizes this correctly; avoid explicit height: 100dvh
+       which would overflow when the location banner is visible */
+    height: auto;
+    max-height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .featureMessages {
-    padding-bottom: clamp(120px, 18vh, 200px);
+    padding-bottom: 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .featureMessagesInner {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .featureComposerDock {
     width: calc(100% - 24px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
   }
 
   .featureComposer {
     border-radius: 20px;
+    max-height: 200px;
+  }
+
+  .featureMain {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Prevent plan card horizontal overflow on mobile */
+  .planCard {
+    padding: 16px 14px;
+    border-radius: 18px;
+  }
+
+  .planCardActions,
+  .actionDock {
+    gap: 6px;
+  }
+
+  .actionChipBtn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  /* Prevent sidebar from being wider than 80vw on mobile */
+  .featureSidebar {
+    max-width: 80vw;
+  }
+
+  /* Ensure message bubbles don't overflow */
+  .messageUserBubble {
+    max-width: 85%;
+  }
+
+  .messageAssistantBubble {
+    max-width: 100%;
   }
 }
 
@@ -2295,3 +2447,184 @@ $green: #22c55e;
   font-weight: 500;
   margin-top: 8px;
 }
+
+/* ── Dev metadata badge ── */
+.devMetaBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba($text, 0.04);
+  border: 1px solid rgba($text, 0.06);
+  color: $text-secondary;
+  font-size: 10px;
+  font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+  margin-top: 8px;
+
+  span {
+    opacity: 0.7;
+  }
+}
+
+/* ─────────────────────────────────────────────
+   I. Agent Execution Events Panel
+   ───────────────────────────────────────────── */
+
+.agentEventsPanel {
+  position: absolute;
+  right: 16px;
+  top: 80px;
+  width: 280px;
+  max-height: calc(100dvh - 200px);
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 12px 16px;
+  z-index: 15;
+  font-size: 13px;
+  animation: featureFadeUp 0.25s ease-out;
+  scrollbar-width: thin;
+  scrollbar-color: rgba($text, 0.12) transparent;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba($text, 0.12);
+    border-radius: 4px;
+  }
+
+  @media (max-width: 860px) {
+    position: fixed;
+    right: 8px;
+    top: 60px;
+    width: calc(100vw - 16px);
+    max-width: 320px;
+    max-height: 200px;
+    font-size: 12px;
+  }
+}
+
+.agentEventsHeader {
+  font-weight: 600;
+  color: $text;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+
+  &:hover {
+    color: color.adjust($text, $lightness: 10%);
+  }
+}
+
+.agentEventsToggle {
+  font-size: 11px;
+  color: $text-secondary;
+}
+
+.agentEventsList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.agentEventItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+  animation: featureFadeIn 0.2s ease-out;
+
+  &.eventSuccess {
+    color: $green;
+  }
+
+  &.eventRunning {
+    color: $text-secondary;
+  }
+
+  &.eventError {
+    color: #ef4444;
+  }
+
+  &.eventWarning {
+    color: #d97706;
+  }
+
+  &.eventSkipped {
+    color: rgba($text, 0.4);
+  }
+}
+
+.agentEventIcon {
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+  font-size: 12px;
+}
+
+.agentEventBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.agentEventTitle {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.4;
+  font-size: 12.5px;
+}
+
+.agentEventDetail {
+  font-size: 11px;
+  opacity: 0.75;
+  line-height: 1.35;
+}
+
+.agentEventSlotDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 2px;
+}
+
+.agentEventSlotKnown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.agentEventSlotChip {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: rgba($green, 0.08);
+  border: 1px solid rgba($green, 0.15);
+  font-size: 11px;
+  color: $green;
+  white-space: nowrap;
+}
+
+.agentEventSlotMissing {
+  font-size: 11px;
+  color: #d97706;
+  opacity: 0.85;
+}
+
+.agentEventSlotDefaults {
+  font-size: 11px;
+  color: $text-secondary;
+  opacity: 0.7;
+}
+

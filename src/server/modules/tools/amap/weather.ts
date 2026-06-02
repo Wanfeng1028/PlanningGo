@@ -29,7 +29,7 @@ registerTool({
     humidity: z.string(),
     reportTime: z.string(),
   }),
-  async execute(input: AmapWeatherLiveInput, ctx: ToolExecutionContext) {
+  async execute(input: AmapWeatherLiveInput, _ctx: ToolExecutionContext) {
     const client = getAmapClient();
 
     // Mock fallback if AMap not configured
@@ -98,7 +98,7 @@ registerTool({
       }),
     ),
   }),
-  async execute(input: AmapWeatherForecastInput, ctx: ToolExecutionContext) {
+  async execute(input: AmapWeatherForecastInput, _ctx: ToolExecutionContext) {
     const client = getAmapClient();
 
     // Mock fallback if AMap not configured

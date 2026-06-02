@@ -40,7 +40,7 @@ export class CalendarProvider {
   /**
    * Set a reminder for an event
    */
-  async setReminder(params: {
+  async setReminder(_params: {
     eventId: string;
     reminderTime: number; // minutes before
   }): Promise<{ success: boolean }> {

@@ -2,7 +2,6 @@ import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { ConfirmActions } from "../../components/FeatureModal";
 import { WorkspaceModal } from "../../components/WorkspaceModal";
-import { Button } from "../../components/Button";
 import type { NavKey, SessionUser } from "../../types";
 import type { ChatSession, ModelMode } from "./types";
 import { SIDEBAR_NAV, formatRelativeTime } from "./constants";

@@ -15,8 +15,15 @@ const DevelopersPage = lazy(() => import("./pages/DevelopersPage").then(m => ({ 
 const FeaturesPage = lazy(() => import("./pages/FeaturesPage").then(m => ({ default: m.default })));
 const HomePage = lazy(() => import("./pages/HomePage").then(m => ({ default: m.HomePage })));
 const ProfilePage = lazy(() => import("./pages/ProfilePage").then(m => ({ default: m.ProfilePage })));
+const HandoffPage = lazy(() => import("./pages/HandoffPage").then(m => ({ default: m.HandoffPage })));
 import styles from "./App.module.scss";
 import pageStyles from "./pages/Pages.module.scss";
+
+/** Extract handoff code from URL path: /handoff/:code */
+function getHandoffCodeFromUrl(): string | null {
+  const match = window.location.pathname.match(/^\/handoff\/([A-Za-z0-9]+)$/);
+  return match ? match[1] : null;
+}
 
 type AuthModalKey = Extract<ModalKey, "login" | "register" | "guest">;
 
@@ -28,6 +35,9 @@ function isAuthModal(key: ModalKey | null): key is AuthModalKey {
 const DEFAULT_CITY_LABEL = "选择城市";
 
 export function App() {
+  // Check for handoff route: /handoff/:code
+  const [handoffCode] = useState(() => getHandoffCodeFromUrl());
+
   const [active, setActive] = useState<NavKey>("home");
   const [modal, setModal] = useState<ModalKey | null>(null);
   const [user, setUser] = useState<SessionUser | null>(() => {
@@ -239,6 +249,17 @@ export function App() {
         return null;
     }
   })();
+
+  // Handoff route: render standalone page without nav/footer
+  if (handoffCode) {
+    return (
+      <ErrorBoundary>
+        <Suspense fallback={<div style={{ display: "flex", justifyContent: "center", padding: "4rem 0", color: "#999", fontSize: "0.85rem" }}>加载中…</div>}>
+          <HandoffPage code={handoffCode} />
+        </Suspense>
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <div

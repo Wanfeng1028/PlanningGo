@@ -1,4 +1,3 @@
-import type { FastifyRequest } from "fastify";
 import { UnauthorizedError } from "./errors";
 
 /**

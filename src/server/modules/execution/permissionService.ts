@@ -79,7 +79,7 @@ export function validateGrant(grant: UserExecutionGrant, requiredScope: Permissi
  */
 export async function getUserPermissionSnapshot(
   userId?: string,
-  guestId?: string,
+  _guestId?: string,
 ): Promise<UserPermissionSnapshot> {
   const prisma = getPrisma();
 

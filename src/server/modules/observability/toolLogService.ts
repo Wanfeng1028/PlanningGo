@@ -1,6 +1,7 @@
 import type { ToolExecutionResult, ToolExecutionContext } from "../tools/types";
 import { env } from "../../config/env";
 import { getPrismaClient } from "../../common/prisma";
+import type { Prisma } from "../../../generated/prisma/client.js";
 
 /**
  * Log a tool call to the database
@@ -28,8 +29,8 @@ export async function logToolCall(params: {
         userId: params.userId,
         traceId: params.traceId,
         toolName: params.toolName,
-        input: params.input as any,
-        output: params.output as any,
+        input: params.input as unknown as Prisma.InputJsonValue,
+        output: params.output as unknown as Prisma.InputJsonValue,
         latencyMs: params.latencyMs,
         status: params.status,
         errorCode: params.errorCode,
@@ -58,8 +59,8 @@ export async function logToolCallsBatch(
     userId: ctx.userId,
     traceId: ctx.traceId,
     toolName: result.tool,
-    input: {} as any,
-    output: (result.success ? result.output : undefined) as any,
+    input: {} as unknown as Prisma.InputJsonValue,
+    output: (result.success ? result.output : undefined) as unknown as Prisma.InputJsonValue,
     latencyMs: result.latencyMs,
     status: (result.success ? "success" : "error") as "success" | "error",
     errorCode: result.success ? undefined : result.error,

@@ -49,16 +49,32 @@ async function authPlugin(app: FastifyInstance) {
   });
 
   // 可选认证（guest 接口）
-  app.decorate("optionalAuthGuard", async (request: FastifyRequest, _reply: FastifyReply) => {
+  app.decorate("optionalAuthGuard", async (request: FastifyRequest, reply: FastifyReply) => {
     const token = extractToken(request);
-    if (!token) return;
+    if (!token) {
+      // No token at all — user is completely unauthenticated
+      // Log at debug level; this is normal for guest requests
+      if (request.headers["x-pg-client"] || request.url.includes("/api/agent/") || request.url.includes("/api/conversations")) {
+        app.log.info({
+          url: request.url,
+          method: request.method,
+        }, "[auth] optionalAuthGuard: no token, request proceeds as anonymous");
+      }
+      return;
+    }
     try {
       const payload: AccessTokenPayload = verifyAccessToken(token);
       request.userId = payload.sub;
       request.userRole = payload.role;
       request.userEmail = payload.email;
     } catch {
-      // token 无效时不阻断，继续作为未登录处理
+      // token 无效 — 通过 header 通知前端刷新
+      // 不阻断请求（仍可作为未登录访问），但前端收到 header 后应主动 refresh
+      app.log.warn({
+        url: request.url,
+        method: request.method,
+      }, "[auth] optionalAuthGuard: token INVALID — user thinks logged in but request proceeds as anonymous. x-token-expired header sent.");
+      reply.header("x-token-expired", "1");
     }
   });
 

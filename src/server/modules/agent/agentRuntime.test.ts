@@ -66,7 +66,7 @@ vi.mock("./modelClient.js", () => ({
 }));
 
 vi.mock("../../services/memoryStore.js", () => ({
-  createConversation: (data: any) => ({ id: "mem-conv-id", ...data, createdAt: new Date(), updatedAt: new Date() }),
+  createConversation: (data: Record<string, unknown>) => ({ id: "mem-conv-id", ...data, createdAt: new Date(), updatedAt: new Date() }),
   getConversation: () => undefined,
   addMessage: () => {},
   updateConversationTitle: () => {},
@@ -176,7 +176,7 @@ describe("agentRuntime", () => {
 
   it("does not pass tools when provider does not support tool calling", async () => {
     // Configure mock to return mimo provider (no tool calling)
-    mockGetChatModel.mockImplementation((mode?: string) => ({
+    mockGetChatModel.mockImplementation((_mode?: string) => ({
       provider: "mimo",
       model: "mimo-v2.5-pro",
     }));
@@ -207,7 +207,7 @@ describe("agentRuntime", () => {
 
   it("handles no-tools path with planning intent", async () => {
     // Configure mock to return mimo provider (no tool calling)
-    mockGetChatModel.mockImplementation((mode?: string) => ({
+    mockGetChatModel.mockImplementation((_mode?: string) => ({
       provider: "mimo",
       model: "mimo-v2.5-pro",
     }));

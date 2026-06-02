@@ -14,8 +14,6 @@ import {
 } from "./tools";
 import {
   finalResponseSchema,
-  executionStepSchema,
-  activityPlanSchema,
   safeValidateFinalResponse,
   type FinalResponse,
 } from "./schemas";
@@ -511,7 +509,7 @@ export async function runLlmPlanningAgent(
 
         // 如果既不是最终结果也不是工具调用，继续循环
         // LLM 可能还在思考
-      } catch (parseError) {
+      } catch (_parseError) {
         // JSON 解析失败，可能是 LLM 还在思考过程
         // 追加提示让 LLM 完成规划
         messages.push({

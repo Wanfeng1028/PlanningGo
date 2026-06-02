@@ -126,7 +126,7 @@ export class ClaudeAdapter implements LlmAdapter {
     const decoder = new TextDecoder();
 
     async function* streamGenerator(): AsyncIterable<LlmStreamChunk> {
-      const buffer = "";
+      const _buffer = "";
       while (true) {
         const { done, value } = await reader!.read();
         if (done) break;
@@ -251,7 +251,7 @@ export class GrokAdapter implements LlmAdapter {
 
             if (delta?.tool_calls) {
               yield {
-                toolCalls: delta.tool_calls.map((tc: any) => ({
+                toolCalls: delta.tool_calls.map((tc: { id?: string; function?: { name?: string; arguments?: string } }) => ({
                   id: tc.id ?? "",
                   name: tc.function?.name ?? "",
                   arguments: tc.function?.arguments ?? "",

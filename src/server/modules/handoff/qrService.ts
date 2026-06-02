@@ -1,17 +1,43 @@
 /**
- * @deprecated 未注册到路由 — HandoffSession 模型未在 Prisma schema 中定义
- * 保留供未来 QR 码跨设备接力功能参考，当前为死代码
+ * QR 码跨设备接力服务
+ * 桌面端生成二维码 → 手机扫码 → 进入同一 conversation/plan
+ *
+ * 安全设计：QR URL 只包含 handoff tokenId，不包含 accessToken / refreshToken
+ *
+ * 注意：HandoffSession 模型已添加到 schema.prisma，但因 Prisma 7 与 Node 20.18
+ * 存在 ESM 兼容性问题导致 `prisma generate` 暂时失败。
+ * 这里使用 $executeRaw / $queryRaw 操作，无需依赖生成的模型类型。
  */
 import { createId } from "../../common/id";
 import { env } from "../../config/env";
 import { getPrismaClient } from "../../common/prisma";
 import { createHandoffToken, hashToken, type HandoffTokenPayload } from "./handoffToken";
 import type { PermissionScope } from "../agent/middleware/permissionGuard";
+import QRCode from "qrcode";
 
-function getPrisma() {
-  const prisma = getPrismaClient();
-  if (!prisma) throw new Error("Database not available");
-  return prisma as any; // HandoffSession model not in schema — dead code pending schema migration
+/**
+ * Minimal type for Prisma raw query methods.
+ * The generated types may not include these due to prisma generate compatibility issues.
+ */
+type RawQueryClient = {
+  $executeRawUnsafe(query: string, ...values: unknown[]): Promise<number>;
+  $queryRawUnsafe<T = Record<string, unknown>>(query: string, ...values: unknown[]): Promise<T[]>;
+};
+
+/** Shape of rows returned from handoff_sessions raw queries */
+interface HandoffSessionRow {
+  id: string;
+  conversation_id: string;
+  plan_id: string | null;
+  selected_option_id: string | null;
+  user_id: string | null;
+  guest_id: string | null;
+  scopes: PermissionScope[] | string | null;
+  status: string;
+  consumed_at: Date | string | null;
+  expires_at: Date | string;
+  claimed_device_id: string | null;
+  claimed_at: Date | string | null;
 }
 
 /**
@@ -30,34 +56,36 @@ export async function createMobileHandoff(params: {
   qrSvg: string;
   expiresAt: string;
 }> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
+  if (!prisma) throw new Error("Database not available");
 
   const handoffId = createId("hnd");
   const tokenPayload = createHandoffToken(params);
+  // tokenId is hashed for storage so the raw value is not persisted
   const tokenHash = hashToken(tokenPayload.tokenId);
   const expiresAt = new Date(Date.now() + env.HANDOFF_TOKEN_TTL_SECONDS * 1000);
+  const now = new Date();
 
-  // Store handoff session in database
-  await prisma.handoffSession.create({
-    data: {
-      id: handoffId,
-      tokenHash,
-      conversationId: params.conversationId,
-      planId: params.planId,
-      selectedOptionId: params.selectedOptionId,
-      userId: params.userId,
-      guestId: params.guestId,
-      scopes: params.scopes as any,
-      status: "waiting_scan",
-      expiresAt,
-    },
+  // Use raw SQL since the HandoffSession model may not yet be in generated client
+  await (prisma as unknown as RawQueryClient).$executeRawUnsafe(`
+    INSERT INTO handoff_sessions (id, token_hash, conversation_id, plan_id, selected_option_id,
+      user_id, guest_id, scopes, status, expires_at, created_at)
+    VALUES ($1, $2, $3::uuid, $4::uuid, $5, $6::uuid, $7, $8::jsonb, $9, $10, $11)
+  `, handoffId, tokenHash, params.conversationId, params.planId,
+     params.selectedOptionId ?? null, params.userId ?? null, params.guestId ?? null,
+     JSON.stringify(params.scopes), "waiting_scan", expiresAt, now);
+
+  // Continue URL only contains the handoff tokenId — NO auth tokens
+  const baseUrl = env.PUBLIC_APP_URL || "http://localhost:5173";
+  const continueUrl = `${baseUrl}/m/continue/${tokenPayload.tokenId}`;
+
+  // Generate real scannable QR code SVG
+  const qrSvg = await QRCode.toString(continueUrl, {
+    type: "svg",
+    width: 200,
+    margin: 2,
+    errorCorrectionLevel: "M",
   });
-
-  // Generate continue URL
-  const continueUrl = `${env.PUBLIC_APP_URL}/m/continue/${tokenPayload.tokenId}`;
-
-  // Generate QR code SVG (simplified - in production use qrcode library)
-  const qrSvg = generateQrSvg(continueUrl);
 
   return {
     handoffId,
@@ -68,39 +96,40 @@ export async function createMobileHandoff(params: {
 }
 
 /**
- * Get handoff session by token
+ * Get handoff session by token (tokenId from URL)
  */
-export async function getHandoffByToken(token: string): Promise<HandoffTokenPayload | null> {
-  const prisma = getPrisma();
-  const tokenHash = hashToken(token);
+export async function getHandoffByToken(tokenId: string): Promise<HandoffTokenPayload | null> {
+  const prisma = getPrismaClient();
+  if (!prisma) throw new Error("Database not available");
 
-  const session = await prisma.handoffSession.findUnique({
-    where: { tokenHash },
-  });
+  const tokenHash = hashToken(tokenId);
 
-  if (!session) {
-    return null;
-  }
+  const rows = await (prisma as unknown as RawQueryClient).$queryRawUnsafe<HandoffSessionRow>(`
+    SELECT id, token_hash, conversation_id, plan_id, selected_option_id,
+           user_id, guest_id, scopes, status, consumed_at, expires_at
+    FROM handoff_sessions
+    WHERE token_hash = $1
+    LIMIT 1
+  `, tokenHash);
+
+  if (!rows.length) return null;
+  const session = rows[0];
 
   // Check if already consumed
-  if (session.consumedAt) {
-    return null;
-  }
+  if (session.consumed_at) return null;
 
   // Check expiration
-  if (new Date() > session.expiresAt) {
-    return null;
-  }
+  if (new Date() > new Date(session.expires_at)) return null;
 
   return {
-    tokenId: token,
-    conversationId: session.conversationId,
-    planId: session.planId || "",
-    selectedOptionId: session.selectedOptionId || undefined,
-    userId: session.userId || undefined,
-    guestId: session.guestId || undefined,
-    scopes: session.scopes as PermissionScope[],
-    expiresAt: session.expiresAt.toISOString(),
+    tokenId,
+    conversationId: session.conversation_id,
+    planId: session.plan_id || "",
+    selectedOptionId: session.selected_option_id || undefined,
+    userId: session.user_id || undefined,
+    guestId: session.guest_id || undefined,
+    scopes: (session.scopes ?? []) as PermissionScope[],
+    expiresAt: new Date(session.expires_at).toISOString(),
     nonce: "",
   };
 }
@@ -114,34 +143,29 @@ export async function claimHandoff(params: {
   guestId?: string;
   grantedScopes: PermissionScope[];
 }): Promise<{ success: boolean; handoffId: string }> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
+  if (!prisma) throw new Error("Database not available");
+
   const tokenHash = hashToken(params.token);
 
-  const session = await prisma.handoffSession.findUnique({
-    where: { tokenHash },
-  });
+  const rows = await (prisma as unknown as RawQueryClient).$queryRawUnsafe<HandoffSessionRow>(`
+    SELECT id, consumed_at, expires_at
+    FROM handoff_sessions
+    WHERE token_hash = $1
+    LIMIT 1
+  `, tokenHash);
 
-  if (!session) {
-    throw new Error("Handoff session not found");
-  }
+  if (!rows.length) throw new Error("Handoff session not found");
+  const session = rows[0];
 
-  if (session.consumedAt) {
-    throw new Error("Handoff session already consumed");
-  }
+  if (session.consumed_at) throw new Error("Handoff session already consumed");
+  if (new Date() > new Date(session.expires_at)) throw new Error("Handoff session expired");
 
-  if (new Date() > session.expiresAt) {
-    throw new Error("Handoff session expired");
-  }
-
-  // Update session as claimed
-  await prisma.handoffSession.update({
-    where: { id: session.id },
-    data: {
-      status: "claimed",
-      claimedDeviceId: params.deviceId,
-      claimedAt: new Date(),
-    },
-  });
+  await (prisma as unknown as RawQueryClient).$executeRawUnsafe(`
+    UPDATE handoff_sessions
+    SET status = 'claimed', claimed_device_id = $1, claimed_at = $2
+    WHERE id = $3
+  `, params.deviceId, new Date(), session.id);
 
   return {
     success: true,
@@ -157,52 +181,38 @@ export async function getHandoffStatus(handoffId: string): Promise<{
   claimedDeviceId?: string;
   claimedAt?: string;
 }> {
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
+  if (!prisma) throw new Error("Database not available");
 
-  const session = await prisma.handoffSession.findUnique({
-    where: { id: handoffId },
-  });
+  const rows = await (prisma as unknown as RawQueryClient).$queryRawUnsafe<HandoffSessionRow>(`
+    SELECT status, claimed_device_id, claimed_at
+    FROM handoff_sessions
+    WHERE id = $1
+    LIMIT 1
+  `, handoffId);
 
-  if (!session) {
-    throw new Error("Handoff session not found");
-  }
+  if (!rows.length) throw new Error("Handoff session not found");
+  const session = rows[0];
 
   return {
     status: session.status,
-    claimedDeviceId: session.claimedDeviceId || undefined,
-    claimedAt: session.claimedAt?.toISOString(),
+    claimedDeviceId: session.claimed_device_id || undefined,
+    claimedAt: session.claimed_at ? new Date(session.claimed_at).toISOString() : undefined,
   };
 }
 
 /**
  * Consume a handoff session (mark as used)
  */
-export async function consumeHandoff(token: string): Promise<void> {
-  const prisma = getPrisma();
-  const tokenHash = hashToken(token);
+export async function consumeHandoff(tokenId: string): Promise<void> {
+  const prisma = getPrismaClient();
+  if (!prisma) throw new Error("Database not available");
 
-  await prisma.handoffSession.updateMany({
-    where: { tokenHash },
-    data: {
-      consumedAt: new Date(),
-      status: "consumed",
-    },
-  });
-}
+  const tokenHash = hashToken(tokenId);
 
-/**
- * Generate simple QR code SVG (placeholder - in production use qrcode library)
- */
-function generateQrSvg(url: string): string {
-  // This is a placeholder - in production, use the qrcode npm package
-  // For now, return a simple SVG with the URL as text
-  return `
-<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
-  <rect width="200" height="200" fill="white"/>
-  <rect x="10" y="10" width="60" height="60" fill="black"/>
-  <rect x="130" y="10" width="60" height="60" fill="black"/>
-  <rect x="10" y="130" width="60" height="60" fill="black"/>
-  <text x="100" y="100" font-size="8" text-anchor="middle" fill="black">${url.substring(0, 30)}...</text>
-</svg>
-  `.trim();
+  await (prisma as unknown as RawQueryClient).$executeRawUnsafe(`
+    UPDATE handoff_sessions
+    SET consumed_at = $1, status = 'consumed'
+    WHERE token_hash = $2
+  `, new Date(), tokenHash);
 }

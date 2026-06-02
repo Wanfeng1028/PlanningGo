@@ -27,7 +27,7 @@ registerTool({
       }),
     ),
   }),
-  async execute(input, ctx: ToolExecutionContext) {
+  async execute(_input, _ctx: ToolExecutionContext) {
     // For now, return mock memory data
     // In production, this would query the database
     return {
@@ -65,7 +65,7 @@ registerTool({
     success: z.boolean(),
     memoryId: z.string(),
   }),
-  async execute(input, ctx: ToolExecutionContext) {
+  async execute(_input, _ctx: ToolExecutionContext) {
     // For now, return mock success
     // In production, this would write to the database
     return {

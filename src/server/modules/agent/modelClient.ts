@@ -413,7 +413,7 @@ async function* wrapAdapterStream(
       choices: [{
         index: 0,
         delta,
-        finish_reason: chunk.finishReason as any ?? null,
+        finish_reason: (chunk.finishReason as string) ?? null,
       }],
     } as unknown as OpenAI.Chat.Completions.ChatCompletionChunk;
   }

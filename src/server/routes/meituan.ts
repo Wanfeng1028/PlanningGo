@@ -58,7 +58,7 @@ export async function registerMeituanRoutes(app: FastifyInstance) {
     // 验证 OAuth state 参数防 CSRF
     const query = request.query as Record<string, string | undefined>;
     const returnedState = query.state;
-    const savedState = (request as any).cookies?.meituan_oauth_state;
+    const savedState = (request as unknown as { cookies?: Record<string, string> })?.cookies?.meituan_oauth_state;
     if (!returnedState || !savedState || returnedState !== savedState) {
       reply.clearCookie("meituan_oauth_state", { path: "/" });
       return sendOk(reply, { configured: true, implemented: false, message: "OAuth state 验证失败，请重新登录" });

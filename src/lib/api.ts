@@ -153,7 +153,7 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
     if (response.status === 401) {
       const newToken = await refreshToken();
       if (newToken) {
-        setAuthToken(newToken);
+        // refreshToken() already called setAuthToken() internally
         // Retry with new token
         headers.authorization = `Bearer ${newToken}`;
         response = await fetch(`${API_BASE}${path}`, {
@@ -166,6 +166,14 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
         setAuthToken(null);
         throw new Error("请重新登录");
       }
+    }
+
+    // Handle optionalAuthGuard signal: token was present but invalid
+    // Proactively refresh in the background for next request
+    if (response.headers.get("x-token-expired") === "1" && _authToken) {
+      refreshToken().then((newToken) => {
+        if (newToken) setAuthToken(newToken);
+      }).catch(() => {});
     }
 
     let body: unknown;
@@ -853,11 +861,19 @@ export async function listConversations(opts?: {
   if (opts?.guestId) params.set("guestId", opts.guestId);
   if (opts?.limit) params.set("limit", String(opts.limit));
   const qs = params.toString();
-  return apiJson<ConversationItem[]>(`/api/conversations${qs ? "?" + qs : ""}`);
+  const token = getAuthToken();
+  console.info("[api] listConversations", { hasToken: Boolean(token), guestId: opts?.guestId ?? null, limit: opts?.limit ?? 50 });
+  const result = await apiJson<ConversationItem[]>(`/api/conversations${qs ? "?" + qs : ""}`);
+  console.info("[api] listConversations result", { count: Array.isArray(result) ? result.length : "not-array", items: Array.isArray(result) ? result.map((c) => ({ id: c.id, title: c.title, userId: c.userId, updatedAt: c.updatedAt, messageCount: c._count?.messages })) : [] });
+  return result;
 }
 
 export async function getConversation(id: string): Promise<ConversationDetail> {
-  return apiJson<ConversationDetail>(`/api/conversations/${id}`);
+  const token = getAuthToken();
+  console.info("[api] getConversation", { id, hasToken: Boolean(token) });
+  const result = await apiJson<ConversationDetail>(`/api/conversations/${id}`);
+  console.info("[api] getConversation result", { id: result?.id, title: result?.title, userId: result?.userId, messageCount: result?.messages?.length ?? 0 });
+  return result;
 }
 
 export async function addConversationMessage(
@@ -896,6 +912,22 @@ export async function confirmExecAction(actionId: string): Promise<Record<string
 
 export async function cancelExecAction(actionId: string): Promise<Record<string, unknown>> {
   return apiJson(`/api/actions/${actionId}/cancel`, { method: "POST" });
+}
+
+// ═══════════════════════════════════════════════════
+// Action Tracking API
+// ═══════════════════════════════════════════════════
+
+export async function trackAction(input: {
+  conversationId?: string;
+  planId?: string;
+  actionType: string;
+  label: string;
+}): Promise<{ success: boolean }> {
+  return apiJson("/api/actions/track", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 // ═══════════════════════════════════════════════════
@@ -940,3 +972,65 @@ export async function reportClientError(input: {
     body: JSON.stringify(input),
   });
 }
+
+// ── Handoff Code API ──
+
+export interface HandoffCodeResult {
+  code: string;
+  continueUrl: string;
+  qrSvg: string;
+  expiresAt: string;
+}
+
+export async function createHandoffCode(input: {
+  conversationId: string;
+  planId?: string;
+}): Promise<HandoffCodeResult> {
+  const resp = await apiJson<{ data: HandoffCodeResult }>("/api/handoff/create", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return resp.data;
+}
+
+export async function getHandoffCode(code: string): Promise<{
+  code: string;
+  conversationId: string;
+  planId: string | null;
+  userId: string | null;
+  status: string;
+  expiresAt: string;
+} | null> {
+  try {
+    const resp = await apiJson<{ data: {
+      code: string;
+      conversationId: string;
+      planId: string | null;
+      userId: string | null;
+      status: string;
+      expiresAt: string;
+    } | null }>(`/api/handoff/${encodeURIComponent(code)}`);
+    return resp.data;
+  } catch {
+    return null;
+  }
+}
+
+export async function claimHandoffCode(code: string, deviceId: string): Promise<{
+  success: boolean;
+  conversationId: string;
+  planId: string | null;
+}> {
+  const resp = await apiJson<{ data: {
+    success: boolean;
+    conversationId: string;
+    planId: string | null;
+  } }>(`/api/handoff/${encodeURIComponent(code)}/claim`, {
+    method: "POST",
+    body: JSON.stringify({ deviceId }),
+  });
+  return resp.data;
+}
+
+// ── Shared type re-exports ──
+export type { PlanningAction, UserMemoryProfile } from "../shared/agentResponse";

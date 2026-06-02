@@ -83,9 +83,108 @@ const SYSTEM_PROMPT = `你是"周末去哪儿"的行程规划 AI。用户会告�
 5. reasoning 字段简要说明"为什么安排这个步骤"，不超过 50 字
 6. 评分基于可行性、用户匹配度、风险控制`;
 
+// ─── Time Helpers ─────────────────────────────────────────
+
+/** 将 "HH:MM" 格式的时间转换为分钟数 */
+function timeToMinutes(time: string): number {
+  const m = time.match(/(\d{1,2})[：:](\d{2})/);
+  if (!m) return 14 * 60; // fallback
+  return parseInt(m[1]!, 10) * 60 + parseInt(m[2]!, 10);
+}
+
+/** 将分钟数转换为 "HH:MM" 格式 */
+function minutesToTime(minutes: number): string {
+  const h = Math.floor(minutes / 60) % 24;
+  const m = minutes % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
 /**
- * Mock 方案生成（仅开发/演示用）。
+ * 从 intent 中推算实际出发时间（HH:MM 格式）。
+ * 优先使用 departAt（用户明确给的时间），其次按 timeWindow 给出合理默认。
  */
+function resolveStartTime(intent: UserIntent): string {
+  // Combine departAt and raw prompt for better time extraction
+  const timeSources = [intent.departAt, intent.raw].filter(Boolean).join(" ");
+
+  // 1. HH:MM or HH：MM format (e.g. "09:00", "14:30")
+  const hm = timeSources.match(/(\d{1,2})[：:](\d{2})/);
+  if (hm) {
+    let hour = parseInt(hm[1]!, 10);
+    if (/(下午|晚上|evening)/.test(timeSources) && hour < 12) hour += 12;
+    return `${String(hour).padStart(2, "0")}:${hm[2]}`;
+  }
+
+  // 2. Chinese format "X点Y分" or "X点半" or "X点"
+  const cnTime = timeSources.match(/(\d{1,2})\s*点\s*(半|(\d{1,2})分?)?/);
+  if (cnTime) {
+    let hour = parseInt(cnTime[1]!, 10);
+    let minute = 0;
+    if (cnTime[2] === "半") {
+      minute = 30;
+    } else if (cnTime[3]) {
+      minute = parseInt(cnTime[3], 10);
+    }
+    // Adjust hour based on time window context
+    if (/(下午|晚上|evening)/.test(timeSources) && hour < 12) {
+      hour += 12;
+    }
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  }
+
+  // 3. 按 timeWindow 给出合理默认
+  switch (intent.timeWindow) {
+    case "morning":   return "09:00";
+    case "afternoon": return "14:00";
+    case "evening":   return "18:00";
+    case "full_day":  return "09:00";
+    default:          return "14:00";
+  }
+}
+
+/**
+ * 根据 intent 动态生成方案标题，体现目的地和偏好。
+ */
+function buildPlanTitle(intent: UserIntent, fallbackLabel: string): string {
+  const city = intent.city || "本地";
+  const dest = intent.raw ? extractSpecificDestination(intent.raw) : null;
+  const prefs = intent.preferences ?? [];
+
+  // 尝试用偏好关键词拼标题
+  const prefLabels: string[] = [];
+  for (const p of prefs) {
+    if (/咖啡/.test(p)) prefLabels.push("咖啡");
+    else if (/火锅/.test(p)) prefLabels.push("火锅");
+    else if (/烧烤/.test(p)) prefLabels.push("烧烤");
+    else if (/看展|展览/.test(p)) prefLabels.push("看展");
+    else if (/拍照/.test(p)) prefLabels.push("拍照");
+    else if (/午饭|午餐/.test(p)) prefLabels.push("美食");
+    else if (/晚饭|晚餐/.test(p)) prefLabels.push("美食");
+  }
+  const prefStr = [...new Set(prefLabels)].slice(0, 2).join("");
+
+  if (dest && prefStr) return `${city}${dest}${prefStr}${fallbackLabel}`;
+  if (dest) return `${city}${dest}${fallbackLabel}`;
+  return `${city}${fallbackLabel}`;
+}
+
+/** 从用户原始输入中提取具体目的地（如 "天安门"、"西湖"） */
+function extractSpecificDestination(raw: string): string | null {
+  const patterns = [
+    /去([^，,。.!！?？\s]{2,15})/,
+    /到([^，,。.!！?？\s]{2,15})/,
+    /目的地[：:]\s*(\S{2,15})/,
+  ];
+  for (const p of patterns) {
+    const m = raw.match(p);
+    if (m?.[1]) {
+      const dest = m[1].replace(/[，,。.！!？?、]/g, "").trim();
+      if (dest.length >= 2 && dest.length <= 15) return dest;
+    }
+  }
+  return null;
+}
+
 /**
  * Mock 方案生成（仅开发/演示用）。
  * 根据用户意图的 participantMode 动态选择方案模板，使用意图中的城市、出发地、预算等信息。
@@ -110,34 +209,55 @@ function buildPrimaryPlan(input: PlannerInput): ActivityPlan {
   const { intent, candidates } = input;
   const city = intent.city || "杭州";
   const origin = intent.origin.label;
-  const budget = intent.budgetMax ?? 420;
+  const hasUserOrigin = !!origin;
+  const userBudget = intent.budgetMax;  // undefined = 用户未提供
+  const budget = userBudget ?? 300;     // Default budget, never override user's explicit value
   const mode = intent.participantMode;
   const activity = candidates.events[0] ?? candidates.activities[0];
   const restaurant = candidates.restaurants[0];
   const optionId = createId("option_primary");
+  const startTime = resolveStartTime(intent);
 
-  const titleMap: Record<string, string> = {
-    family: `${city}家庭休闲半日游`,
-    solo: `${city}个人探索之旅`,
-    unknown: `${city}半日精选路线`,
-  };
-  const title = titleMap[mode] ?? titleMap.unknown;
+  // 动态标题：体现目的地 + 偏好
+  const title = buildPlanTitle(intent, mode === "family" ? "家庭休闲半日游" : mode === "solo" ? "个人探索之旅" : "精选路线");
 
-  const summaryMap: Record<string, string> = {
-    family: `基于${origin}出发，${city}周边${intent.distanceLimitMinutes}分钟交通圈内的家庭方案，预算约￥${budget}。`,
-    solo: `基于${origin}出发，适合独自探索${city}的轻松路线，预算约￥${budget}。`,
-    unknown: `基于${origin}出发，${city}周边精选路线，预算约￥${budget}。`,
-  };
-  const summary = summaryMap[mode] ?? summaryMap.unknown;
+  // 预算描述：区分用户提供 vs 默认估算
+  const budgetDisplay = userBudget !== undefined ? `￥${userBudget}` : undefined;
+  const budgetAssumption = userBudget !== undefined
+    ? `预算：${userBudget}元`
+    : "未提供预算，暂按人均 200-300 估算，可继续调整";
 
-  const highlightsMap: Record<string, string[]> = {
-    family: ["亲子友好", "低步行负担", `预算约￥${budget}`],
-    solo: ["节奏自由", "可随时调整", `预算约￥${budget}`],
-    unknown: ["路线灵活", `预算约￥${budget}`],
-  };
-  const highlights = highlightsMap[mode] ?? highlightsMap.unknown;
+  const summary = mode === "family"
+    ? `基于${origin || "未知出发地"}出发，${city}周边${intent.distanceLimitMinutes}分钟交通圈内的家庭方案${budgetDisplay ? `，预算${budgetDisplay}` : ""}。`
+    : mode === "solo"
+      ? `基于${origin || "未知出发地"}出发，适合独自探索${city}的轻松路线${budgetDisplay ? `，预算${budgetDisplay}` : ""}。`
+      : `基于${origin || "未知出发地"}出发，${city}周边精选路线${budgetDisplay ? `，预算${budgetDisplay}` : ""}。`;
+
+  const highlights = mode === "family"
+    ? ["亲子友好", "低步行负担", budgetAssumption]
+    : mode === "solo"
+      ? ["节奏自由", "可随时调整", budgetAssumption]
+      : ["路线灵活", budgetAssumption];
 
   const walkingKm = mode === "family" ? 2.2 : 3.0;
+
+  // 基于 startTime 计算后续时间
+  const startMin = timeToMinutes(startTime);
+  const t1 = minutesToTime(startMin);
+  const t2 = minutesToTime(startMin + 40);
+  const t3 = minutesToTime(startMin + 40 + 100);
+  const t4 = minutesToTime(startMin + 40 + 100 + 40);
+  const t5 = minutesToTime(startMin + 40 + 100 + 40 + 70);
+  const t6 = minutesToTime(startMin + 40 + 100 + 40 + 70 + 30);
+
+  // origin guard: 如果没有出发地，不生成导航类步骤
+  const travelTitle = hasUserOrigin ? `从${origin}出发` : "前往目的地（出发地待确认）";
+  const returnTitle = hasUserOrigin ? "返程" : "返程（出发地待确认）";
+
+  const assumptions: string[] = [];
+  if (hasUserOrigin) assumptions.push(`从${origin}出发`);
+  else assumptions.push("出发地未提供，以下暂不估算交通时间");
+  assumptions.push(budgetAssumption);
 
   return {
     id: optionId,
@@ -150,15 +270,15 @@ function buildPrimaryPlan(input: PlannerInput): ActivityPlan {
     totalCostMin: Math.round(budget * 0.6),
     totalCostMax: budget,
     walkingKm,
-    assumptions: [`从${origin}出发`, `默认下午 14:00 出发`],
+    assumptions,
     highlights,
     risks: ["餐厅高峰可能等位", "天气变化需关注"],
     timeline: [
-      { id: createId("step"), startTime: "14:00", endTime: "14:40", type: "travel", title: `从${origin}出发`, poiId: null, poiName: origin, durationMinutes: 40, transport: "taxi", reasoning: "打车前往目的地，节省体力。", bookingNeeded: false, actionId: null },
-      { id: createId("step"), startTime: "14:40", endTime: "16:20", type: "activity", title: activity?.name ?? "景点游览", poiId: activity?.id ?? null, poiName: activity?.name ?? null, durationMinutes: 100, transport: "none", reasoning: "下午时段人流量适中，适合游览。", bookingNeeded: activity?.bookingRequired ?? false, actionId: null },
-      { id: createId("step"), startTime: "16:20", endTime: "17:00", type: "buffer", title: "休息与转场", poiId: null, poiName: null, durationMinutes: 40, transport: "walk", reasoning: "预留缓冲避免赶场。", bookingNeeded: false, actionId: null },
-      { id: createId("step"), startTime: "17:00", endTime: "18:10", type: "meal", title: restaurant?.name ?? "晚餐", poiId: restaurant?.id ?? null, poiName: restaurant?.name ?? null, durationMinutes: 70, transport: "none", reasoning: "较早用餐避开高峰。", bookingNeeded: true, actionId: null },
-      { id: createId("step"), startTime: "18:10", endTime: "18:40", type: "return", title: "返程", poiId: null, poiName: origin, durationMinutes: 30, transport: "taxi", reasoning: "保证总时长在合理范围内。", bookingNeeded: false, actionId: null },
+      { id: createId("step"), startTime: t1, endTime: t2, type: "travel", title: travelTitle, poiId: null, poiName: hasUserOrigin ? origin : null, durationMinutes: 40, transport: hasUserOrigin ? "taxi" : "none", reasoning: hasUserOrigin ? "打车前往目的地，节省体力。" : "出发地未提供，交通方式待定。", bookingNeeded: false, actionId: null },
+      { id: createId("step"), startTime: t2, endTime: t3, type: "activity", title: activity?.name ?? "景点游览", poiId: activity?.id ?? null, poiName: activity?.name ?? null, durationMinutes: 100, transport: "none", reasoning: "该时段人流量适中，适合游览。", bookingNeeded: activity?.bookingRequired ?? false, actionId: null },
+      { id: createId("step"), startTime: t3, endTime: t4, type: "buffer", title: "休息与转场", poiId: null, poiName: null, durationMinutes: 40, transport: "walk", reasoning: "预留缓冲避免赶场。", bookingNeeded: false, actionId: null },
+      { id: createId("step"), startTime: t4, endTime: t5, type: "meal", title: restaurant?.name ?? "晚餐", poiId: restaurant?.id ?? null, poiName: restaurant?.name ?? null, durationMinutes: 70, transport: "none", reasoning: "较早用餐避开高峰。", bookingNeeded: true, actionId: null },
+      { id: createId("step"), startTime: t5, endTime: t6, type: "return", title: returnTitle, poiId: null, poiName: hasUserOrigin ? origin : null, durationMinutes: 30, transport: hasUserOrigin ? "taxi" : "none", reasoning: "保证总时长在合理范围内。", bookingNeeded: false, actionId: null },
     ],
     backupPlan: `如果天气不好，切换到${city}室内活动 + 同商圈晚餐。`,
   };
@@ -166,32 +286,50 @@ function buildPrimaryPlan(input: PlannerInput): ActivityPlan {
 
 function buildFriendsPlan(input: PlannerInput): ActivityPlan {
   const { intent, candidates } = input;
-  const city = intent.city || "杭州";
+  const _city = intent.city || "杭州";
   const origin = intent.origin.label;
-  const budget = intent.budgetMax ?? 500;
+  const hasUserOrigin = !!origin;
+  const userBudget = intent.budgetMax;
+  const budget = userBudget ?? 300; // Default budget, never override user's explicit value
   const activity = candidates.events[0] ?? candidates.activities[0];
   const restaurant = candidates.restaurants[0];
   const optionId = createId("option_friends");
+  const startTime = resolveStartTime(intent);
+  const startMin = timeToMinutes(startTime);
+  const t1 = minutesToTime(startMin);
+  const t2 = minutesToTime(startMin + 40);
+  const t3 = minutesToTime(startMin + 40 + 80);
+  const t4 = minutesToTime(startMin + 40 + 80 + 20 + 60);
+  const t5 = minutesToTime(startMin + 40 + 80 + 20 + 60 + 40);
+
+  const budgetAssumption = userBudget !== undefined
+    ? `预算：${userBudget}元`
+    : "未提供预算，暂按人均 200-300 估算，可继续调整";
+
+  const assumptions: string[] = [];
+  if (hasUserOrigin) assumptions.push(`从${origin}出发`);
+  else assumptions.push("出发地未提供，以下暂不估算交通时间");
+  assumptions.push(`默认 ${intent.partySize} 人`, budgetAssumption);
 
   return {
     id: optionId,
     planId: input.planId,
-    title: `${city}朋友小聚轻社交方案`,
+    title: buildPlanTitle(intent, "朋友小聚轻社交方案"),
     targetGroup: "friends",
     score: 88,
-    summary: `适合多人下午轻社交，从${origin}出发，优先同商圈，预算约￥${budget}。`,
+    summary: `适合多人${intent.timeWindow === "morning" ? "上午" : "下午"}轻社交${hasUserOrigin ? `，从${origin}出发` : ""}，优先同商圈${userBudget !== undefined ? `，预算${userBudget}元` : ""}。`,
     totalDurationMinutes: 310,
     totalCostMin: Math.round(budget * 0.6),
     totalCostMax: budget,
     walkingKm: 3.1,
-    assumptions: [`默认 ${intent.partySize} 人`, "默认下午 14:00 出发"],
+    assumptions,
     highlights: ["适合多人同行", "可分享给朋友投票"],
     risks: ["餐厅 18:00 可能紧张"],
     timeline: [
-      { id: createId("step"), startTime: "14:00", endTime: "14:40", type: "travel", title: "集合出发", poiId: null, poiName: origin, durationMinutes: 40, transport: "mixed", reasoning: "同城集合优先同商圈。", bookingNeeded: false, actionId: null },
-      { id: createId("step"), startTime: "14:40", endTime: "16:00", type: "event", title: activity?.name ?? "展览活动", poiId: activity?.id ?? null, poiName: activity?.name ?? null, durationMinutes: 80, transport: "none", reasoning: "适合聊天拍照，节奏轻松。", bookingNeeded: activity?.bookingRequired ?? false, actionId: null },
-      { id: createId("step"), startTime: "16:20", endTime: "17:20", type: "activity", title: "同商圈休闲", poiId: null, poiName: null, durationMinutes: 60, transport: "walk", reasoning: "弹性时间可逛街或咖啡。", bookingNeeded: false, actionId: null },
-      { id: createId("step"), startTime: "18:00", endTime: "19:00", type: "meal", title: restaurant?.name ?? "朋友晚餐", poiId: restaurant?.id ?? null, poiName: restaurant?.name ?? null, durationMinutes: 60, transport: "walk", reasoning: "同商圈方便聚餐返程。", bookingNeeded: true, actionId: null },
+      { id: createId("step"), startTime: t1, endTime: t2, type: "travel", title: hasUserOrigin ? "集合出发" : "集合（出发地待确认）", poiId: null, poiName: hasUserOrigin ? origin : null, durationMinutes: 40, transport: hasUserOrigin ? "mixed" : "none", reasoning: "同城集合优先同商圈。", bookingNeeded: false, actionId: null },
+      { id: createId("step"), startTime: t2, endTime: t3, type: "event", title: activity?.name ?? "展览活动", poiId: activity?.id ?? null, poiName: activity?.name ?? null, durationMinutes: 80, transport: "none", reasoning: "适合聊天拍照，节奏轻松。", bookingNeeded: activity?.bookingRequired ?? false, actionId: null },
+      { id: createId("step"), startTime: t3, endTime: t4, type: "activity", title: "同商圈休闲", poiId: null, poiName: null, durationMinutes: 60, transport: "walk", reasoning: "弹性时间可逛街或咖啡。", bookingNeeded: false, actionId: null },
+      { id: createId("step"), startTime: t4, endTime: t5, type: "meal", title: restaurant?.name ?? "朋友晚餐", poiId: restaurant?.id ?? null, poiName: restaurant?.name ?? null, durationMinutes: 60, transport: "walk", reasoning: "同商圈方便聚餐返程。", bookingNeeded: true, actionId: null },
     ],
     backupPlan: "改为同商圈桌游/咖啡，晚餐时间不变。",
   };
@@ -201,30 +339,49 @@ function buildCouplePlan(input: PlannerInput): ActivityPlan {
   const { intent, candidates } = input;
   const city = intent.city || "杭州";
   const origin = intent.origin.label;
-  const budget = intent.budgetMax ?? 360;
+  const hasUserOrigin = !!origin;
+  const userBudget = intent.budgetMax;
+  const budget = userBudget ?? 300; // Default budget, never override user's explicit value
   const activity = candidates.activities[0];
   const restaurant = candidates.restaurants[0];
   const optionId = createId("option_couple");
+  const startTime = resolveStartTime(intent);
+  const startMin = timeToMinutes(startTime);
+  const t1 = minutesToTime(startMin);
+  const t2 = minutesToTime(startMin + 30);
+  const t3 = minutesToTime(startMin + 30 + 120);
+  const t4 = minutesToTime(startMin + 30 + 120 + 60);
+  const t5 = minutesToTime(startMin + 30 + 120 + 60 + 30);
+  const t6 = minutesToTime(startMin + 30 + 120 + 60 + 30 + 90);
+
+  const budgetAssumption = userBudget !== undefined
+    ? `预算：${userBudget}元`
+    : "未提供预算，暂按人均 200-300 估算，可继续调整";
+
+  const assumptions: string[] = [];
+  if (hasUserOrigin) assumptions.push(`从${origin}出发`);
+  else assumptions.push("出发地未提供，以下暂不估算交通时间");
+  assumptions.push("默认 2 人", budgetAssumption);
 
   return {
     id: optionId,
     planId: input.planId,
-    title: `${city}情侣轻约会路线`,
+    title: buildPlanTitle(intent, "情侣轻约会路线"),
     targetGroup: "couple",
     score: 89,
-    summary: `适合双人的浪漫${city}半日游，从${origin}出发，预算约￥${budget}。`,
+    summary: `适合双人的浪漫${city}半日游${hasUserOrigin ? `，从${origin}出发` : ""}${userBudget !== undefined ? `，预算${userBudget}元` : ""}。`,
     totalDurationMinutes: 300,
     totalCostMin: Math.round(budget * 0.5),
     totalCostMax: budget,
     walkingKm: 2.5,
-    assumptions: ["默认 2 人", "默认下午 14:00 出发"],
+    assumptions,
     highlights: ["浪漫氛围", "节奏轻松", "适合拍照打卡"],
     risks: ["热门餐厅需提前预约"],
     timeline: [
-      { id: createId("step"), startTime: "14:00", endTime: "14:30", type: "travel", title: `从${origin}出发`, poiId: null, poiName: origin, durationMinutes: 30, transport: "taxi", reasoning: "打车前往，轻松开始约会。", bookingNeeded: false, actionId: null },
-      { id: createId("step"), startTime: "14:30", endTime: "16:30", type: "activity", title: activity?.name ?? "景点漫步", poiId: activity?.id ?? null, poiName: activity?.name ?? null, durationMinutes: 120, transport: "walk", reasoning: "下午光线好，适合拍照。", bookingNeeded: activity?.bookingRequired ?? false, actionId: null },
-      { id: createId("step"), startTime: "16:30", endTime: "17:30", type: "buffer", title: "咖啡休息", poiId: null, poiName: null, durationMinutes: 60, transport: "walk", reasoning: "找家有情调的咖啡馆小坐。", bookingNeeded: false, actionId: null },
-      { id: createId("step"), startTime: "18:00", endTime: "19:30", type: "meal", title: restaurant?.name ?? "浪漫晚餐", poiId: restaurant?.id ?? null, poiName: restaurant?.name ?? null, durationMinutes: 90, transport: "walk", reasoning: "提前预约好位子。", bookingNeeded: true, actionId: null },
+      { id: createId("step"), startTime: t1, endTime: t2, type: "travel", title: hasUserOrigin ? `从${origin}出发` : "前往目的地（出发地待确认）", poiId: null, poiName: hasUserOrigin ? origin : null, durationMinutes: 30, transport: hasUserOrigin ? "taxi" : "none", reasoning: "打车前往，轻松开始约会。", bookingNeeded: false, actionId: null },
+      { id: createId("step"), startTime: t2, endTime: t3, type: "activity", title: activity?.name ?? "景点漫步", poiId: activity?.id ?? null, poiName: activity?.name ?? null, durationMinutes: 120, transport: "walk", reasoning: "光线好，适合拍照。", bookingNeeded: activity?.bookingRequired ?? false, actionId: null },
+      { id: createId("step"), startTime: t3, endTime: t4, type: "buffer", title: "咖啡休息", poiId: null, poiName: null, durationMinutes: 60, transport: "walk", reasoning: "找家有情调的咖啡馆小坐。", bookingNeeded: false, actionId: null },
+      { id: createId("step"), startTime: t5, endTime: t6, type: "meal", title: restaurant?.name ?? "浪漫晚餐", poiId: restaurant?.id ?? null, poiName: restaurant?.name ?? null, durationMinutes: 90, transport: "walk", reasoning: "提前预约好位子。", bookingNeeded: true, actionId: null },
     ],
     backupPlan: `如果下雨，改去${city}室内展览或商场，晚餐不变。`,
   };
@@ -232,31 +389,49 @@ function buildCouplePlan(input: PlannerInput): ActivityPlan {
 
 function buildIndoorBackupPlan(input: PlannerInput): ActivityPlan {
   const { intent, candidates } = input;
-  const city = intent.city || "杭州";
+  const _city = intent.city || "杭州";
   const origin = intent.origin.label;
-  const budget = intent.budgetMax ?? 400;
+  const hasUserOrigin = !!origin;
+  const userBudget = intent.budgetMax;
+  const budget = userBudget ?? 300; // Default budget, never override user's explicit value
   const indoor = candidates.activities.find((item) => item.indoor);
   const restaurant = candidates.restaurants[0];
   const optionId = createId("option_indoor");
+  const startTime = resolveStartTime(intent);
+  const startMin = timeToMinutes(startTime);
+  const t1 = minutesToTime(startMin);
+  const t2 = minutesToTime(startMin + 35);
+  const t3 = minutesToTime(startMin + 35 + 115);
+  const t4 = minutesToTime(startMin + 35 + 115 + 25);
+  const t5 = minutesToTime(startMin + 35 + 115 + 25 + 60);
+
+  const budgetAssumption = userBudget !== undefined
+    ? `预算：${userBudget}元`
+    : "未提供预算，暂按人均 200-300 估算，可继续调整";
+
+  const assumptions: string[] = [];
+  if (hasUserOrigin) assumptions.push(`从${origin}出发`);
+  else assumptions.push("出发地未提供，以下暂不估算交通时间");
+  assumptions.push("优先室内", budgetAssumption);
 
   return {
     id: optionId,
     planId: input.planId,
-    title: `${city}室内备选方案`,
+    title: buildPlanTitle(intent, "室内备选方案"),
     targetGroup: intent.participantMode === "unknown" ? "solo" : intent.participantMode,
     score: 86,
-    summary: `针对雨天/拥堵的低风险方案，从${origin}出发，减少户外和长距离转场。`,
+    summary: `针对雨天/拥堵的低风险方案${hasUserOrigin ? `，从${origin}出发` : ""}，减少户外和长距离转场${userBudget !== undefined ? `，预算${userBudget}元` : ""}。`,
     totalDurationMinutes: 240,
     totalCostMin: Math.round(budget * 0.5),
     totalCostMax: Math.round(budget * 0.85),
     walkingKm: 1.4,
-    assumptions: ["优先室内", "餐厅需确认"],
+    assumptions,
     highlights: ["雨天友好", "路线短", "失败恢复成本低"],
     risks: ["室内活动库存需确认"],
     timeline: [
-      { id: createId("step"), startTime: "14:00", endTime: "14:35", type: "travel", title: "出发到室内场所", poiId: null, poiName: origin, durationMinutes: 35, transport: "taxi", reasoning: "雨天减少户外暴露。", bookingNeeded: false, actionId: null },
-      { id: createId("step"), startTime: "14:35", endTime: "16:30", type: "activity", title: indoor?.name ?? "室内活动", poiId: indoor?.id ?? null, poiName: indoor?.name ?? null, durationMinutes: 115, transport: "none", reasoning: "室内场所对雨天更稳妥。", bookingNeeded: indoor?.bookingRequired ?? true, actionId: null },
-      { id: createId("step"), startTime: "17:00", endTime: "18:00", type: "meal", title: restaurant?.name ?? "同商圈晚餐", poiId: restaurant?.id ?? null, poiName: restaurant?.name ?? null, durationMinutes: 60, transport: "walk", reasoning: "同商圈减少转场风险。", bookingNeeded: true, actionId: null },
+      { id: createId("step"), startTime: t1, endTime: t2, type: "travel", title: hasUserOrigin ? "出发到室内场所" : "前往室内场所（出发地待确认）", poiId: null, poiName: hasUserOrigin ? origin : null, durationMinutes: 35, transport: hasUserOrigin ? "taxi" : "none", reasoning: "雨天减少户外暴露。", bookingNeeded: false, actionId: null },
+      { id: createId("step"), startTime: t2, endTime: t3, type: "activity", title: indoor?.name ?? "室内活动", poiId: indoor?.id ?? null, poiName: indoor?.name ?? null, durationMinutes: 115, transport: "none", reasoning: "室内场所对雨天更稳妥。", bookingNeeded: indoor?.bookingRequired ?? true, actionId: null },
+      { id: createId("step"), startTime: t4, endTime: t5, type: "meal", title: restaurant?.name ?? "同商圈晚餐", poiId: restaurant?.id ?? null, poiName: restaurant?.name ?? null, durationMinutes: 60, transport: "walk", reasoning: "同商圈减少转场风险。", bookingNeeded: true, actionId: null },
     ],
     backupPlan: "若室内活动无票，则保留餐厅并切换到商场休息/咖啡。",
   };
@@ -320,12 +495,12 @@ function buildLlmPrompt(input: PlannerInput): string {
 
   return `用户需求：
 - 城市：${intent.city}
-- 出发地：${intent.origin.label}
+- 出发地：${intent.origin.label || "未提供"}
 - 日期：${intent.date ?? "本周末"}
-- 出发时间：${intent.departAt ?? "14:00"}
+- 出发时间：${intent.departAt ?? resolveStartTime(intent)}
 - 参与者：${intent.participantMode}，${intent.partySize}人
 - 时长：${intent.durationHours[0]}-${intent.durationHours[1]}小时
-- 预算上限：${intent.budgetMax ?? "不限"}元
+- 预算上限：${intent.budgetMax !== undefined ? `${intent.budgetMax}元（用户明确提供，请严格遵守）` : "用户未提供预算，请按中等消费水平合理估算，并在 assumptions 中标注"}
 - 偏好：${intent.preferences.length > 0 ? intent.preferences.join("、") : "无特殊偏好"}
 
 天气：${weather.condition}，${weather.temperature}，${weather.suggestion}

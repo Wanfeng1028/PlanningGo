@@ -23,7 +23,7 @@ registerTool({
     capacity: z.number(),
     estimatedWait: z.string().optional(),
   }),
-  async execute(input, ctx: ToolExecutionContext) {
+  async execute(_input, _ctx: ToolExecutionContext) {
     // For now, return mock availability
     // In production, this would check with external APIs
     return {

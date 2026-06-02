@@ -6,6 +6,7 @@ import { API_BASE } from "./config";
 export interface StreamOptions {
   onChunk?: (chunk: string) => void;
   onFinalResult?: (result: PlanningResult) => void;
+  onAgentEvent?: (event: unknown) => void;
   onError?: (error: Error) => void;
   onComplete?: () => void;
   signal?: AbortSignal;
@@ -15,16 +16,43 @@ export async function streamFetch(
   url: string,
   options: RequestInit & StreamOptions
 ): Promise<void> {
-  const { onChunk, onFinalResult, onError, onComplete, signal, ...fetchOptions } = options;
+  const { onChunk, onFinalResult, onAgentEvent, onError, onComplete, signal, ...fetchOptions } = options;
 
   try {
-    const response = await fetch(url, {
+    let response = await fetch(url, {
       ...fetchOptions,
       signal,
     });
 
+    // Handle 401: refresh token and retry once
+    if (response.status === 401) {
+      const newToken = await refreshToken().catch(() => null);
+      if (newToken) {
+        // refreshToken() already called setAuthToken() internally
+        // Retry with refreshed token
+        const retryHeaders: Record<string, string> = {
+          ...(fetchOptions.headers as Record<string, string> ?? {}),
+          authorization: `Bearer ${newToken}`,
+        };
+        response = await fetch(url, {
+          ...fetchOptions,
+          headers: retryHeaders,
+          signal,
+        });
+      } else {
+        // Refresh failed — clear stale token and signal auth error
+        setAuthToken(null);
+        throw new Error("登录已过期，请重新登录");
+      }
+    }
+
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
+    }
+
+    // Proactively refresh token if optionalAuthGuard signalled expiration
+    if (response.headers.get("x-token-expired") === "1") {
+      refreshToken().then((t) => { if (t) setAuthToken(t); }).catch(() => {});
     }
 
     const reader = response.body?.getReader();
@@ -63,9 +91,13 @@ export async function streamFetch(
               continue;
             }
             try {
-              const parsed = JSON.parse(data) as { content?: string; error?: string; done?: boolean; result?: PlanningResult };
+              const parsed = JSON.parse(data) as { content?: string; error?: string; done?: boolean; result?: PlanningResult; type?: string; event?: unknown };
               if (typeof parsed.error === "string") {
                 throw new Error(parsed.error);
+              }
+              if (parsed.type === "agent_event" && parsed.event) {
+                onAgentEvent?.(parsed.event);
+                continue;
               }
               if (typeof parsed.content === "string") {
                 onChunk?.(parsed.content);
@@ -133,6 +165,7 @@ export async function streamPlanningRequest(
 export interface AgentStreamOptions {
   onChunk?: (chunk: string) => void;
   onFinalResult?: (result: unknown) => void;
+  onAgentEvent?: (event: unknown) => void;
   onError?: (error: Error) => void;
   onComplete?: () => void;
   signal?: AbortSignal;
@@ -164,6 +197,12 @@ export async function streamAgentMessage(
   if (token) {
     headers.authorization = `Bearer ${token}`;
   }
+
+  console.info("[stream] streamAgentMessage", {
+    hasToken: Boolean(token),
+    conversationId: input.conversationId ?? null,
+    messagePreview: input.message.slice(0, 60),
+  });
 
   // Reuse streamFetch but with generic onFinalResult
   const { onFinalResult, ...restOptions } = options;

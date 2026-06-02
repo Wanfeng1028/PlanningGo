@@ -1,7 +1,6 @@
 import type { MapProvider, LlmProvider, BookingProvider } from './types.js'
 import { MockMapProvider } from './mockMapProvider.js'
 import { MockLlmProvider } from './mockLlmProvider.js'
-import { MockBookingProvider } from './mockBookingProvider.js'
 import { AmapMapProvider } from './amapMapProvider.js'
 import { OpenAICompatibleLlmProvider } from './openAICompatibleLlmProvider.js'
 import { SafeBookingProvider } from './safeBookingProvider.js'

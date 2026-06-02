@@ -6,14 +6,14 @@
  * POST /api/agent/plans/select — Plan selection endpoint
  */
 
-import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { ZodError, z } from "zod";
 import { corsOrigins } from "../config/env.js";
 import { handleAgentMessage } from "../modules/agent/chatRouter.js";
 import { runAgentChatStream } from "../modules/agent/agentRuntime.js";
 import { hasAnyLlmKey } from "../modules/agent/modelClient.js";
 import { env } from "../config/env.js";
-import type { AgentMessageInput, AgentResponse } from "../../shared/agentResponse.js";
+import type { AgentResponse } from "../../shared/agentResponse.js";
 import type { PrismaClient } from "../../generated/prisma/client.js";
 import * as mem from "../services/memoryStore.js";
 
@@ -53,7 +53,12 @@ export async function registerAgentChatRoutes(app: FastifyInstance) {
         const userId = request.userId;
         const db: PrismaClient | null = app.db;
 
-        app.log.info({ route: "POST /api/agent/chat/stream", userId: userId ?? null, authenticated: Boolean(userId), conversationId: parsed.conversationId ?? null, method: "POST" }, "[agentChat:stream] incoming");
+        app.log.info({
+          route: "/api/agent/chat/stream",
+          userId,
+          conversationId: parsed.conversationId,
+          authenticated: Boolean(userId),
+        }, "[agentChat] request");
 
         // SSE headers (use raw.setHeader for reliable delivery with reply.raw.write)
         reply.raw.setHeader("Content-Type", "text/event-stream");
@@ -89,11 +94,17 @@ export async function registerAgentChatRoutes(app: FastifyInstance) {
                   modelMode: parsed.modelMode ?? 'flash',
                   conversationId: parsed.conversationId,
                   selectedOptionId: parsed.selectedOptionId,
+                  guestId: parsed.guestId,
                 },
                 { db, providers: app.providers ?? undefined, userId, log: app.log },
                 {
                   writeText: (delta) => {
                     if (!clientDisconnected) reply.raw.write(`data: ${JSON.stringify({ content: delta })}\n\n`);
+                  },
+                  writeEvent: (event) => {
+                    if (!clientDisconnected) {
+                      reply.raw.write(`data: ${JSON.stringify({ type: "agent_event", event })}\n\n`);
+                    }
                   },
                 },
               );
@@ -126,6 +137,7 @@ export async function registerAgentChatRoutes(app: FastifyInstance) {
                 modelMode: parsed.modelMode,
                 conversationId: parsed.conversationId,
                 selectedOptionId: parsed.selectedOptionId,
+                guestId: parsed.guestId,
               },
               { db, providers: app.providers ?? undefined, userId, log: app.log },
             );
@@ -159,6 +171,15 @@ export async function registerAgentChatRoutes(app: FastifyInstance) {
               fallbackUsed,
             },
           };
+          app.log.info({
+            conversationId: parsed.conversationId,
+            type: agentResponse.type,
+            provider: resolvedProvider,
+            model: resolvedModel,
+            mode: responseWithMeta.metadata.mode,
+            fallbackUsed,
+            contentLength: (agentResponse.content ?? "").length,
+          }, "[agentChat] response complete");
           reply.raw.write(`data: [FINAL_RESULT]${JSON.stringify(responseWithMeta)}\n\n`);
           reply.raw.write('data: [DONE]\n\n');
           reply.raw.end();
@@ -211,6 +232,7 @@ export async function registerAgentChatRoutes(app: FastifyInstance) {
             modelMode: parsed.modelMode,
             conversationId: parsed.conversationId,
             selectedOptionId: parsed.selectedOptionId,
+            guestId: parsed.guestId,
           },
           { db, providers: app.providers ?? undefined, userId, log: app.log },
         );

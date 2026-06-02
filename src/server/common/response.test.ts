@@ -10,7 +10,7 @@ function mockReply() {
     request,
     status(code: number) { reply._status = code; return reply },
     send(payload?: unknown) { reply._payload = payload; return reply },
-    header(key: string, value: string) { return reply },
+    header(_key: string, _value: string) { return reply },
   }
   return reply as unknown as import('fastify').FastifyReply & { _status: number; _payload: unknown }
 }

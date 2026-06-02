@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createActionsForPlans } from './actionService.js'
+import { createActionsForPlans, createPlanningActions } from './actionService.js'
 import type { ActivityPlan, UserIntent } from '../planning/schemas.js'
 
 const mockIntent: UserIntent = {
@@ -147,5 +147,162 @@ describe('createActionsForPlans', () => {
       intent: mockIntent,
     })
     expect(actions[0].userId).toBe('anonymous')
+  })
+})
+
+// ─── Mock data for createPlanningActions ────────────────────
+
+const planningMockOption: ActivityPlan = {
+  id: 'opt-1',
+  planId: 'plan-1',
+  title: '西湖咖啡火锅游',
+  targetGroup: 'solo',
+  score: 85,
+  summary: '一天的轻松行程',
+  totalDurationMinutes: 360,
+  totalCostMin: 100,
+  totalCostMax: 200,
+  walkingKm: 2.5,
+  assumptions: [],
+  highlights: ['西湖风景'],
+  risks: [],
+  timeline: [
+    {
+      id: 'step-1',
+      startTime: '09:00',
+      endTime: '11:00',
+      type: 'activity',
+      title: '咖啡厅',
+      poiId: 'poi-1',
+      poiName: '西湖边咖啡厅',
+      durationMinutes: 120,
+      transport: 'walk',
+      reasoning: '先坐坐',
+      bookingNeeded: false,
+      actionId: null,
+    },
+    {
+      id: 'step-2',
+      startTime: '12:00',
+      endTime: '14:00',
+      type: 'meal',
+      title: '火锅午餐',
+      poiId: 'poi-2',
+      poiName: '西湖火锅店',
+      durationMinutes: 120,
+      transport: 'walk',
+      reasoning: '满足火锅偏好',
+      bookingNeeded: true,
+      actionId: null,
+    },
+  ],
+}
+
+const planningMockIntent: UserIntent = {
+  raw: '从杭师大仓前出发，一个人去西湖，咖啡厅坐坐，中午吃火锅，预算200',
+  city: '杭州',
+  origin: { label: '杭师大仓前' },
+  participantMode: 'solo',
+  partySize: 1,
+  timeWindow: 'morning',
+  preferences: ['咖啡厅', '火锅'],
+  distanceLimitMinutes: 40,
+  durationHours: [4, 6],
+  isPlanningRequest: true,
+  mustAsk: [],
+}
+
+describe('createPlanningActions', () => {
+  it('generates map_search action', () => {
+    const actions = createPlanningActions({
+      planId: 'plan-1',
+      conversationId: 'conv-1',
+      options: [planningMockOption],
+      intent: planningMockIntent,
+    })
+    const mapAction = actions.find((a) => a.type === 'map_search')
+    expect(mapAction).toBeDefined()
+    if (mapAction && mapAction.type === 'map_search') {
+      expect(mapAction.provider).toBe('amap')
+      expect(mapAction.query).toBe('杭州')
+      expect(mapAction.label).toContain('高德')
+    }
+  })
+
+  it('generates navigation action for first POI', () => {
+    const actions = createPlanningActions({
+      planId: 'plan-1',
+      options: [planningMockOption],
+      intent: planningMockIntent,
+    })
+    const navAction = actions.find((a) => a.type === 'navigation')
+    expect(navAction).toBeDefined()
+    if (navAction && navAction.type === 'navigation') {
+      expect(navAction.destination).toBe('西湖边咖啡厅')
+      expect(navAction.provider).toBe('amap')
+    }
+  })
+
+  it('generates copy_text action', () => {
+    const actions = createPlanningActions({
+      planId: 'plan-1',
+      options: [planningMockOption],
+      intent: planningMockIntent,
+    })
+    const copyAction = actions.find((a) => a.type === 'copy_text')
+    expect(copyAction).toBeDefined()
+    if (copyAction && copyAction.type === 'copy_text') {
+      expect(copyAction.text).toContain('西湖咖啡火锅游')
+      expect(copyAction.label).toBe('复制完整行程')
+    }
+  })
+
+  it('generates calendar action with time range', () => {
+    const actions = createPlanningActions({
+      planId: 'plan-1',
+      options: [planningMockOption],
+      intent: planningMockIntent,
+    })
+    const calAction = actions.find((a) => a.type === 'calendar')
+    expect(calAction).toBeDefined()
+    if (calAction && calAction.type === 'calendar') {
+      expect(calAction.title).toBe('西湖咖啡火锅游')
+      expect(calAction.startTime).toBe('09:00')
+      expect(calAction.endTime).toBe('14:00')
+    }
+  })
+
+  it('generates mobile_handoff when conversationId provided', () => {
+    const actions = createPlanningActions({
+      planId: 'plan-1',
+      conversationId: 'conv-123',
+      options: [planningMockOption],
+      intent: planningMockIntent,
+    })
+    const handoffAction = actions.find((a) => a.type === 'mobile_handoff')
+    expect(handoffAction).toBeDefined()
+    if (handoffAction && handoffAction.type === 'mobile_handoff') {
+      expect(handoffAction.conversationId).toBe('conv-123')
+      expect(handoffAction.planId).toBe('plan-1')
+    }
+  })
+
+  it('skips mobile_handoff when no conversationId', () => {
+    const actions = createPlanningActions({
+      planId: 'plan-1',
+      options: [planningMockOption],
+      intent: planningMockIntent,
+    })
+    const handoffAction = actions.find((a) => a.type === 'mobile_handoff')
+    expect(handoffAction).toBeUndefined()
+  })
+
+  it('returns empty array when no options', () => {
+    const actions = createPlanningActions({
+      planId: 'plan-1',
+      options: [],
+      intent: planningMockIntent,
+    })
+    expect(actions).toEqual([])
   })
 })

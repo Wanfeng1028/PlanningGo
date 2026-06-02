@@ -38,12 +38,12 @@ function mockTokenService() {
 }
 
 describe('AuthService - Password Reset', () => {
-  let userRepo: any
+  let userRepo: ReturnType<typeof mockUserRepo>
   let authService: AuthService
 
   beforeEach(() => {
     userRepo = mockUserRepo()
-    authService = new AuthService(userRepo, mockProfileRepo() as any, mockTokenService() as any)
+    authService = new AuthService(userRepo as unknown as UserRepository, mockProfileRepo() as unknown as ProfileRepository, mockTokenService() as unknown as TokenService)
     vi.clearAllMocks()
   })
 

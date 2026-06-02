@@ -39,8 +39,9 @@ export function executeUpdatePlanningDraft(
   if (input.origin) incoming.origin = input.origin;
   if (input.destination) incoming.destination = input.destination;
   if (input.destinationCity) incoming.destinationCity = input.destinationCity;
-  if (input.budget) incoming.budget = input.budget;
-  if (input.partySize) incoming.partySize = input.partySize;
+  // budget/partySize: use explicit check so 0 is not silently dropped
+  if (input.budget !== undefined && input.budget !== null) incoming.budget = input.budget;
+  if (input.partySize !== undefined && input.partySize !== null) incoming.partySize = input.partySize;
   if (input.date) incoming.date = input.date;
   if (input.time) incoming.time = input.time;
   if (input.timeWindow) incoming.timeWindow = input.timeWindow;
@@ -59,12 +60,23 @@ export function executeUpdatePlanningDraft(
       incoming.preference = prefs;
     }
   }
-  incoming.preferences = incoming.preference;
+  // Sync preferences alias — only if preference was actually set
+  if (incoming.preference) {
+    incoming.preferences = incoming.preference;
+  }
   if (input.companions) incoming.companions = input.companions;
 
-  // Sync destination aliases
-  if (incoming.destination && !incoming.destinationCity) incoming.destinationCity = incoming.destination as string;
-  if (incoming.destinationCity && !incoming.destination) incoming.destination = incoming.destinationCity;
+  // Do NOT blindly sync destination ↔ destinationCity
+  // destination = specific place (西湖), destinationCity = city (杭州)
+  // Only infer city from known mappings
+  if (incoming.destination && !incoming.destinationCity) {
+    const cityMap: Record<string, string> = {
+      "西湖": "杭州", "灵隐寺": "杭州", "西溪": "杭州", "千岛湖": "杭州",
+      "外滩": "上海", "南京路": "上海", "迪士尼": "上海",
+      "故宫": "北京", "天安门": "北京", "长城": "北京",
+    };
+    incoming.destinationCity = cityMap[incoming.destination as string] ?? undefined;
+  }
 
   const merged = mergeSlots(currentDraft ?? {}, incoming);
   const missing = getMissingSlots(merged);

@@ -12,7 +12,8 @@
  * 3. 作为意图分类的参考实现
  */
 
-import type { PrismaClient } from "../../../generated/prisma/client.js";
+import type { PrismaClient, Prisma } from "../../../generated/prisma/client.js";
+import { updateConversationTitle } from "./titleUtils.js";
 import type {
   AgentResponse,
   AgentIntent,
@@ -24,6 +25,8 @@ import type {
 } from "../../../shared/agentResponse.js";
 import type { PlanningProviders } from "../planning/schemas.js";
 import { runPlanningPipeline } from "./orchestrator.js";
+import { createPlanningActions } from "../execution/actionService.js";
+import { extractMemoryFromSlots, mergeMemoryProfile } from "./memoryExtractor.js";
 import * as mem from "../../services/memoryStore.js";
 
 // ─── Constants ──────────────────────────────────────────────
@@ -85,7 +88,7 @@ export function classifyAgentIntent(message: string, state?: AgentState | null):
 
   // continuation — user says "生成完整方案/继续/就这个/安排吧" etc.
   // If state already has planningDraft with info, treat as continuation (skip re-asking)
-  if (/生成.*方案|完整.*方案|继续|就这个|安排吧|帮我细化|重新规划|出.*方案|给.*方案|来.*方案/.test(trimmed)) {
+  if (/生成.*方案|完整.*方案|继续|就这个|安排吧|帮我细化|重新规划|出.*方案|给.*方案|来.*方案|可以了|够了|就这样|安排一下|出方案|生成完整|帮我安排/.test(trimmed)) {
     const draft = state?.planningDraft;
     if (draft && (draft.destination || draft.destinationCity || draft.origin || draft.budget)) {
       return "continuation";
@@ -117,7 +120,7 @@ export function classifyAgentIntent(message: string, state?: AgentState | null):
 /** Check if the user's message is a continuation intent (generate/continue/arrange) */
 export function isContinuationIntent(message: string): boolean {
   const trimmed = message.trim();
-  return /生成.*方案|完整.*方案|继续|就这个|安排吧|帮我细化|重新规划|出.*方案|给.*方案|来.*方案|可以了|够了|就这样/.test(trimmed);
+  return /生成.*方案|完整.*方案|继续|就这个|安排吧|帮我细化|重新规划|出.*方案|给.*方案|来.*方案|可以了|够了|就这样|安排一下|出方案|生成完整|帮我安排/.test(trimmed);
 }
 
 // ─── Slot Extraction ────────────────────────────────────────
@@ -135,15 +138,31 @@ export function extractPlanningSlots(message: string): PlanningSlots {
     }
   }
 
-  // destination — "去西湖" / "去杭州西湖" / "目的地：西湖"
+  // destination — "去西湖" / "去杭州西湖" / "去北京天安门" / "目的地：西湖"
+  // Must exclude verb patterns like "去吃午饭" / "去看看" / "去玩"
   const destMatch = normalized.match(/去([^，,。.！!？?\s]{2,20})/) ||
                     normalized.match(/目的地[：:]\s*(.+)/) ||
                     normalized.match(/到([^，,。.！!？?\s]{2,20})/);
   if (destMatch) {
     const dest = destMatch[1].replace(/[，,。.！!？?、]/g, "").trim();
-    if (dest.length > 0 && dest.length < 30) {
+    // Exclude verb patterns: "吃午饭", "看看", "玩玩", "逛" etc. are NOT destinations
+    const isVerbPattern = /^(吃|看|玩|逛|买|喝|坐|拍|找|选|试|听|学|做|体验|享受|参加|参观)/.test(dest);
+    if (dest.length > 0 && dest.length < 30 && !isVerbPattern) {
       slots.destination = dest;
-      slots.destinationCity = dest;
+      // Infer city: check if dest CONTAINS known landmarks (not exact match)
+      const cityMap: Array<[string, string]> = [
+        ["西湖", "杭州"], ["灵隐寺", "杭州"], ["西溪", "杭州"], ["千岛湖", "杭州"],
+        ["外滩", "上海"], ["南京路", "上海"], ["迪士尼", "上海"],
+        ["故宫", "北京"], ["天安门", "北京"], ["长城", "北京"], ["颐和园", "北京"],
+        ["宽窄巷子", "成都"], ["春熙路", "成都"],
+        ["兵马俑", "西安"], ["大雁塔", "西安"],
+      ];
+      for (const [landmark, city] of cityMap) {
+        if (dest.includes(landmark)) {
+          slots.destinationCity = city;
+          break;
+        }
+      }
     }
   }
 
@@ -159,9 +178,11 @@ export function extractPlanningSlots(message: string): PlanningSlots {
   }
 
   // partySize
-  const sizeMatch = normalized.match(/(\d+)\s*人/);
+  const cnNumMap: Record<string, number> = { "一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9 };
+  const sizeMatch = normalized.match(/(\d+)\s*人/) || normalized.match(/([一二两三四五六七八九])\s*人/);
   if (sizeMatch) {
-    slots.partySize = Number(sizeMatch[1]);
+    const raw = sizeMatch[1]!;
+    slots.partySize = cnNumMap[raw] ?? Number(raw);
   } else if (/两个人|俩人/.test(normalized)) {
     slots.partySize = 2;
   } else if (/三个人|仨人/.test(normalized)) {
@@ -188,9 +209,10 @@ export function extractPlanningSlots(message: string): PlanningSlots {
   else if (/明天/.test(normalized)) slots.date = "明天";
   else if (/下周/.test(normalized)) slots.date = "下周";
 
-  // time — extract specific time like "明天上午9点"
-  const timeMatch = normalized.match(/(明天|下周[一二三四五六日]?|周末|周[一二三四五六日])(上午|下午|晚上)?(\d{1,2}[点时:：]\d{0,2})?/) ||
-                    normalized.match(/(\d{1,2}[点时:：]\d{0,2})/);
+  // time — extract specific time like "明天上午9点"、"明天早上10点"、"今天下午3点"
+  const timeMatch = normalized.match(/(明天|下周[一二三四五六日]?|周末|周[一二三四五六日]|今天)(上午|早上|下午|晚上)(\d{1,2}[点时:：]\d{0,2}(?:分)?)?/) ||
+                    normalized.match(/(明天|下周[一二三四五六日]?|周末|周[一二三四五六日]|今天)(\d{1,2}[点时:：]\d{0,2}(?:分)?)/) ||
+                    normalized.match(/(\d{1,2}[点时:：]\d{0,2}(?:分)?)/);
   if (timeMatch) {
     const parts = [timeMatch[1], timeMatch[2], timeMatch[3]].filter(Boolean);
     if (parts.length > 0) {
@@ -246,9 +268,8 @@ export function mergeSlots(existing: PlanningSlots, incoming: PlanningSlots): Pl
       }
     }
   }
-  // Sync aliases
-  if (merged.destination && !merged.destinationCity) merged.destinationCity = merged.destination as string;
-  if (merged.destinationCity && !merged.destination) merged.destination = merged.destinationCity as string;
+  // Sync aliases — do NOT blindly copy destination ↔ destinationCity
+  // destination = specific place (西湖), destinationCity = city (杭州)
   if (merged.preferences && !merged.preference) merged.preference = merged.preferences;
   if (merged.preference && !merged.preferences) merged.preferences = merged.preference;
   if (merged.time && !merged.date) {
@@ -261,21 +282,25 @@ export function mergeSlots(existing: PlanningSlots, incoming: PlanningSlots): Pl
 
 export function getMissingSlots(slots: PlanningSlots): PlanningSlotKey[] {
   const missing: PlanningSlotKey[] = [];
-  // Very lenient: only require partySize/companions if nothing else is known.
-  // If user has provided destination or preferences, we have enough to plan.
+
   const hasDestination = !!(slots.destination || slots.destinationCity);
   const hasOrigin = !!slots.origin;
-  const hasBudget = !!slots.budget;
+  const hasTime = !!(slots.time || slots.date || slots.timeWindow);
   const hasParty = !!(slots.partySize || slots.companions);
-  const hasPrefs = !!(slots.preferences || slots.preference);
 
-  // If user has given us a destination and at least one other detail, we can plan
-  if (hasDestination && (hasOrigin || hasBudget || hasPrefs || hasParty)) {
-    return []; // enough info to generate a plan
-  }
+  // 目的地是必须的 — 没有目的地无法规划
+  if (!hasDestination) missing.push("destination");
 
-  // Otherwise only block on partySize/companions
+  // 时间是必要的 — 至少需要日期或时段
+  if (!hasTime) missing.push("time");
+
+  // 人数/同行人是必要的
   if (!hasParty) missing.push("partySize");
+
+  // 出发地：如果缺失则标记，后续方案生成时判断是否需要
+  // 缺 origin 不生成导航型完整方案，但可以生成轻方案
+  if (!hasOrigin) missing.push("origin");
+
   return missing;
 }
 
@@ -283,18 +308,22 @@ export function getMissingSlots(slots: PlanningSlots): PlanningSlotKey[] {
 
 export function generateTitleFromSlots(slots: PlanningSlots): string | null {
   const dest = String(slots.destination || slots.destinationCity || "").trim();
+  const origin = String(slots.origin || "").trim();
   const prefs = slots.preferences || slots.preference;
   const prefStr = Array.isArray(prefs) ? prefs.slice(0, 3).join("") : String(prefs || "");
 
+  if (origin && dest && prefStr) {
+    // Best title: "杭师大仓前到西湖咖啡火锅游"
+    return `${origin}到${dest}${prefStr}游`;
+  }
   if (dest && prefStr) {
     return `${dest}${prefStr}游`;
   }
-  if (dest) {
-    return `${dest}出行规划`;
-  }
-  const origin = String(slots.origin || "").trim();
   if (origin && dest) {
     return `${origin}到${dest}规划`;
+  }
+  if (dest) {
+    return `${dest}出行规划`;
   }
   return null;
 }
@@ -319,6 +348,20 @@ export async function handleAgentMessage(
 
   // 2. Load agent state
   const state = await loadAgentState(db, conversationId, log);
+
+  // 2.5 Load recent history for context-aware slot extraction
+  const recentHistory = await loadRecentHistory(db, conversationId, log);
+  // Merge slots from recent history into the state's planningDraft
+  if (recentHistory.length > 0 && state) {
+    for (const msg of recentHistory) {
+      if (msg.role === "user") {
+        const historicalSlots = extractPlanningSlots(msg.content);
+        if (Object.keys(historicalSlots).length > 0) {
+          state.planningDraft = mergeSlots(state.planningDraft ?? {}, historicalSlots);
+        }
+      }
+    }
+  }
 
   // 3. Save user message
   await saveMsg(db, conversationId, "user", input.message, undefined, log);
@@ -374,12 +417,58 @@ export async function handleAgentMessage(
       response = replyCasual(conversationId, input.message);
   }
 
+  // 4.5 Extract and persist memory profile after successful plan generation
+  if (response.type === "plan" && userId) {
+    try {
+      const newMemory = extractMemoryFromSlots(state?.planningDraft ?? {});
+      if (Object.keys(newMemory).length > 0) {
+        // Upsert as a single "planning_profile" memory entry
+        const existing = await db?.memory.findFirst({
+          where: { userId: userId!, category: "route", title: "planning_profile", deletedAt: null },
+        });
+        const memoryJson = existing
+          ? mergeMemoryProfile(JSON.parse(existing.detail), newMemory)
+          : newMemory;
+        if (existing) {
+          await db?.memory.update({
+            where: { id: existing.id },
+            data: { detail: JSON.stringify(memoryJson), weight: 0.9 },
+          });
+        } else {
+          await db?.memory.create({
+            data: {
+              userId: userId!,
+              category: "route",
+              title: "planning_profile",
+              detail: JSON.stringify(memoryJson),
+              weight: 0.9,
+            },
+          });
+        }
+        log.info({ userId, memoryJson }, "[chatRouter] Memory profile updated from planning slots");
+      }
+    } catch (memErr) {
+      log.warn({ err: memErr }, "[chatRouter] Failed to update memory profile");
+    }
+  }
+
   // 5. Save assistant message
   await saveMsg(db, conversationId, "assistant", response.content, { ...response }, log);
 
-  // 6. Update agent state
-  const newState = computeNewState(state, response);
+  // 6. Update agent state — re-merge draft from this turn to ensure planningDraft is current
+  const latestSlots = mergeSlots(state?.planningDraft ?? {}, extractPlanningSlots(input.message));
+  const hasSlotData = Object.keys(latestSlots).length > 0;
+  const newState = computeNewState(state, response, hasSlotData ? latestSlots : undefined);
   await saveAgentState(db, conversationId, newState, log);
+
+  // 7. Update conversation title if we have planning info
+  const currentDraftForTitle = newState?.planningDraft;
+  if (currentDraftForTitle) {
+    const newTitle = generateTitleFromSlots(currentDraftForTitle);
+    if (newTitle) {
+      await updateConversationTitle(db, conversationId, newTitle, log);
+    }
+  }
 
   return response;
 }
@@ -436,7 +525,7 @@ async function handlePlanSelectedByText(
   conversationId: string,
   message: string,
   state: AgentState | null,
-  log: HandlerContext["log"],
+  _log: HandlerContext["log"],
 ): Promise<AgentResponse> {
   // Check if user has a selectedOptionId in state
   const selectedId = state?.selectedOptionId;
@@ -520,10 +609,9 @@ async function handleContinuation(
     intent: "continuation",
   }, "[chatRouter] continuation draft merge");
 
-  // If we have enough info, go straight to plan generation
-  // Continuation intent NEVER re-asks — use defaults for anything missing
-  if (!mergedSlots.origin) mergedSlots.origin = "市中心";
-  if (!mergedSlots.budget && !mergedSlots.budgetFlexible) mergedSlots.budget = 300;
+  // Continuation: only fill truly missing defaults, NEVER override user values
+  // origin: 不默认填 "市中心"，缺 origin 时方案中标注"出发地未提供"
+  // budget: 不默认填 300，缺 budget 时在方案中标注"预算未提供"
   if (!mergedSlots.partySize && !mergedSlots.companions) mergedSlots.partySize = 1;
 
   return generatePlanFromSlots(conversationId, input, mergedSlots, providers, userId, log);
@@ -550,24 +638,26 @@ async function handlePlanningIntent(
     intent: "planning_request",
   }, "[chatRouter] planning draft merge");
 
-  // Check completeness — only ask when truly missing core info
+  // Check completeness — ask when missing core info
   const missing = getMissingSlots(mergedSlots);
 
-  if (missing.length > 0) {
-    return askMissingSlots(conversationId, mergedSlots, missing);
+  // Filter: origin is not a hard blocker — we can generate a "light" plan without it
+  const hardMissing = missing.filter((k) => k !== "origin");
+
+  if (hardMissing.length > 0) {
+    return askMissingSlots(conversationId, mergedSlots, hardMissing);
   }
 
-  // Apply defaults for optional fields that are missing — but NEVER override user budget
-  if (!mergedSlots.origin) mergedSlots.origin = "市中心";
-  // Only set budget default if user didn't specify one and didn't say "预算我安排吧"
-  if (!mergedSlots.budget && !mergedSlots.budgetFlexible) mergedSlots.budget = 300;
+  // NEVER override user's budget with defaults
+  // budget: only use default if user didn't specify and didn't say "预算我安排吧"
+  // origin: don't fill "市中心" — let planner handle missing origin gracefully
 
   log.info({
     conversationId,
     finalSlotsUsedForPlan: mergedSlots,
   }, "[chatRouter] generate plan slots");
 
-  // Slots are complete — generate plan
+  // Generate plan — planner will handle missing origin/budget gracefully
   return generatePlanFromSlots(conversationId, input, mergedSlots, providers, userId, log);
 }
 
@@ -634,12 +724,16 @@ async function generatePlanFromSlots(
       ? `${input.message}\n\n[规划信息] ${slotSummary.join("；")}`
       : input.message;
 
+    // Extract departAt from time slot — e.g. "明天上午9点" → pass to pipeline
+    const departAt = typeof slots.time === "string" ? slots.time : undefined;
+
     const result = await runPlanningPipeline({
       prompt: enrichedPrompt,
       city: input.city ?? (typeof (slots.destination || slots.origin) === "string" ? (slots.destination as string) || (slots.origin as string) : undefined) ?? "北京",
       startPoint: typeof slots.origin === "string" ? slots.origin : undefined,
       companions,
       budget: typeof slots.budget === "number" ? slots.budget : undefined,
+      departAt,
       modelMode: (input.modelMode as "flash" | "pro") ?? "flash",
       providers,
       userId,
@@ -653,6 +747,12 @@ async function generatePlanFromSlots(
         options: result.options,
         summary: result.summary,
         executableActions: result.executableActions,
+        planningActions: createPlanningActions({
+          planId: result.planId,
+          conversationId,
+          options: result.options as import("../planning/schemas.js").ActivityPlan[],
+          intent: result.intent,
+        }),
         conversationId,
       },
       conversationId,
@@ -662,13 +762,15 @@ async function generatePlanFromSlots(
 
     if (message.startsWith("MISSING_REQUIRED_SLOTS:")) {
       const missingKeys = message.replace("MISSING_REQUIRED_SLOTS:", "").split(",") as PlanningSlotKey[];
+      // Don't fill defaults silently — ask the user for truly required slots
+      // Only fill partySize as it's safe to default
       const withDefaults = { ...slots };
       for (const key of missingKeys) {
-        if (key === "origin" && !withDefaults.origin) withDefaults.origin = "市中心";
-        if (key === "budget" && !withDefaults.budget) withDefaults.budget = 300;
         if (key === "partySize" && !withDefaults.partySize && !withDefaults.companions) withDefaults.partySize = 2;
       }
-      if (missingKeys.every((k) => withDefaults[k])) {
+      // If all missing keys can be defaulted, proceed; otherwise ask
+      const unfillable = missingKeys.filter((k) => !withDefaults[k]);
+      if (unfillable.length > 0) {
         return askMissingSlots(conversationId, slots, missingKeys);
       }
       return generatePlanFromSlots(conversationId, input, withDefaults, providers, userId, log);
@@ -686,27 +788,27 @@ async function generatePlanFromSlots(
 
 // ─── State Management ───────────────────────────────────────
 
-function computeNewState(prev: AgentState | null | undefined, response: AgentResponse): AgentState {
+function computeNewState(prev: AgentState | null | undefined, response: AgentResponse, currentDraft?: PlanningSlots): AgentState {
   const base: AgentState = prev ?? { phase: "idle" };
 
   switch (response.type) {
     case "chat":
     case "identity":
-      return { ...base, phase: "chatting", lastAssistantType: response.type };
+      return { ...base, phase: "chatting", lastAssistantType: response.type, planningDraft: currentDraft ?? base.planningDraft };
     case "travel_advice":
-      return { ...base, phase: "chatting", lastAssistantType: "travel_advice" };
+      return { ...base, phase: "chatting", lastAssistantType: "travel_advice", planningDraft: currentDraft ?? base.planningDraft };
     case "slot_question":
       return {
         ...base,
         phase: "collecting_slots",
-        planningDraft: response.knownSlots,
+        planningDraft: response.knownSlots ?? currentDraft ?? base.planningDraft,
         lastAssistantType: "slot_question",
       };
     case "plan":
       return {
         ...base,
         phase: "plan_generated",
-        planningDraft: prev?.planningDraft, // preserve draft
+        planningDraft: currentDraft ?? base.planningDraft, // always use latest merged draft
         lastPlanResult: {
           planId: response.data.planId,
           options: response.data.options,
@@ -737,6 +839,31 @@ function computeNewState(prev: AgentState | null | undefined, response: AgentRes
 
 // ─── DB Helpers ─────────────────────────────────────────────
 
+async function loadRecentHistory(
+  db: PrismaClient | null,
+  conversationId: string,
+  log: HandlerContext["log"],
+): Promise<Array<{ role: string; content: string }>> {
+  if (db) {
+    try {
+      const msgs = await db.message.findMany({
+        where: { conversationId },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        select: { role: true, content: true },
+      });
+      return msgs.reverse();
+    } catch {
+      log.warn("[chatRouter] Failed to load history from DB");
+    }
+  }
+  const memMsgs = mem.listMessages(conversationId);
+  return memMsgs.slice(-20).map((m: { role: string; content: string }) => ({
+    role: m.role,
+    content: m.content,
+  }));
+}
+
 async function ensureConversation(
   db: PrismaClient | null,
   userId: string | undefined,
@@ -748,17 +875,29 @@ async function ensureConversation(
       try {
         const existing = await db.conversation.findUnique({
           where: { id: input.conversationId },
-          select: { id: true },
+          select: { id: true, userId: true },
         });
         if (existing) {
-          log.info(`[chatRouter] ensureConversation FOUND conv=${input.conversationId}`);
-          return input.conversationId;
-        }
-        log.warn(`[chatRouter] ensureConversation NOT FOUND in DB conv=${input.conversationId}, checking memory`);
-        const memConv = mem.getConversation(input.conversationId);
-        if (memConv) {
-          log.info(`[chatRouter] ensureConversation FOUND in MEMORY conv=${input.conversationId}`);
-          return input.conversationId;
+          // Ownership check: logged-in user must only use their own conversations
+          if (userId && existing.userId && existing.userId !== userId) {
+            log.warn(`[chatRouter] ensureConversation OWNERSHIP MISMATCH conv=${input.conversationId} owner=${existing.userId} current=${userId}, creating new`);
+            // Fall through to create a new conversation
+          } else {
+            log.info(`[chatRouter] ensureConversation FOUND conv=${input.conversationId}`);
+            return input.conversationId;
+          }
+        } else {
+          log.warn(`[chatRouter] ensureConversation NOT FOUND in DB conv=${input.conversationId}, checking memory`);
+          const memConv = mem.getConversation(input.conversationId);
+          if (memConv) {
+            if (userId && memConv.userId && memConv.userId !== userId) {
+              log.warn(`[chatRouter] ensureConversation MEMORY OWNERSHIP MISMATCH conv=${input.conversationId}`);
+              // Fall through to create new
+            } else {
+              log.info(`[chatRouter] ensureConversation FOUND in MEMORY conv=${input.conversationId}`);
+              return input.conversationId;
+            }
+          }
         }
       } catch (err) {
         log.error({ err }, "[chatRouter] Failed to verify conversationId");
@@ -776,12 +915,13 @@ async function ensureConversation(
       const conv = await db.conversation.create({
         data: {
           userId: userId ?? undefined,
+          guestId: !userId ? (input.guestId ?? undefined) : undefined,
           title,
           city: input.city ?? "北京",
           modelMode: (input.modelMode as "flash" | "pro") ?? "flash",
         },
       });
-      log.info(`[chatRouter] ensureConversation CREATED DB conv=${conv.id} userId=${userId ?? "null"}`);
+      log.info(`[chatRouter] ensureConversation CREATED DB conv=${conv.id} userId=${userId ?? "null"} guestId=${input.guestId ?? "null"}`);
       return conv.id;
     } catch (err) {
       log.error({ err }, "[chatRouter] Failed to create conversation in DB");
@@ -829,7 +969,7 @@ async function saveAgentState(
       await db.conversation.update({
         where: { id: conversationId },
         data: {
-          agentStateJson: state as any,
+          agentStateJson: state as unknown as Prisma.InputJsonValue,
           selectedOptionId: state.selectedOptionId ?? null,
           updatedAt: new Date(),
         },
@@ -851,9 +991,13 @@ async function saveMsg(
   if (db) {
     try {
       const msg = await db.message.create({
-        data: { conversationId, role, content, payloadJson: payloadJson as any },
+        data: { conversationId, role, content, payloadJson: payloadJson as unknown as Prisma.InputJsonValue },
       });
-      log?.info(`[chatRouter] saveMsg OK id=${msg.id} role=${role} conv=${conversationId}`);
+      log?.info({
+        conversationId,
+        role,
+        messageId: msg.id,
+      }, "[chatRouter] message saved to DB");
       try {
         await db.conversation.update({
           where: { id: conversationId },
@@ -862,9 +1006,13 @@ async function saveMsg(
       } catch { /* non-critical */ }
       return;
     } catch (err) {
-      log?.error({ err }, `[chatRouter] saveMsg DB FAILED role=${role} conv=${conversationId}, falling back to memory`);
+      log?.error({
+        conversationId,
+        role,
+        err,
+      }, "[chatRouter] message DB write failed");
     }
   }
   mem.addMessage({ conversationId, role, content, payloadJson });
-  log?.info(`[chatRouter] saveMsg MEMORY fallback role=${role} conv=${conversationId}`);
+  log?.warn({ conversationId, role }, "[chatRouter] message saved to MEMORY only (DB unavailable)");
 }

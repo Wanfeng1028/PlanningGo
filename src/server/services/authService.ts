@@ -168,7 +168,7 @@ export class AuthService {
 
     // Store via userRepo if method exists, otherwise skip (memory mode)
     if ("createPasswordResetToken" in this.userRepo) {
-      await (this.userRepo as any).createPasswordResetToken({
+      await this.userRepo.createPasswordResetToken({
         userId: user.id,
         tokenHash,
         expiresAt,
@@ -193,12 +193,12 @@ export class AuthService {
 
     // Try DB lookup if method exists
     if ("findPasswordResetToken" in this.userRepo && "usePasswordResetToken" in this.userRepo) {
-      const record = await (this.userRepo as any).findPasswordResetToken(tokenHash);
+      const record = await this.userRepo.findPasswordResetToken(tokenHash);
       if (!record) throw new BadRequestError("重置令牌无效或已过期");
 
       const passwordHash = await hashPassword(newPassword);
       await this.userRepo.updatePasswordHash(record.userId, passwordHash);
-      await (this.userRepo as any).usePasswordResetToken(record.id);
+      await this.userRepo.usePasswordResetToken(record.id);
       await this.tokenService.revokeAllTokens(record.userId);
       return;
     }

@@ -6,7 +6,7 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { sendOk, sendCreated, sendNoContent, sendError } from "../common/response.js";
-import { UnauthorizedError } from "../common/errors.js";
+
 import { nullToUndefined, toRecordOrEmpty, toStringArray } from "../common/json.js";
 import { DeveloperRepository } from "../repositories/developerRepository.js";
 import { requireUserId } from "../common/uid.js";
@@ -122,7 +122,7 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
       expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
     }
 
-    const { apiKey, rawKey, prefix } = await repo.createApiKey(userId, {
+    const { apiKey, rawKey, prefix: _prefix } = await repo.createApiKey(userId, {
       name: input.name,
       appId: input.appId,
       scopes: input.scopes,

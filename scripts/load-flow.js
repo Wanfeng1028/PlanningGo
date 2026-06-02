@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 import autocannon from "autocannon";
 
 const BASE_URL = process.env.LOAD_TARGET_URL || "http://localhost:3001";
@@ -22,7 +21,7 @@ function requestFactory() {
   ];
 }
 
-const setupClient = (_client) => {
+const _setupClient = (_client) => {
   const requests = requestFactory();
   return { requests };
 };

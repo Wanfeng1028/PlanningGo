@@ -4,6 +4,8 @@ import {
   extractPlanningSlots,
   mergeSlots,
   getMissingSlots,
+  isContinuationIntent,
+  generateTitleFromSlots,
 } from "./chatRouter.js";
 import type { AgentState, PlanningSlots } from "../../../shared/agentResponse.js";
 
@@ -142,33 +144,172 @@ describe("chatRouter", () => {
 
   describe("getMissingSlots", () => {
     it("returns empty when all required slots present", () => {
-      const slots: PlanningSlots = { origin: "仓前", budget: 300, partySize: 2 };
+      const slots: PlanningSlots = { origin: "仓前", destination: "西湖", time: "明天", partySize: 2 };
       expect(getMissingSlots(slots)).toEqual([]);
     });
 
     it("returns empty when companions present instead of partySize", () => {
-      const slots: PlanningSlots = { origin: "仓前", budget: 300, companions: "friends" };
+      const slots: PlanningSlots = { origin: "仓前", destination: "西湖", time: "明天", companions: "friends" };
       expect(getMissingSlots(slots)).toEqual([]);
     });
 
-    it("does NOT require origin (can use default)", () => {
-      const slots: PlanningSlots = { budget: 300, partySize: 2 };
-      expect(getMissingSlots(slots)).toEqual([]);
+    it("reports origin as missing when not provided", () => {
+      const slots: PlanningSlots = { destination: "西湖", time: "明天", partySize: 2 };
+      expect(getMissingSlots(slots)).toContain("origin");
     });
 
-    it("does NOT require budget (can use default)", () => {
-      const slots: PlanningSlots = { origin: "仓前", partySize: 2 };
-      expect(getMissingSlots(slots)).toEqual([]);
+    it("does NOT require budget (optional field)", () => {
+      const slots: PlanningSlots = { origin: "仓前", destination: "西湖", time: "明天", partySize: 2 };
+      const missing = getMissingSlots(slots);
+      expect(missing).not.toContain("budget");
+      expect(missing).toEqual([]);
     });
 
     it("requires partySize or companions", () => {
-      const slots: PlanningSlots = { origin: "仓前", budget: 300 };
-      expect(getMissingSlots(slots)).toEqual(["partySize"]);
+      const slots: PlanningSlots = { origin: "仓前", destination: "西湖", time: "明天" };
+      expect(getMissingSlots(slots)).toContain("partySize");
     });
 
-    it("only reports partySize when both origin and budget missing", () => {
+    it("reports all missing fields when empty", () => {
       const slots: PlanningSlots = {};
-      expect(getMissingSlots(slots)).toEqual(["partySize"]);
+      const missing = getMissingSlots(slots);
+      expect(missing).toContain("destination");
+      expect(missing).toContain("time");
+      expect(missing).toContain("partySize");
+      expect(missing).toContain("origin");
+    });
+
+    it("reports time as missing when destination + preferences present but no time", () => {
+      const slots: PlanningSlots = { destination: "西湖", preferences: ["咖啡厅", "火锅"], partySize: 1 };
+      const missing = getMissingSlots(slots);
+      expect(missing).toContain("time");
+    });
+
+    it("reports time as missing when destination + origin + budget present but no time", () => {
+      const slots: PlanningSlots = { destination: "西湖", origin: "杭师大仓前", budget: 200, partySize: 1 };
+      const missing = getMissingSlots(slots);
+      expect(missing).toContain("time");
+    });
+  });
+
+  describe("isContinuationIntent", () => {
+    it("identifies continuation intents", () => {
+      expect(isContinuationIntent("生成完整的方案")).toBe(true);
+      expect(isContinuationIntent("继续")).toBe(true);
+      expect(isContinuationIntent("就这个")).toBe(true);
+      expect(isContinuationIntent("安排吧")).toBe(true);
+      expect(isContinuationIntent("帮我细化")).toBe(true);
+      expect(isContinuationIntent("重新规划一下")).toBe(true);
+      expect(isContinuationIntent("出方案")).toBe(true);
+      expect(isContinuationIntent("给个方案")).toBe(true);
+      expect(isContinuationIntent("来个方案")).toBe(true);
+      expect(isContinuationIntent("可以了")).toBe(true);
+      expect(isContinuationIntent("够了")).toBe(true);
+      expect(isContinuationIntent("就这样")).toBe(true);
+    });
+
+    it("does not identify non-continuation messages", () => {
+      expect(isContinuationIntent("你好")).toBe(false);
+      expect(isContinuationIntent("你是谁")).toBe(false);
+      expect(isContinuationIntent("去西湖")).toBe(false);
+    });
+  });
+
+  describe("generateTitleFromSlots", () => {
+    it("generates title with destination + preferences", () => {
+      const slots: PlanningSlots = { destination: "西湖", preferences: ["咖啡厅", "火锅"] };
+      const title = generateTitleFromSlots(slots);
+      expect(title).toBe("西湖咖啡厅火锅游");
+    });
+
+    it("generates title with origin + destination", () => {
+      const slots: PlanningSlots = { origin: "杭师大仓前", destination: "西湖" };
+      const title = generateTitleFromSlots(slots);
+      expect(title).toBe("杭师大仓前到西湖规划");
+    });
+
+    it("generates title with destination only", () => {
+      const slots: PlanningSlots = { destination: "杭州" };
+      const title = generateTitleFromSlots(slots);
+      expect(title).toBe("杭州出行规划");
+    });
+
+    it("returns null when no destination", () => {
+      const slots: PlanningSlots = { origin: "仓前", budget: 200 };
+      const title = generateTitleFromSlots(slots);
+      expect(title).toBeNull();
+    });
+
+    it("does NOT generate casual chat titles like '你好' or '你是谁'", () => {
+      // These should never be valid titles from slots
+      const slots: PlanningSlots = { destination: "西湖" };
+      const title = generateTitleFromSlots(slots);
+      expect(title).not.toContain("你好");
+      expect(title).not.toContain("你是谁");
+      expect(title).not.toContain("今天是什么时间");
+    });
+  });
+
+  describe("continuation intent with existing draft", () => {
+    it("classifies '生成完整的方案' as continuation when draft exists", () => {
+      const state: AgentState = {
+        phase: "collecting_slots",
+        planningDraft: { destination: "西湖", budget: 200, partySize: 1, companions: "solo" },
+      };
+      expect(classifyAgentIntent("生成完整的方案", state)).toBe("continuation");
+    });
+
+    it("classifies '继续' as continuation when draft has destination", () => {
+      const state: AgentState = {
+        phase: "collecting_slots",
+        planningDraft: { destination: "西湖" },
+      };
+      expect(classifyAgentIntent("继续", state)).toBe("continuation");
+    });
+
+    it("classifies '生成完整的方案' as planning_request when no draft exists", () => {
+      expect(classifyAgentIntent("生成完整的方案")).toBe("planning_request");
+    });
+  });
+
+  describe("budget preservation in slot merge", () => {
+    it("preserves budget 200 when merging with empty incoming", () => {
+      const existing: PlanningSlots = { budget: 200, destination: "西湖", origin: "杭师大仓前" };
+      const incoming: PlanningSlots = {};
+      const merged = mergeSlots(existing, incoming);
+      expect(merged.budget).toBe(200);
+    });
+
+    it("preserves budget 200 when merging with non-budget incoming", () => {
+      const existing: PlanningSlots = { budget: 200, destination: "西湖" };
+      const incoming: PlanningSlots = { preferences: ["咖啡厅"] };
+      const merged = mergeSlots(existing, incoming);
+      expect(merged.budget).toBe(200);
+      expect(merged.preferences).toEqual(["咖啡厅"]);
+    });
+
+    it("does NOT change budget 200 to 420", () => {
+      const existing: PlanningSlots = { budget: 200 };
+      const incoming: PlanningSlots = {};
+      const merged = mergeSlots(existing, incoming);
+      expect(merged.budget).toBe(200);
+      expect(merged.budget).not.toBe(420);
+    });
+  });
+
+  describe("slot extraction for complex planning messages", () => {
+    it("extracts all slots from a detailed planning message", () => {
+      const slots = extractPlanningSlots("一个人，从杭师大仓前出发，明天上午9点出发，找个咖啡厅坐坐，然后去吃午饭，想吃火锅，预算200");
+      expect(slots.origin).toBe("杭师大仓前");
+      expect(slots.partySize).toBe(1);
+      expect(slots.companions).toBe("solo");
+      expect(slots.budget).toBe(200);
+      expect(slots.preferences).toContain("咖啡厅");
+      expect(slots.preferences).toContain("火锅");
+      expect(slots.preferences).toContain("午饭");
+      expect(slots.time).toContain("明天");
+      expect(slots.time).toContain("上午");
+      expect(slots.time).toContain("9");
     });
   });
 });

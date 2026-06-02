@@ -1,4 +1,5 @@
-import type { PlanningOption, PlanningExecutableAction } from "../../lib/api";
+import type { PlanningOption, PlanningExecutableAction, PlanningAction } from "../../lib/api";
+import { formatMatchScore } from "./formatMatchScore";
 import styles from "../../pages/FeaturesPage.module.scss";
 
 /* ── Plan Card — structured view ── */
@@ -9,6 +10,8 @@ export function PlanCardView({
   planActions,
   onExecuteAction,
   busyActionId,
+  unifiedActions,
+  onUnifiedAction,
 }: {
   plan: PlanningOption;
   selected: boolean;
@@ -16,6 +19,8 @@ export function PlanCardView({
   planActions?: PlanningExecutableAction[];
   onExecuteAction?: (action: PlanningExecutableAction) => void;
   busyActionId?: string | null;
+  unifiedActions?: PlanningAction[];
+  onUnifiedAction?: (action: PlanningAction) => void;
 }) {
   // Format duration nicely
   const formatDuration = (minutes: number) => {
@@ -35,7 +40,7 @@ export function PlanCardView({
       <div className={styles.planCardHeader}>
         <div className={styles.planCardTitle}>{plan.title}</div>
         {plan.score > 0 && (
-          <span className={styles.planCardScore}>{Math.round(plan.score * 100)}%匹配</span>
+          <span className={styles.planCardScore}>{formatMatchScore(plan.score)} 匹配</span>
         )}
       </div>
 
@@ -199,6 +204,31 @@ export function PlanCardView({
               </button>
             );
           })}
+        </div>
+      )}
+
+      {/* Unified planning actions */}
+      {unifiedActions && unifiedActions.length > 0 && (
+        <div className={styles.actionDock}>
+          {unifiedActions.map((action, idx) => (
+            <button
+              key={`${action.type}-${idx}`}
+              className={styles.actionChipBtn}
+              onClick={() => onUnifiedAction?.(action)}
+            >
+              <span className={styles.actionChipIcon}>
+                {action.type === "map_search" ? "🗺️" :
+                 action.type === "navigation" ? "🧭" :
+                 action.type === "copy_text" ? "📋" :
+                 action.type === "calendar" ? "📅" :
+                 action.type === "mobile_handoff" ? "📱" :
+                 action.type === "open_url" ? "🔗" : "⚡"}
+              </span>
+              <span className={styles.actionChipBody}>
+                <span className={styles.actionChipTitle}>{action.label}</span>
+              </span>
+            </button>
+          ))}
         </div>
       )}
     </div>

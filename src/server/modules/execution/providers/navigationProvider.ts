@@ -11,7 +11,7 @@ export class NavigationProvider {
     destination?: string;
   }): Promise<{ navigationUrl: string; points: string[] }> {
     // In production, this would use AMap navigation API
-    const pointsStr = params.points.join("|");
+    const _pointsStr = params.points.join("|");
     const navigationUrl = `https://uri.amap.com/navigation?from=${params.origin || ""}&to=${params.destination || params.points[0] || ""}&mode=car&policy=1&src=mypage&coordinate=gaode&callnative=1`;
 
     return {

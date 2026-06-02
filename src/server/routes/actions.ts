@@ -5,8 +5,9 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { listActions, quoteAction, confirmAction, cancelAction } from "../services/store.js";
-import { ForbiddenError, NotFoundError, RateLimitError } from "../common/errors.js";
+import { ForbiddenError, NotFoundError } from "../common/errors.js";
 import { sendOk } from "../common/response.js";
+import { optionalUserId } from "../common/uid.js";
 
 export async function registerActionRoutes(app: FastifyInstance) {
   app.get("/api/actions", { preHandler: [app.authGuard] }, async (request, reply) => {
@@ -56,5 +57,46 @@ export async function registerActionRoutes(app: FastifyInstance) {
       if (message.includes("FORBIDDEN")) throw new ForbiddenError("无权操作此 Action");
       throw err;
     }
+  });
+
+  // ── Track action clicks (works for both logged-in and guest users) ──
+  app.post("/api/actions/track", { preHandler: [app.optionalAuthGuard] }, async (request, reply) => {
+    const body = z
+      .object({
+        conversationId: z.string().optional(),
+        planId: z.string().optional(),
+        actionType: z.string(),
+        label: z.string(),
+      })
+      .parse(request.body);
+
+    const userId = optionalUserId(request);
+    app.log.info({ userId, ...body }, "[actions:track] action clicked");
+
+    // If DB available and user is logged in, store in memory table as an event log
+    const db = app.db;
+    if (db && userId) {
+      try {
+        await db.memory.create({
+          data: {
+            userId,
+            category: "action_click",
+            title: body.actionType,
+            detail: JSON.stringify({
+              conversationId: body.conversationId ?? null,
+              planId: body.planId ?? null,
+              label: body.label,
+              clickedAt: new Date().toISOString(),
+            }),
+            weight: 0.3,
+            source: "auto",
+          },
+        });
+      } catch (err) {
+        app.log.warn({ err }, "[actions:track] failed to persist click event");
+      }
+    }
+
+    return sendOk(reply, { success: true });
   });
 }

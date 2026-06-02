@@ -11,6 +11,7 @@ pnpm-debug.log*
 .DS_Store
 *.local
 *.tsbuildinfo
+nul
 
 /src/generated/prisma
 .qwen/

@@ -18,6 +18,7 @@ const scripts = [
   "smoke-llm.mjs",
   "smoke-chat.mjs",
   "smoke-plan.mjs",
+  "smoke-auth-history.mjs",
 ];
 
 console.log(`\n🚀 PlanningGo 全量冒烟测试`);

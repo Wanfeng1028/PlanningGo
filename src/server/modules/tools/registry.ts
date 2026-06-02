@@ -1,4 +1,4 @@
-import type { AgentTool, ToolExecutionContext } from "./types";
+import type { AgentTool } from "./types";
 
 /**
  * Central registry for all tools

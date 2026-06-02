@@ -1,8 +1,8 @@
-import { createId, createIdempotencyKey } from "../../common/id";
 import { getPrismaClient } from "../../common/prisma";
+import type { Prisma } from "../../../generated/prisma/client.js";
 import type { ExecutionAction } from "../planning/schemas";
 import { transitionState, type ActionStatus } from "./stateMachine";
-import type { PermissionScope, UserPermissionSnapshot } from "../agent/middleware/permissionGuard";
+import type { UserPermissionSnapshot } from "../agent/middleware/permissionGuard";
 
 function getPrisma() {
   const prisma = getPrismaClient();
@@ -33,7 +33,7 @@ export class ActionExecutor {
     action: ExecutionAction;
     permissions: UserPermissionSnapshot;
   }): Promise<ActionResult> {
-    const { userId, planId, action, permissions } = params;
+    const { userId, planId, action, permissions: _permissions } = params;
     const prisma = getPrisma();
 
     // Check if action already exists (idempotency)
@@ -45,7 +45,7 @@ export class ActionExecutor {
       return {
         actionId: existing.id,
         status: existing.status as ActionStatus,
-        result: existing.result as any,
+        result: existing.result,
         error: existing.errorMessage || undefined,
       };
     }
@@ -59,7 +59,7 @@ export class ActionExecutor {
         status: "proposed",
         confirmationRequired: action.confirmationRequired,
         idempotencyKey: action.idempotencyKey,
-        payload: action.payload as any,
+        payload: action.payload as unknown as Prisma.InputJsonValue,
         quote: action.priceEstimate ? { price: action.priceEstimate } : undefined,
       },
     });
@@ -131,7 +131,7 @@ export class ActionExecutor {
         where: { id: actionId },
         data: {
           status: "succeeded",
-          result: result as any,
+          result: result as unknown as Prisma.InputJsonValue,
         },
       });
 
@@ -142,7 +142,7 @@ export class ActionExecutor {
           eventType: "execution_success",
           fromStatus: "executing",
           toStatus: "succeeded",
-          payload: result as any,
+          payload: result as unknown as Prisma.InputJsonValue,
         },
       });
 
@@ -228,7 +228,7 @@ export class ActionExecutor {
     // In production, this would generate a real navigation link
     return {
       navigationUrl: "https://uri.amap.com/navigation",
-      points: (payload as any).points,
+      points: (payload as Record<string, unknown>)?.points,
     };
   }
 
@@ -239,9 +239,9 @@ export class ActionExecutor {
     // In production, this would write to user's calendar
     return {
       calendarEventId: `cal_${Date.now()}`,
-      title: (payload as any).title,
-      startTime: (payload as any).startTime,
-      endTime: (payload as any).endTime,
+      title: (payload as Record<string, unknown>)?.title,
+      startTime: (payload as Record<string, unknown>)?.startTime,
+      endTime: (payload as Record<string, unknown>)?.endTime,
     };
   }
 
@@ -252,7 +252,7 @@ export class ActionExecutor {
     // In production, this would generate a shareable link
     return {
       shareUrl: `https://your-domain.com/share/${Date.now()}`,
-      text: (payload as any).text,
+      text: (payload as Record<string, unknown>)?.text,
     };
   }
 
@@ -263,8 +263,8 @@ export class ActionExecutor {
     // In production, this would call external reservation APIs
     return {
       reservationId: `res_${Date.now()}`,
-      poiId: (payload as any).poiId,
-      poiName: (payload as any).poiName,
+      poiId: (payload as Record<string, unknown>)?.poiId,
+      poiName: (payload as Record<string, unknown>)?.poiName,
       status: "confirmed",
     };
   }

@@ -562,7 +562,6 @@ export default function DevelopersPage({
 
   useEffect(() => {
     if (!isLoggedIn) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- standard data-fetching pattern
     if (activePanel === "overview") loadDashboard();
     else if (activePanel === "apps") loadApps();
     else if (activePanel === "keys") loadApiKeys();
@@ -848,7 +847,6 @@ export default function DevelopersPage({
 
   const timeAgo = (d: string | null) => {
     if (!d) return "—";
-    // eslint-disable-next-line react-hooks/purity -- Date.now is acceptable in display-only helper
     const diff = Date.now() - new Date(d).getTime();
     if (diff < 60000) return "刚刚";
     if (diff < 3600000) return `${Math.floor(diff / 60000)} 分钟前`;
