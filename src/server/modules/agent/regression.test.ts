@@ -200,8 +200,8 @@ describe("Regression §3: frontend sessionId migrates to backend conversationId"
     // }
 
     // Simulate the migration logic
-    const localUuid = "550e8400-e29b-41d4-a716-446655440000";
-    const backendConvId = "777a1234-b567-89ab-cdef-0123456789ab";
+    const localUuid: string = "550e8400-e29b-41d4-a716-446655440000";
+    const backendConvId: string = "777a1234-b567-89ab-cdef-0123456789ab";
 
     // Before migration
     const messagesBySession = new Map<string, unknown[]>();
@@ -229,7 +229,7 @@ describe("Regression §3: frontend sessionId migrates to backend conversationId"
   });
 
   it("no migration when backend returns same conversationId", () => {
-    const existingConvId = "777a1234-b567-89ab-cdef-0123456789ab";
+    const existingConvId: string = "777a1234-b567-89ab-cdef-0123456789ab";
     const sessions = [{ id: existingConvId, title: "test" }];
 
     // No migration needed
