@@ -22,10 +22,8 @@ import { streamAgentMessage } from "../lib/stream";
 import { WorkspaceModal } from "../components/WorkspaceModal";
 import { Button } from "../components/Button";
 import type { ModalKey, NavKey, SessionUser } from "../types";
-import type { ChatMessage, ChatSession, AttachmentItem, ModelMode, ChatMessageKind, NextActionItem, MessageStatus } from "../components/features/types";
-import { MODEL_MODES } from "../components/features/types";
 import type { ChatMessage, ChatSession, AttachmentItem, ModelMode, ChatMessageKind, NextActionItem, MessageStatus, PlanningAction } from "../components/features/types";
-import { MODEL_MODES, isDev } from "../components/features/types";
+import { MODEL_MODES } from "../components/features/types";
 import { SUGGESTION_PROMPTS } from "../components/features/constants";
 import { AmbientBackground } from "../components/features/AmbientBackground";
 import { FeaturesSidebar } from "../components/features/FeaturesSidebar";
@@ -664,23 +662,6 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
               modelMode: toApiModelMode(modelMode),
               conversationId: conversationIdRef.current ?? undefined,
               selectedOptionId: selectedPlanId ?? undefined,
-            onAgentEvent: (event) => {
-              const traceEvent = event as AgentTraceEvent;
-              setAgentEvents((prev) => {
-                // Upsert by id: if same id exists, update it; otherwise append
-                if (traceEvent.id) {
-                  const idx = prev.findIndex((e) => e.id === traceEvent.id);
-                  if (idx >= 0) {
-                    const next = [...prev];
-                    next[idx] = traceEvent;
-                    return next;
-                  }
-                }
-                return [...prev, traceEvent];
-              });
-            },
-            onFinalResult: (result: unknown) => {
-              agentResponse = result;
             },
             {
               signal: controller.signal,
@@ -690,6 +671,21 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
               },
               onFinalResult: (result: unknown) => {
                 agentResponse = result;
+              },
+              onAgentEvent: (event) => {
+                const traceEvent = event as AgentTraceEvent;
+                setAgentEvents((prev) => {
+                  // Upsert by id: if same id exists, update it; otherwise append
+                  if (traceEvent.id) {
+                    const idx = prev.findIndex((e) => e.id === traceEvent.id);
+                    if (idx >= 0) {
+                      const next = [...prev];
+                      next[idx] = traceEvent;
+                      return next;
+                    }
+                  }
+                  return [...prev, traceEvent];
+                });
               },
             }
           );
