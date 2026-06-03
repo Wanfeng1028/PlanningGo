@@ -22,6 +22,7 @@ import { ForbiddenError, NotFoundError } from "../common/errors.js";
 import { sendOk } from "../common/response.js";
 import { optionalUserId } from "../common/uid.js";
 import { getConnectorRegistry } from "../modules/connectors/registry.js";
+import type { ConnectorSearchResult } from "../modules/connectors/types.js";
 import { isTerminalState, isValidTransition, type ActionStatus } from "../modules/execution/stateMachine.js";
 
 /**
@@ -108,7 +109,7 @@ export async function registerActionRoutes(app: FastifyInstance) {
       const quoteResult = await connector.quote({
         provider: connectorProvider,
         actionType,
-        poi: payload?.poi as Record<string, unknown> | undefined,
+        poi: (payload?.poi as Record<string, unknown> | undefined) as ConnectorSearchResult | undefined as any,
         items: payload?.items as Array<{ name: string; quantity: number; price?: number }> | undefined,
         partySize: payload?.partySize as number | undefined,
         startTime: payload?.startTime as string | undefined,
@@ -181,7 +182,7 @@ export async function registerActionRoutes(app: FastifyInstance) {
       const prepared = await connector.prepare({
         provider: connectorProvider,
         actionType,
-        poi: payload?.poi as Record<string, unknown> | undefined,
+        poi: (payload?.poi as Record<string, unknown> | undefined) as ConnectorSearchResult | undefined as any,
         items: payload?.items as Array<{ name: string; quantity: number; price?: number }> | undefined,
         partySize: payload?.partySize as number | undefined,
         startTime: payload?.startTime as string | undefined,

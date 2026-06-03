@@ -257,7 +257,7 @@ export async function runAgentRuntime(input: AgentRunInput): Promise<AgentRunRes
     for (const action of allowed.slice(0, env.AUTO_EXECUTION_MAX_ACTIONS)) {
       if (action.type === "navigation") {
         // Navigation can be auto-executed
-        autoExecutedActions.push({ ...action, status: "success" });
+        autoExecutedActions.push({ ...action, status: "succeeded" as ExecutionAction["status"] });
       }
     }
   }

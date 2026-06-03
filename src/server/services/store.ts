@@ -301,14 +301,14 @@ export function confirmAction(id: string, userId: string): ExecutionAction | nul
   assertActionNotExpired(action);
   assertActionTypeAllowed(action);
   if (!action.confirmationRequired) {
-    const next: ExecutionAction = { ...action, status: "success" };
+    const next: ExecutionAction = { ...action, status: "succeeded" as ExecutionAction["status"] };
     actionStore.set(id, next);
     return next;
   }
   const next: ExecutionAction = { ...action, status: "executing" };
   actionStore.set(id, next);
   // 模拟执行完成
-  const final: ExecutionAction = { ...next, status: "success" };
+  const final: ExecutionAction = { ...next, status: "succeeded" as ExecutionAction["status"] };
   actionStore.set(id, final);
   return final;
 }

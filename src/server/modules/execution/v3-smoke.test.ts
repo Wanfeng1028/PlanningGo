@@ -19,7 +19,7 @@ const mockIntent: UserIntent = {
   raw: 'test',
   city: '北京',
   origin: { label: '家' },
-  timeWindow: 'weekend',
+  timeWindow: 'unknown',
   durationHours: [4, 6],
   participantMode: 'family',
   partySize: 2,
@@ -71,12 +71,12 @@ const mockPlan: ActivityPlan = {
       transport: 'walk',
       reasoning: '适合亲子',
       bookingNeeded: false,
-      actionId: null,
+      actionId: null as string | null | undefined,
     },
   ],
-  backupPlan: null,
+  backupPlan: null as string | undefined,
   validationStatus: 'pending',
-  validationReport: null,
+  validationReport: null as string | undefined,
 };
 
 describe('V3 Execution System Smoke Test', () => {

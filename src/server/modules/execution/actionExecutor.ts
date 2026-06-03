@@ -4,6 +4,7 @@ import type { ExecutionAction } from "../planning/schemas";
 import { transitionState, type ActionStatus } from "./stateMachine";
 import type { UserPermissionSnapshot } from "../agent/middleware/permissionGuard";
 import { getConnectorRegistry } from "../connectors/registry.js";
+import type { ConnectorSearchResult } from "../connectors/types.js";
 
 function getPrisma() {
   const prisma = getPrismaClient();
@@ -193,7 +194,8 @@ export class ActionExecutor {
             },
           });
 
-          return { actionId, status: prepared.status, result: prepared };
+          const resolvedStatus = (prepared.status as ActionStatus) || ("prepared" as ActionStatus);
+          return { actionId, status: resolvedStatus, result: prepared };
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : String(err);
           if (message.includes("PAYMENT_DISABLED")) {
@@ -222,7 +224,7 @@ export class ActionExecutor {
             const prepared = await connector.prepare({
               provider: provider as any,
               actionType: type,
-              poi: (payload as Record<string, unknown>)?.poi as Record<string, unknown> | undefined,
+              poi: (payload as Record<string, unknown>)?.poi as ConnectorSearchResult | undefined as any,
               userId: "guest",
             });
             result = prepared;
