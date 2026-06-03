@@ -79,7 +79,7 @@ export function transitionState(current: ActionStatus, target: ActionStatus): Ac
  * Check if an action is in a terminal state
  */
 export function isTerminalState(status: ActionStatus): boolean {
-  return ["succeeded", "cancelled", "expired"].includes(status);
+  return ["succeeded", "ics_generated", "cancelled", "expired"].includes(status);
 }
 
 /**
