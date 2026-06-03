@@ -258,15 +258,34 @@ export class ActionExecutor {
 
   /**
    * Execute reservation action
+   * V3: 不返回 confirmed，只返回 prepared/waiting_user_confirm
+   * 所有预约/票务动作必须等待用户到第三方平台确认
    */
   private async executeReservation(payload: unknown): Promise<unknown> {
-    // In production, this would call external reservation APIs
+    const poiName = (payload as Record<string, unknown>)?.poiName as string | undefined;
+    const poiId = (payload as Record<string, unknown>)?.poiId as string | undefined;
+    
+    // V3: 返回 prepared 状态，提示用户到第三方确认
     return {
       reservationId: `res_${Date.now()}`,
-      poiId: (payload as Record<string, unknown>)?.poiId,
-      poiName: (payload as Record<string, unknown>)?.poiName,
-      status: "confirmed",
+      poiId,
+      poiName: poiName || "待选择",
+      status: "prepared",
+      message: `已生成${poiName ? poiName + ' ' : ''}预约信息，请到第三方平台确认并支付`,
+      redirectUrl: this.buildThirdPartyUrl(payload),
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30分钟过期
     };
+  }
+
+  /**
+   * 构建第三方平台 URL（深链 fallback）
+   */
+  private buildThirdPartyUrl(payload: unknown): string | undefined {
+    const poiName = (payload as Record<string, unknown>)?.poiName as string | undefined;
+    if (!poiName) return undefined;
+    
+    // 美团/点评深链 fallback
+    return `https://search.meituan.com/search?keyword=${encodeURIComponent(poiName)}`;
   }
 }
 

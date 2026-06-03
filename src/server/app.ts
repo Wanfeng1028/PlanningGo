@@ -7,6 +7,7 @@ import { AppError } from "./common/errors";
 import { sendError } from "./common/response";
 import { registerRoutes } from "./routes";
 import { getChatModel, hasAnyLlmKey } from "./modules/agent/modelClient";
+import { initConnectors } from "./modules/connectors/index.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
@@ -19,6 +20,9 @@ export async function buildApp() {
     bodyLimit: 1024 * 1024,
     trustProxy: true,
   });
+
+  // ── 初始化 Connectors（V3） ──
+  initConnectors();
 
   // ── 安全 + Cookie ──
   await app.register(import("./plugins/security.js"));

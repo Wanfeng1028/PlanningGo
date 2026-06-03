@@ -282,7 +282,7 @@ export async function selectPlan(planId: string) {
   });
 }
 
-export async function savePlanToDb(input: { conversationId: string; planId: string; optionId: string; planData?: PlanningOption }) {
+export async function savePlanToDb(input: { conversationId: string; planId: string; optionId: string; planData?: PlanningOption; executableActions?: PlanningExecutableAction[] }) {
   return apiJson<{ planId: string; message: string }>("/api/plans/save", {
     method: "POST",
     body: JSON.stringify(input),
@@ -337,6 +337,9 @@ export interface PlanningExecutableAction {
   description: string;
   confirmationRequired: boolean;
   priceEstimate?: string;
+  idempotencyKey?: string;
+  expiresAt?: string;
+  payload?: Record<string, unknown>;
 }
 
 export interface PlanningRequestInput {
@@ -441,15 +444,26 @@ export async function cancelAction(actionId: string): Promise<ActionItem> {
 
 // ── Calendar ──
 
-export async function createIcs(title: string, date?: string): Promise<string> {
+export interface IcsStep {
+  id?: string;
+  startTime: string;
+  endTime: string;
+  type?: string;
+  title: string;
+  poiName?: string | null;
+  description?: string;
+  estimatedCost?: string;
+}
+
+export async function createIcs(input: { title?: string; date?: string; steps?: IcsStep[] }): Promise<Blob> {
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (_authToken) headers.authorization = `Bearer ${_authToken}`;
   const response = await fetch(`${API_BASE}/api/ics`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ title, date }),
+    body: JSON.stringify(input),
   });
-  return response.text();
+  return response.blob();
 }
 
 export async function createReservation(input: { type: string; title: string; status?: string; price?: string; detail: string }) {

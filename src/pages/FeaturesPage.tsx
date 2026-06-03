@@ -1432,32 +1432,21 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
       loadingText: "正在生成日历…",
       successText: "日历文件已下载",
       errorText: "日历生成失败",
-      run: () => {
-        const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//PlanningGo//CN"];
-        for (const step of plan.timeline) {
-          const date = resolveRelativeDate(step.startTime?.split(" ")[0] ?? "");
-          const stTime = step.startTime?.split(" ")[1]?.replace(/:/g, "") ?? "0900";
-          const edTime = step.endTime?.split(" ")[1]?.replace(/:/g, "") ?? "1800";
-          lines.push(
-            "BEGIN:VEVENT",
-            `UID:${plan.id}-${step.id}@planninggo`,
-            `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").split(".")[0]}Z`,
-            `DTSTART;TZID=Asia/Shanghai:${date}T${stTime}00`,
-            `DTEND;TZID=Asia/Shanghai:${date}T${edTime}00`,
-            `SUMMARY:${step.title}`,
-            step.poiName ? `LOCATION:${step.poiName}` : "",
-            `DESCRIPTION:${step.title}`,
-            "BEGIN:VALARM",
-            "TRIGGER:-PT30M",
-            "ACTION:DISPLAY",
-            `DESCRIPTION:即将开始：${step.title}`,
-            "END:VALARM",
-            "END:VEVENT",
-          );
-        }
-        lines.push("END:VCALENDAR");
-        const content = lines.filter(Boolean).join("\r\n");
-        const blob = new Blob([content], { type: "text/calendar;charset=utf-8" });
+      run: async () => {
+        const { createIcs } = await import("../lib/api.js");
+        const blob = await createIcs({
+          title: plan.title,
+          steps: plan.timeline.map((step) => ({
+            id: step.id,
+            startTime: step.startTime,
+            endTime: step.endTime,
+            type: step.type,
+            title: step.title,
+            poiName: step.poiName,
+            description: step.description,
+            estimatedCost: step.estimatedCost,
+          })),
+        });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -1477,15 +1466,19 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
       errorText: "保存失败，请重试",
       run: async () => {
         if (!conversationIdRef.current) throw new Error("没有活跃的对话");
+        // 从当前消息中获取 executableActions
+        const currentMessage = messages[messages.length - 1];
+        const executableActions = currentMessage?.actions ?? [];
         await savePlanToDb({
           conversationId: conversationIdRef.current,
           planId: plan.planId,
           optionId: plan.id,
           planData: plan,
+          executableActions,
         });
       },
     });
-  }, [showToast]);
+  }, [showToast, messages]);
 
   const handleViewReservations = useCallback((plan: PlanningOption) => {
     const steps = plan.timeline.filter((s) => s.bookingNeeded);

@@ -10,6 +10,25 @@ import { NotFoundError } from "../common/errors.js";
 import { sendOk } from "../common/response.js";
 import { optionalUserId } from "../common/uid.js";
 
+/**
+ * ExecutableAction 的 Zod schema，用于验证前端传入的 action 数据
+ */
+const executableActionSchema = z.object({
+  id: z.string(),
+  planId: z.string(),
+  optionId: z.string(),
+  userId: z.string(),
+  type: z.string(),
+  status: z.string(),
+  title: z.string(),
+  description: z.string(),
+  confirmationRequired: z.boolean(),
+  idempotencyKey: z.string().optional(),
+  priceEstimate: z.string().optional(),
+  expiresAt: z.string().optional(),
+  payload: z.record(z.string(), z.unknown()).optional(),
+});
+
 export async function registerPlanRoutes(app: FastifyInstance) {
   app.get("/api/plans/demo", { preHandler: [app.optionalAuthGuard] }, async (request) => ({
     selectedPlanId: getSelectedPlanId(request.userId ?? "_anon"),
@@ -57,6 +76,7 @@ export async function registerPlanRoutes(app: FastifyInstance) {
           suggestions: z.array(z.string()).optional(),
         })).optional(),
       }).optional(),
+      executableActions: z.array(executableActionSchema).optional(),
     }).parse(request.body);
 
     const userId = optionalUserId(request);
@@ -69,10 +89,11 @@ export async function registerPlanRoutes(app: FastifyInstance) {
       return reply.status(503).send({ error: "数据库不可用" });
     }
 
-    // Idempotent: check if already saved
+    // Idempotent: check if already saved for this conversation + plan + option
     const existing = await db.plan.findFirst({
       where: {
         userId,
+        conversationId: input.conversationId ?? undefined,
         intent: { path: ["optionId"], equals: input.optionId },
       },
     });
@@ -82,6 +103,7 @@ export async function registerPlanRoutes(app: FastifyInstance) {
     }
 
     const pd = input.planData;
+    const actions = input.executableActions;
 
     // Create Plan
     const plan = await db.plan.create({
@@ -145,6 +167,25 @@ export async function registerPlanRoutes(app: FastifyInstance) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           await db.planStep.create({ data: stepData as any });
         }
+      }
+    }
+
+    // Create ExecutableActions if provided
+    if (actions && actions.length > 0) {
+      for (const action of actions) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await db.executionAction.create({
+          data: {
+            planId: plan.id,
+            type: action.type,
+            title: action.title,
+            description: action.description,
+            status: action.status,
+            priceEstimate: action.priceEstimate ?? null,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            metadata: (action.payload ?? {}) as any,
+          },
+        });
       }
     }
 

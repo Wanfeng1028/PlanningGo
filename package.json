@@ -38,6 +38,7 @@
     "smoke:auth-history": "node scripts/smoke-auth-history.mjs",
     "debug:conversations": "node scripts/debug-conversations.mjs",
     "dev:clean-anonymous": "node scripts/dev-clean-anonymous.mjs",
+    "dev:claim-conversations": "node scripts/dev-claim-conversations.mjs",
     "dev:seed-demo-history": "node scripts/dev-seed-demo-history.mjs",
     "dev:reset-xiaoming": "node scripts/dev-reset-xiaoming.mjs"
   },
@@ -95,6 +96,6 @@
     "tsx": "^4.21.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.47.0",
-    "vitest": "^4.1.6"
+    "vitest": "^3.2.4"
   }
 }
