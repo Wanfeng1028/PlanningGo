@@ -61,7 +61,7 @@ function createBookingAction(
     userId,
     type,
     provider: isMeal ? "meituan" : "mock",
-    status: "waiting_confirm",
+    status: "waiting_user_confirm",
     title: isMeal ? `预约 ${poiLabel}` : `锁定 ${poiLabel}`,
     description: isMeal
       ? `${step.startTime} 为 ${intent.partySize} 人预约，提交前需要你确认。`
@@ -93,7 +93,7 @@ function createNavigationAction(planId: string, optionId: string, option: Activi
     userId,
     type: "navigation",
     provider: "amap",
-    status: "draft",
+    status: "proposed",
     title: "生成导航路线",
     description: `为「${option.title}」生成多点导航。`,
     confirmationRequired: false,
@@ -112,7 +112,7 @@ function createCalendarAction(planId: string, optionId: string, option: Activity
     userId,
     type: "calendar_event",
     provider: "calendar",
-    status: "waiting_confirm",
+    status: "waiting_user_confirm",
     title: "写入日历提醒",
     description: `把「${option.title}」写入日历，并在出发前提醒。`,
     confirmationRequired: true,
@@ -121,6 +121,15 @@ function createCalendarAction(planId: string, optionId: string, option: Activity
       title: option.title,
       startTime: option.timeline[0]?.startTime,
       endTime: option.timeline[option.timeline.length - 1]?.endTime,
+      // V3: 携带完整 timeline 供 Calendar Connector 生成多 VEVENT
+      timeline: option.timeline.map((step) => ({
+        id: step.id,
+        title: step.title,
+        startTime: step.startTime,
+        endTime: step.endTime,
+        poiName: step.poiName,
+        type: step.type,
+      })),
     },
   };
 }
@@ -139,7 +148,7 @@ function createShareAction(
     userId,
     type: "share_message",
     provider: "mock",
-    status: "waiting_confirm",
+    status: "waiting_user_confirm",
     title: intent.participantMode === "friends" ? "发给朋友投票" : "发给家人确认",
     description: `生成「${option.title}」的简版行程卡，发送前需要确认。`,
     confirmationRequired: true,

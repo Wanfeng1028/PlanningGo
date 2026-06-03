@@ -7,6 +7,10 @@
  *   POST /api/actions/:id/confirm → 通过 Connector Registry 执行 prepare → redirect
  *   POST /api/actions/:id/cancel  → 更新 DB 状态为 cancelled
  *
+ * 安全:
+ *   - 所有 /api/actions/:id/* 操作必须校验 userId ownership（不能仅靠 id 查找）
+ *   - confirm 必须走 V3 状态机门禁，不允许任意非终态 confirm
+ *
  * 注意: 所有 action 操作统一使用 Action 表（不是 ExecutionAction），
  *       与 actionExecutor.ts 共享同一套状态机和数据源。
  */
@@ -18,7 +22,27 @@ import { ForbiddenError, NotFoundError } from "../common/errors.js";
 import { sendOk } from "../common/response.js";
 import { optionalUserId } from "../common/uid.js";
 import { getConnectorRegistry } from "../modules/connectors/registry.js";
-import { isTerminalState } from "../modules/execution/stateMachine.js";
+import { isTerminalState, isValidTransition, type ActionStatus } from "../modules/execution/stateMachine.js";
+
+/**
+ * 安全查找 action：同时校验 id 和 userId ownership
+ * 防止用户 A 通过用户 B 的 action id 执行 quote/confirm/cancel
+ */
+async function findActionOwnedByUser(db: NonNullable<FastifyInstance["db"]>, id: string, userId: string) {
+  return db.action.findFirst({
+    where: { id, userId },
+  });
+}
+
+/**
+ * confirm 状态门禁：只有 waiting_user_confirm 状态允许 confirm
+ * V3 交易状态机要求：用户确认动作必须处于 waiting_user_confirm 状态
+ */
+function assertConfirmable(status: ActionStatus): void {
+  if (status !== "waiting_user_confirm") {
+    throw new ForbiddenError(`ACTION_NOT_CONFIRMABLE: 当前状态 "${status}" 不允许 confirm`);
+  }
+}
 
 export async function registerActionRoutes(app: FastifyInstance) {
   // ── GET /api/actions — 从 DB Action 表查询 ──
@@ -50,9 +74,8 @@ export async function registerActionRoutes(app: FastifyInstance) {
       throw new NotFoundError("DB_UNAVAILABLE");
     }
 
-    const action = await db.action.findUnique({
-      where: { id: params.id },
-    });
+    // V3: 必须校验 userId ownership，防止越权操作
+    const action = await findActionOwnedByUser(db, params.id, request.userId!);
 
     if (!action) throw new NotFoundError("ACTION_NOT_FOUND");
     if (isTerminalState(action.status as any)) {
@@ -63,10 +86,8 @@ export async function registerActionRoutes(app: FastifyInstance) {
     const registry = getConnectorRegistry();
     const actionType = action.type;
 
-    // 根据 action 的 provider 字段选择 connector（从 payload 中读取 _provider）
-    const payload = (action.payload as Record<string, unknown>) ?? {};
-    const provider = payload._provider as string | undefined;
-    const connectorProvider = (provider || "mock") as any;
+    // 根据 action 的 provider 字段选择 connector
+    const connectorProvider = (action.provider || "mock") as any;
     const connector = registry.get(connectorProvider);
 
     if (!connector?.quote) {
@@ -83,20 +104,14 @@ export async function registerActionRoutes(app: FastifyInstance) {
     }
 
     try {
-      const poi = payload.poi as Record<string, unknown> | undefined;
+      const payload = action.payload as Record<string, unknown> | undefined;
       const quoteResult = await connector.quote({
         provider: connectorProvider,
         actionType,
-        poi: poi ? {
-          provider: connectorProvider,
-          name: (poi.name as string) || action.type,
-          address: (poi.address as string) || undefined,
-          lat: (poi.lat as number) || undefined,
-          lng: (poi.lng as number) || undefined,
-        } : undefined,
-        items: payload.items as Array<{ name: string; quantity: number; price?: number }> | undefined,
-        partySize: payload.partySize as number | undefined,
-        startTime: payload.startTime as string | undefined,
+        poi: payload?.poi as Record<string, unknown> | undefined,
+        items: payload?.items as Array<{ name: string; quantity: number; price?: number }> | undefined,
+        partySize: payload?.partySize as number | undefined,
+        startTime: payload?.startTime as string | undefined,
         userId: request.userId!,
       });
 
@@ -129,22 +144,22 @@ export async function registerActionRoutes(app: FastifyInstance) {
       throw new NotFoundError("DB_UNAVAILABLE");
     }
 
-    const action = await db.action.findUnique({
-      where: { id: params.id },
-    });
+    // V3: 必须校验 userId ownership，防止越权操作
+    const action = await findActionOwnedByUser(db, params.id, request.userId!);
 
     if (!action) throw new NotFoundError("ACTION_NOT_FOUND");
     if (isTerminalState(action.status as any)) {
       throw new NotFoundError("ACTION_EXPIRED");
     }
 
+    // V3: confirm 状态门禁 — 只有 waiting_user_confirm 允许 confirm
+    const actionStatus = action.status as ActionStatus;
+    assertConfirmable(actionStatus);
+
     // V3: 所有交易动作不直接 succeeded，走 Connector prepare → redirect
     const registry = getConnectorRegistry();
     const actionType = action.type;
-    const payload = (action.payload as Record<string, unknown>) ?? {};
-
-    const provider = payload._provider as string | undefined;
-    const connectorProvider = (provider || "mock") as any;
+    const connectorProvider = (action.provider || "mock") as any;
     const connector = registry.get(connectorProvider);
 
     if (!connector?.prepare) {
@@ -162,29 +177,29 @@ export async function registerActionRoutes(app: FastifyInstance) {
     }
 
     try {
-      const poi = payload.poi as Record<string, unknown> | undefined;
+      const payload = action.payload as Record<string, unknown> | undefined;
       const prepared = await connector.prepare({
         provider: connectorProvider,
         actionType,
-        poi: poi ? {
-          provider: connectorProvider,
-          name: (poi.name as string) || action.type,
-          address: (poi.address as string) || undefined,
-          lat: (poi.lat as number) || undefined,
-          lng: (poi.lng as number) || undefined,
-        } : undefined,
-        items: payload.items as Array<{ name: string; quantity: number; price?: number }> | undefined,
-        partySize: payload.partySize as number | undefined,
-        startTime: payload.startTime as string | undefined,
+        poi: payload?.poi as Record<string, unknown> | undefined,
+        items: payload?.items as Array<{ name: string; quantity: number; price?: number }> | undefined,
+        partySize: payload?.partySize as number | undefined,
+        startTime: payload?.startTime as string | undefined,
         userId: request.userId!,
       });
+
+      // V3: 验证状态转换合法性
+      const nextState = prepared.status as ActionStatus;
+      if (!isValidTransition(actionStatus, nextState)) {
+        throw new ForbiddenError(`Invalid state transition: ${actionStatus} -> ${nextState}`);
+      }
 
       // 更新 DB 状态
       await db.action.update({
         where: { id: params.id },
         data: {
-          status: prepared.status,
-          payload: { ...(payload as Record<string, unknown>), preparedAction: prepared as unknown as Prisma.InputJsonValue },
+          status: nextState,
+          payload: { ...(payload ?? {}), preparedAction: prepared as unknown as Prisma.InputJsonValue },
         },
       });
 
@@ -206,9 +221,8 @@ export async function registerActionRoutes(app: FastifyInstance) {
       throw new NotFoundError("DB_UNAVAILABLE");
     }
 
-    const action = await db.action.findUnique({
-      where: { id: params.id },
-    });
+    // V3: 必须校验 userId ownership，防止越权取消
+    const action = await findActionOwnedByUser(db, params.id, request.userId!);
 
     if (!action) throw new NotFoundError("ACTION_NOT_FOUND");
 

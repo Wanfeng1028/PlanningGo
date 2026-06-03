@@ -311,6 +311,7 @@ export async function registerPlanRoutes(app: FastifyInstance) {
             userId,
             planId: plan.id,
             type: action.type,
+            provider: action.provider || "mock",
             status: normalizeActionStatus(action.status),
             confirmationRequired: action.confirmationRequired,
             idempotencyKey: action.idempotencyKey || `idem-${action.id}`,

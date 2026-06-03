@@ -128,7 +128,7 @@ export async function registerConversationRoutes(app: FastifyInstance) {
           where: { id },
           include: {
             messages: { orderBy: { createdAt: "asc" } },
-            plans: { include: { options: { include: { steps: true } }, execActions: true } },
+            plans: { include: { options: { include: { steps: true } } } },
           },
         });
         if (!conv) return sendError(reply, 404, "NOT_FOUND", "会话不存在");

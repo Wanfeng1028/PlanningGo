@@ -9,7 +9,7 @@ import type { ActionStatus } from "./stateMachine.js";
  * 旧状态 → V3 状态映射表
  */
 const STATUS_MAP: Record<string, ActionStatus> = {
-  // 旧 Action 表状态
+  // 旧 Action 表状态（大写）
   "DRAFT": "proposed",
   "PENDING": "proposed",
   "CONFIRMED": "prepared",
@@ -24,6 +24,11 @@ const STATUS_MAP: Record<string, ActionStatus> = {
   "waiting_authorization": "waiting_user_confirm",
   "authorized": "redirect_required",
 
+  // ExecutionAction schema 旧状态 → V3 状态
+  "draft": "proposed",
+  "waiting_confirm": "waiting_user_confirm",
+  "success": "succeeded",
+
   // V3 状态直接透传
   "proposed": "proposed",
   "quoted": "quoted",
@@ -35,13 +40,13 @@ const STATUS_MAP: Record<string, ActionStatus> = {
   "external_confirmed": "external_confirmed",
   "executing": "executing",
   "succeeded": "succeeded",
+  "ics_generated": "ics_generated",
   "failed": "failed",
   "cancelled": "cancelled",
   "expired": "expired",
 
   // ExecutionAction 旧默认值
   "pending": "proposed",
-  "success": "succeeded",
 };
 
 /**
@@ -50,7 +55,8 @@ const STATUS_MAP: Record<string, ActionStatus> = {
 const KNOWN_V3_STATUSES = new Set([
   "proposed", "quoted", "prepared", "waiting_user_confirm",
   "redirect_required", "redirected_to_payment", "waiting_external_confirm",
-  "external_confirmed", "executing", "succeeded", "failed", "cancelled", "expired",
+  "external_confirmed", "executing", "succeeded", "ics_generated",
+  "failed", "cancelled", "expired",
 ]);
 
 /**

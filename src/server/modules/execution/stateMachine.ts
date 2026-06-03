@@ -13,6 +13,7 @@ export type ActionStatus =
   | "external_confirmed"
   | "executing"
   | "succeeded"
+  | "ics_generated"
   | "failed"
   | "cancelled"
   | "expired";
@@ -49,8 +50,9 @@ const stateTransitions: Record<ActionStatus, ActionStatus[]> = {
   redirected_to_payment: ["waiting_external_confirm", "cancelled", "expired"],
   waiting_external_confirm: ["external_confirmed", "cancelled", "expired"],
   external_confirmed: ["executing", "cancelled"],
-  executing: ["succeeded", "failed", "cancelled"],
+  executing: ["succeeded", "ics_generated", "failed", "cancelled"],
   succeeded: [], // Terminal
+  ics_generated: [], // Terminal — 日历 ICS 已生成，用户需手动导入
   failed: ["prepared"], // 可重试
   cancelled: [], // Terminal
   expired: [], // Terminal

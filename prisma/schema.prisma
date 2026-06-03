@@ -153,6 +153,7 @@ model Plan {
   user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   conversation Conversation?     @relation(fields: [conversationId], references: [id], onDelete: SetNull)
   options      PlanOption[]
+  // @deprecated V3 已废弃 — 使用 Action 表（actions）替代
   execActions  ExecutionAction[]
 
   @@index([userId])
@@ -245,6 +246,7 @@ model Action {
   planId               String?   @map("plan_id") @db.Uuid
   planOptionId         String?   @map("plan_option_id") @db.Uuid
   type                 String
+  provider             String  @default("mock") @map("provider")
   status               String    @default("proposed")
   confirmationRequired Boolean   @default(true) @map("confirmation_required")
   idempotencyKey       String    @unique @map("idempotency_key")
@@ -746,6 +748,9 @@ model Message {
 
 // ============================================================================
 // Execution Actions (per-plan, persisted)
+// ============================================================================
+// @deprecated V3 已废弃 — 统一使用 Action 表（actions）
+// 保留此模型仅用于向后兼容，新代码不应再写入 execution_actions 表
 // ============================================================================
 
 model ExecutionAction {
