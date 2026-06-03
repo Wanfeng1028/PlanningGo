@@ -485,11 +485,30 @@
 }
 
 .frameActive {
-  composes: frame;
-  border-color: var(--color-brand) !important;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+  border-radius: 16px;
+  border: 2px solid var(--color-brand) !important;
   background: var(--color-surface) !important;
+  cursor: pointer;
+  text-align: center;
+  width: 100%;
+  transition:
+    border-color 200ms var(--ease-out),
+    background 200ms var(--ease-out),
+    transform 200ms var(--ease-out),
+    box-shadow 200ms var(--ease-out);
   box-shadow: var(--shadow-sm);
   transform: translateX(4px) !important;
+
+  &:hover {
+    border-color: var(--color-brand) !important;
+    background: var(--color-surface) !important;
+    transform: translateX(4px) !important;
+  }
 }
 
 /* 胶片齿孔 */

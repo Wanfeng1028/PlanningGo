@@ -121,6 +121,7 @@ export const executionActionSchema = z.object({
     "add_to_calendar",
     "set_reminder",
   ]),
+  provider: z.enum(["meituan", "amap", "calendar", "mock"]).default("mock"),
   status: z.enum([
     "draft",
     "quoted",

@@ -61,7 +61,7 @@ export class ActionExecutor {
         idempotencyKey: action.idempotencyKey,
         payload: {
           ...action.payload,
-          _provider: action.type.includes("meituan") || action.type.includes("restaurant") ? "meituan" : action.type.includes("calendar") || action.type.includes("add_to_calendar") ? "calendar" : action.type.includes("amap") || action.type.includes("navigation") ? "amap" : "mock",
+          _provider: action.provider,
         } as unknown as Prisma.InputJsonValue,
         quote: action.priceEstimate ? { price: action.priceEstimate } : undefined,
       },
