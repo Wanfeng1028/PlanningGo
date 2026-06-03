@@ -3,6 +3,8 @@
  * 根据步骤类型、时间段、同行人和位置，智能推荐周边服务。
  */
 
+import type { AmapClient } from "../tools/amap/client";
+
 export interface SuggestionItem {
   id: string;
   category: string;
@@ -62,7 +64,7 @@ function inferSuggestions(
   step: StepContext,
   context: PlanContext,
   hour: number,
-  stepIndex: number,
+  _stepIndex: number,
 ): SuggestionItem[] {
   const results: SuggestionItem[] = [];
   const poiName = step.poiName || step.title;
@@ -156,4 +158,69 @@ function makeSuggestion(
       payload: { keyword: poiName, category },
     },
   };
+}
+
+/**
+ * 用真实 POI 数据增强建议。
+ * 对每个静态建议，搜索周边真实门店替换。
+ */
+export async function enrichSuggestionsWithPoi(
+  suggestions: SuggestionItem[],
+  amapClient: AmapClient | undefined,
+  city: string,
+): Promise<SuggestionItem[]> {
+  if (!amapClient || !amapClient.isConfigured()) {
+    // No Amap available — return static suggestions as-is
+    return suggestions;
+  }
+
+  const enriched = await Promise.all(
+    suggestions.map(async (suggestion) => {
+      try {
+        const keyword = suggestion.action.payload.keyword;
+        const category = suggestion.action.payload.category;
+        if (!keyword) return suggestion;
+
+        // Search for real POIs near the reference point
+        const result = await amapClient.searchPoiText({
+          keywords: `${keyword} ${category}`,
+          city,
+          offset: 3,
+        });
+
+        const pois = result?.pois;
+        if (!pois || pois.length === 0) return suggestion;
+
+        // Use the best-rated POI
+        const bestPoi = pois.reduce((best, poi) => {
+          const rating = parseFloat(poi.biz_ext?.rating ?? "0") || 0;
+          const bestRating = parseFloat(best.biz_ext?.rating ?? "0") || 0;
+          return rating > bestRating ? poi : best;
+        }, pois[0]!);
+
+        // Parse location string "lng,lat" into separate values
+        const [lngStr, latStr] = (bestPoi.location ?? "").split(",");
+
+        return {
+          ...suggestion,
+          description: `${bestPoi.name} · ${bestPoi.address ?? ""}${bestPoi.biz_ext?.rating ? ` · 评分${bestPoi.biz_ext.rating}` : ""}${bestPoi.biz_ext?.cost ? ` · ${bestPoi.biz_ext.cost}` : ""}`,
+          action: {
+            ...suggestion.action,
+            payload: {
+              ...suggestion.action.payload,
+              poiName: bestPoi.name,
+              address: bestPoi.address ?? "",
+              lat: latStr ?? "",
+              lng: lngStr ?? "",
+            },
+          },
+        };
+      } catch {
+        // Non-fatal: return static suggestion
+        return suggestion;
+      }
+    }),
+  );
+
+  return enriched;
 }

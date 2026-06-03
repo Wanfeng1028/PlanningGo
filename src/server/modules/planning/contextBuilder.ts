@@ -6,6 +6,7 @@ export interface PlanningContextInput {
   planId: string;
   intent: UserIntent;
   providers?: PlanningProviders;
+  userId?: string;
 }
 
 export interface WeatherInfo {
@@ -37,7 +38,7 @@ export interface UserProfileInfo {
   /* Phase 5: extended profile fields */
   transportMode?: string;
   distanceLimitKm?: number;
-  walkingTolerance?: number;
+  walkingTolerance?: string;
   queueTolerance?: string;
   dietPreference?: string[];
   avoidFoods?: string[];
@@ -94,14 +95,17 @@ export async function buildPlanningContext(input: PlanningContextInput): Promise
   const city = input.intent.city || "杭州";
   const isProd = env.NODE_ENV === "production";
 
-  const weather = await fetchWeather(city, input.providers, isProd);
+  const [weather, dbProfile] = await Promise.all([
+    fetchWeather(city, input.providers, isProd),
+    input.userId ? loadProfileFromDb(input.userId) : Promise.resolve({}),
+  ]);
 
   return {
     traceId: input.traceId,
     planId: input.planId,
     intent: input.intent,
     providers: input.providers,
-    userProfile: buildUserProfile(input.intent),
+    userProfile: buildUserProfile(input.intent, dbProfile),
     environment: {
       weather,
       routes: [],
@@ -163,24 +167,76 @@ function buildWeatherSuggestion(condition: string, tempMax: number, tempMin: num
   return parts.join("；") + "。";
 }
 
-function buildUserProfile(intent: UserIntent): UserProfileInfo {
+function buildUserProfile(intent: UserIntent, dbProfile?: Partial<UserProfileInfo>): UserProfileInfo {
   return {
     ...DEFAULT_PROFILE,
-    city: intent.city || "杭州",
-    startPoint: intent.origin.label,
-    family: intent.participantMode === "family" ? ["家人"] : [],
-    preferences: intent.preferences,
-    budgetRange: intent.budgetMax ? [0, intent.budgetMax] : DEFAULT_PROFILE.budgetRange,
-    transportMode: undefined,
-    distanceLimitKm: undefined,
-    walkingTolerance: undefined,
-    queueTolerance: undefined,
-    dietPreference: undefined,
-    avoidFoods: undefined,
-    activityTags: undefined,
-    avoidActivityTags: undefined,
-    indoorPreference: undefined,
-    pace: undefined,
-    favoriteAreas: undefined,
+    ...dbProfile,  // DB values as defaults
+    city: intent.city || dbProfile?.city || "杭州",
+    startPoint: intent.origin.label || dbProfile?.startPoint || "",
+    family: intent.participantMode === "family" ? ["家人"] : (dbProfile?.family ?? []),
+    preferences: intent.preferences.length > 0 ? intent.preferences : (dbProfile?.preferences ?? []),
+    budgetRange: intent.budgetMax ? [0, intent.budgetMax] : (dbProfile?.budgetRange ?? DEFAULT_PROFILE.budgetRange),
+    // Extended fields: prefer DB, fallback to undefined
+    transportMode: dbProfile?.transportMode,
+    distanceLimitKm: dbProfile?.distanceLimitKm,
+    walkingTolerance: dbProfile?.walkingTolerance,
+    queueTolerance: dbProfile?.queueTolerance,
+    dietPreference: dbProfile?.dietPreference,
+    avoidFoods: dbProfile?.avoidFoods,
+    activityTags: dbProfile?.activityTags,
+    avoidActivityTags: dbProfile?.avoidActivityTags,
+    indoorPreference: dbProfile?.indoorPreference,
+    pace: dbProfile?.pace,
+    favoriteAreas: dbProfile?.favoriteAreas,
   };
+}
+
+/**
+ * 从 DB 加载完整用户画像，与 intent 合并。
+ * DB 字段作为默认值，intent 优先覆盖。
+ */
+async function loadProfileFromDb(userId: string): Promise<Partial<UserProfileInfo>> {
+  try {
+    const { getPrismaClient } = await import("../../common/prisma.js");
+    const db = getPrismaClient();
+    if (!db) return {};
+
+    const profile = await db.userProfile.findFirst({
+      where: { userId },
+    });
+    if (!profile) return {};
+
+    // Read JSON fields directly from schema (no metadata column)
+    const prefs = (profile.preferences ?? []) as string[];
+    const dietPref = (profile.dietPreference ?? []) as string[];
+    const avoidFoods = (profile.avoidFoods ?? []) as string[];
+    const actTags = (profile.activityTags ?? []) as string[];
+    const avoidActTags = (profile.avoidActivityTags ?? []) as string[];
+    const favAreas = (profile.favoriteAreas ?? []) as string[];
+
+    return {
+      id: userId,
+      name: "用户",
+      city: profile.city ?? "",
+      startPoint: profile.startPoint ?? "",
+      preferences: prefs,
+      budgetRange: profile.budgetMin && profile.budgetMax
+        ? [profile.budgetMin, profile.budgetMax] as [number, number]
+        : undefined,
+      transportMode: profile.transportMode ?? undefined,
+      distanceLimitKm: profile.distanceLimitKm ?? undefined,
+      walkingTolerance: profile.walkingTolerance ?? undefined,
+      queueTolerance: profile.queueTolerance ?? undefined,
+      dietPreference: dietPref.length > 0 ? dietPref : undefined,
+      avoidFoods: avoidFoods.length > 0 ? avoidFoods : undefined,
+      activityTags: actTags.length > 0 ? actTags : undefined,
+      avoidActivityTags: avoidActTags.length > 0 ? avoidActTags : undefined,
+      indoorPreference: profile.indoorPreference ?? undefined,
+      pace: profile.pace ?? undefined,
+      favoriteAreas: favAreas.length > 0 ? favAreas : undefined,
+    };
+  } catch (err) {
+    console.warn("[contextBuilder] Failed to load profile from DB:", err instanceof Error ? err.message : err);
+    return {};
+  }
 }

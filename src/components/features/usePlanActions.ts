@@ -18,7 +18,7 @@ export interface UsePlanActionsOptions {
 }
 
 export function usePlanActions(opts: UsePlanActionsOptions) {
-  const { showToast, conversationId, city, setInputValue, textareaRef, onSavePlanApi, onSelectPlan } = opts;
+  const { showToast, conversationId, city: _city, setInputValue, textareaRef, onSavePlanApi, onSelectPlan } = opts;
 
   /** 继续调整：预填引导文字 + 聚焦输入框 */
   const handleAdjustPlan = useCallback((plan: PlanningOption) => {
@@ -98,8 +98,8 @@ export function usePlanActions(opts: UsePlanActionsOptions) {
       .filter((step) => step.poiName)
       .map((step) => ({
         name: step.poiName!,
-        lat: (step as Record<string, unknown>).lat as number | undefined,
-        lng: (step as Record<string, unknown>).lng as number | undefined,
+        lat: (step as unknown as Record<string, unknown>).lat as number | undefined,
+        lng: (step as unknown as Record<string, unknown>).lng as number | undefined,
       }));
 
     if (navPoints.length === 0) {

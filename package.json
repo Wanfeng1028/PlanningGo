@@ -25,6 +25,8 @@
     "docker:logs": "docker compose logs -f api",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install chromium",
     "load:health": "node scripts/load-plan.js --path /api/health --method GET --duration 10",
     "load:plan": "node scripts/load-plan.js",
     "load:flow": "node scripts/load-flow.js",
@@ -72,6 +74,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.60.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/ms": "^2.1.0",

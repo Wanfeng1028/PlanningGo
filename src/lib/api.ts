@@ -282,7 +282,7 @@ export async function selectPlan(planId: string) {
   });
 }
 
-export async function savePlanToDb(input: { conversationId: string; planId: string; optionId: string }) {
+export async function savePlanToDb(input: { conversationId: string; planId: string; optionId: string; planData?: PlanningOption }) {
   return apiJson<{ planId: string; message: string }>("/api/plans/save", {
     method: "POST",
     body: JSON.stringify(input),

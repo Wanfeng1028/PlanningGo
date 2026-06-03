@@ -5,6 +5,7 @@
 import type { ActivityPlan, TimelineStep } from "./schemas";
 import type { CandidatePoi } from "./schemas";
 import type { CandidatePool } from "./candidateGenerator";
+import type { AmapClient } from "../tools/amap/client";
 
 /** 将 "HH:MM" 格式的时间转换为分钟数 */
 export function timeToMinutes(time: string): number {
@@ -62,54 +63,63 @@ function estimateTransportTime(
 }
 
 /**
- * 计算方案中连续步骤间的交通时间，更新 transport 和时间线
+ * 计算方案中连续步骤间的交通时间。
+ * 优先使用高德路线 API 获取真实交通时间，失败时回退到估算模型。
  */
-export function calculateRouteTimes(
+export async function calculateRouteTimes(
   plans: ActivityPlan[],
   candidates: CandidatePool,
-): ActivityPlan[] {
+  amapClient?: AmapClient,
+): Promise<ActivityPlan[]> {
   const poiMap = buildPoiMap(candidates);
 
-  return plans.map((plan) => {
+  return Promise.all(plans.map(async (plan) => {
     const updatedTimeline = [...plan.timeline];
 
     for (let i = 0; i < updatedTimeline.length - 1; i++) {
       const current = updatedTimeline[i]!;
       const next = updatedTimeline[i + 1]!;
 
-      // Skip buffer/travel steps
       if (next.type === "buffer" || next.type === "travel") continue;
 
       const fromPoi = current.poiId ? poiMap.get(current.poiId) : current.poiName ? poiMap.get(current.poiName) : undefined;
       const toPoi = next.poiId ? poiMap.get(next.poiId) : next.poiName ? poiMap.get(next.poiName) : undefined;
 
-      const transportTime = estimateTransportTime(fromPoi, toPoi, next.transport);
+      let transportTime = 0;
+      let usedRealApi = false;
+
+      // Try real Amap route API first
+      if (amapClient && amapClient.isConfigured() && fromPoi?.lat && fromPoi?.lng && toPoi?.lat && toPoi?.lng) {
+        transportTime = await fetchRealRouteTime(amapClient, fromPoi, toPoi, next.transport);
+        if (transportTime > 0) usedRealApi = true;
+      }
+
+      // Fallback to estimation
+      if (!usedRealApi) {
+        transportTime = estimateTransportTime(fromPoi, toPoi, next.transport);
+      }
+
       const transportMode = next.transport !== "none" ? next.transport : inferTransportMode(transportTime);
 
-      // Update the next step's transport info
       updatedTimeline[i + 1] = {
         ...next,
         transport: transportMode,
-        durationMinutes: next.durationMinutes, // Keep activity duration, transport is in the gap
+        durationMinutes: next.durationMinutes,
       };
 
-      // Adjust start time if needed to account for transport
       const currentEndMin = timeToMinutes(current.endTime);
       const neededStartMin = currentEndMin + transportTime;
       const nextStartMin = timeToMinutes(next.startTime);
 
       if (neededStartMin > nextStartMin) {
-        // Push next step start time forward
         updatedTimeline[i + 1] = {
           ...updatedTimeline[i + 1]!,
           startTime: minutesToTime(neededStartMin),
         };
-        // Cascade: push subsequent steps if they overlap
         cascadeTimeAdjust(updatedTimeline, i + 1);
       }
     }
 
-    // Recalculate total duration
     const firstStart = timeToMinutes(updatedTimeline[0]?.startTime ?? "09:00");
     const lastEnd = timeToMinutes(updatedTimeline[updatedTimeline.length - 1]?.endTime ?? "18:00");
     const totalDuration = lastEnd - firstStart;
@@ -119,7 +129,47 @@ export function calculateRouteTimes(
       timeline: updatedTimeline,
       totalDurationMinutes: totalDuration > 0 ? totalDuration : plan.totalDurationMinutes,
     };
-  });
+  }));
+}
+
+/**
+ * 调用高德真实路线 API 获取交通时间（分钟）。
+ * 失败返回 -1 表示应使用 fallback。
+ */
+async function fetchRealRouteTime(
+  client: AmapClient,
+  from: CandidatePoi,
+  to: CandidatePoi,
+  mode: string,
+): Promise<number> {
+  const origin = `${from.lng},${from.lat}`;
+  const destination = `${to.lng},${to.lat}`;
+
+  try {
+    let response: { route?: { paths?: Array<{ duration?: string }> } } | undefined;
+
+    if (mode === "walk" || mode === "walking") {
+      response = await client.routeWalking({ origin, destination });
+    } else if (mode === "driving" || mode === "taxi") {
+      response = await client.routeDriving({ origin, destination });
+    } else {
+      // Default to transit for subway/mixed
+      response = await client.routeTransit({ origin, destination });
+    }
+
+    const duration = response?.route?.paths?.[0]?.duration;
+    if (duration) {
+      const seconds = parseInt(duration, 10);
+      if (!isNaN(seconds) && seconds > 0) {
+        return Math.max(1, Math.round(seconds / 60));
+      }
+    }
+  } catch (err) {
+    // Non-fatal: fall back to estimation
+    console.warn("[routeCalculator] Amap route API failed, using estimation:", err instanceof Error ? err.message : err);
+  }
+
+  return -1; // Signal fallback
 }
 
 function buildPoiMap(candidates: CandidatePool): Map<string, CandidatePoi> {
@@ -154,7 +204,7 @@ function cascadeTimeAdjust(timeline: TimelineStep[], startIndex: number): void {
 
     if (nextStart < currentEnd) {
       // Push next step forward
-      const shift = currentEnd - nextStart;
+      const _shift = currentEnd - nextStart;
       const durationMin = next.durationMinutes || (timeToMinutes(next.endTime) - timeToMinutes(next.startTime));
       timeline[i + 1] = {
         ...next,

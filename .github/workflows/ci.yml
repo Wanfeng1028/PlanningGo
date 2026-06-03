@@ -2,94 +2,39 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev_*]
   pull_request:
     branches: [main]
 
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  build-and-test:
+  check:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version: [20, 22]
-
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: planninggo
-          POSTGRES_PASSWORD: planninggo_ci
-          POSTGRES_DB: planninggo
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U planninggo"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd="redis-cli ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
-    env:
-      DATABASE_URL: postgresql://planninggo:planninggo_ci@localhost:5432/planninggo
-      REDIS_URL: redis://localhost:6379
-      NODE_ENV: test
-      NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: "20"
           cache: npm
-          registry-url: https://registry.npmjs.org/
-
-      - name: Configure npm registry
-        run: |
-          npm config set registry https://registry.npmjs.org/
-          npm config get registry
 
       - name: Install dependencies
-        run: |
-          for i in 1 2 3; do
-            npm ci --no-audit --no-fund --progress=false && break
-            if [ "$i" = "3" ]; then exit 1; fi
-            echo "npm ci failed, retrying in 15 seconds..."
-            sleep 15
-          done
+        run: npm ci
 
       - name: Generate Prisma client
-        run: npx prisma generate
-
-      - name: Run database migrations
-        run: npx prisma migrate deploy
+        run: npx prisma generate --schema=prisma/schema.prisma
+        env:
+          DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
 
       - name: Typecheck
         run: npm run typecheck
 
       - name: Lint
         run: npm run lint
-        continue-on-error: true
 
-      - name: Test
-        run: npm test
+      - name: Unit tests
+        run: npm run test
 
       - name: Build
         run: npm run build

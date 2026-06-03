@@ -87,7 +87,7 @@ export function usePlanAction(showToast: ShowToast): {
     [states, errors, showToast],
   );
 
-  const isAnyLoading = loadingRef.current.size > 0;
+  const isAnyLoading = Object.values(states).some((s) => s === "loading");
 
   return { getAction, isAnyLoading };
 }

@@ -1476,13 +1476,13 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
       successText: "方案已保存",
       errorText: "保存失败，请重试",
       run: async () => {
-        if (conversationIdRef.current) {
-          await savePlanToDb({
-            conversationId: conversationIdRef.current,
-            planId: plan.planId,
-            optionId: plan.id,
-          });
-        }
+        if (!conversationIdRef.current) throw new Error("没有活跃的对话");
+        await savePlanToDb({
+          conversationId: conversationIdRef.current,
+          planId: plan.planId,
+          optionId: plan.id,
+          planData: plan,
+        });
       },
     });
   }, [showToast]);
@@ -1499,7 +1499,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
   /* ── usePlanActions hook — provides handleOpenNavigation (Phase 1) ── */
   const { handleOpenNavigation } = usePlanActions({
     showToast,
-    conversationId: conversationIdRef.current,
+    conversationId,
     city,
     setInputValue,
     textareaRef,
@@ -1552,7 +1552,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
           break;
       }
     },
-    [selectedPlanId, messages, city, showToast, handleOpenNavigation],
+    [selectedPlanId, messages, showToast, handleOpenNavigation],
   );
 
   /* ── Render: agent execution events panel ── */

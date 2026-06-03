@@ -12,6 +12,8 @@ import { scoreAndFilterCandidates } from "../planning/poiScorer";
 import { enrichPlanWithPoiDetails } from "../planning/poiEnricher";
 import { calculateRouteTimes } from "../planning/routeCalculator";
 import { generateSuggestions } from "../suggestions/suggestionEngine";
+import { getAmapClient } from "../tools/amap/client";
+import type { AmapClient } from "../tools/amap/client";
 import type { PlanningResponse, PlanningProviders } from "../planning/schemas";
 
 /**
@@ -55,7 +57,7 @@ export async function runPlanningPipeline(
   if (intent.mustAsk && intent.mustAsk.length > 0) {
     throw new Error(`MISSING_REQUIRED_SLOTS:${intent.mustAsk.join(",")}`);
   }
-  const context = await buildPlanningContext({ traceId, planId, intent, providers: input.providers });
+  const context = await buildPlanningContext({ traceId, planId, intent, providers: input.providers, userId: input.userId });
 
   // 3. 生成候选 POI 池（通过 providers.map 获取真实数据）
   const candidates = await generateCandidates(context);
@@ -98,16 +100,16 @@ export async function runPlanningPipeline(
   const enrichedOptions = enrichPlanWithPoiDetails(options, effectiveCandidates);
 
   // 7. 计算路线交通时间
-  const routedOptions = calculateRouteTimes(enrichedOptions, effectiveCandidates);
+  const routedOptions = await calculateRouteTimes(enrichedOptions, effectiveCandidates, input.providers?.map ? getAmapClientIfAvailable(input.providers.map) : undefined);
 
   // 8. 校验方案
   const validation = validatePlans({ intent, candidates: effectiveCandidates, options: routedOptions });
 
-  // 9. 为最优方案生成推荐
+  // 9. 为最优方案生成推荐（静态推理 + 真实 POI 增强）
   const bestPlan = routedOptions[0];
   let suggestions: ReturnType<typeof generateSuggestions> | undefined;
   if (bestPlan) {
-    suggestions = generateSuggestions({
+    const staticSuggestions = generateSuggestions({
       steps: bestPlan.timeline.map((step) => ({
         type: step.type,
         title: step.title,
@@ -118,10 +120,27 @@ export async function runPlanningPipeline(
       participantMode: intent.participantMode,
       city: intent.city,
     });
+    // Enrich with real POI data if Amap is available
+    try {
+      const { enrichSuggestionsWithPoi } = await import("../suggestions/suggestionEngine.js");
+      suggestions = await enrichSuggestionsWithPoi(staticSuggestions, getAmapClientIfAvailable(input.providers?.map), intent.city);
+    } catch {
+      suggestions = staticSuggestions;
+    }
   }
 
   // 10. 生成可执行动作（绑定 userId）
   const executableActions = createActionsForPlans({ planId, options: routedOptions, intent, userId: input.userId });
+
+  // 10.5 画像沉淀：方案生成后异步更新用户画像
+  if (input.userId && routedOptions[0]) {
+    try {
+      const { syncProfileToDb } = await import("./memoryExtractor.js");
+      await syncProfileToDb(input.userId, routedOptions[0], intent);
+    } catch (err) {
+      console.warn("[orchestrator] Profile sync failed:", err instanceof Error ? err.message : err);
+    }
+  }
 
   // 11. 组装响应
   return {
@@ -145,4 +164,13 @@ function shouldFallbackToMock(error: unknown): boolean {
   if (!env.ENABLE_LLM_FALLBACK) return false;
   const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
   return message.includes("timeout") || message.includes("超时") || message.includes("timed out");
+}
+
+function getAmapClientIfAvailable(_mapProvider: unknown): AmapClient | undefined {
+  try {
+    const client = getAmapClient();
+    return client.isConfigured() ? client : undefined;
+  } catch {
+    return undefined;
+  }
 }

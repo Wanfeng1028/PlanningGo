@@ -234,3 +234,182 @@ function mergeWithDedup(existing: string[], incoming: string[]): string[] {
   const set = new Set([...existing, ...incoming]);
   return [...set].slice(0, 20); // Cap at 20 items
 }
+
+// ─── DB Persistence with Confidence ──────────────────────
+
+interface ProfileFieldMeta {
+  value: unknown;
+  weight: number;      // 0-1 confidence score
+  count: number;       // how many times observed
+  lastSeenAt: string;  // ISO date
+  source: string;      // "plan_selection" | "intent" | "slot"
+}
+
+interface ProfileWithConfidence {
+  fields: Record<string, ProfileFieldMeta>;
+  planCount: number;
+  updatedAt: string;
+}
+
+/**
+ * 从方案选择中提取记忆并持久化到 DB。
+ * 使用置信度机制防止过度学习：单次选择不永久改变画像，多次选择才提升权重。
+ */
+export async function syncProfileToDb(
+  userId: string,
+  selectedPlan: {
+    title: string;
+    targetGroup: string;
+    totalCostMin: number;
+    totalCostMax: number;
+    timeline: Array<{ type: string; title: string; poiName: string | null }>;
+  },
+  _intent: { participantMode: string; preferences: string[]; city: string },
+): Promise<void> {
+  try {
+    const { getPrismaClient } = await import("../../common/prisma.js");
+    const db = getPrismaClient();
+    if (!db) return;
+
+    // 1. Extract memory from this plan selection
+    const extracted = extractMemoryFromPlanSelection({ selectedPlan });
+
+    // 2. Load existing profile from DB
+    const existingProfile = await db.userProfile.findFirst({ where: { userId } });
+    // Store confidence tracking inside the `preferences` JSON field
+    const storedPrefs = (existingProfile?.preferences ?? {}) as Record<string, unknown>;
+    const profileData: ProfileWithConfidence = (storedPrefs.__profileConfidence as ProfileWithConfidence) ?? {
+      fields: {},
+      planCount: 0,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // 3. Update fields with confidence tracking
+    const now = new Date().toISOString();
+
+    if (extracted.activityPreferences?.length) {
+      for (const tag of extracted.activityPreferences) {
+        const key = `activity_${tag}`;
+        const existing = profileData.fields[key];
+        profileData.fields[key] = {
+          value: tag,
+          weight: existing ? Math.min(1, existing.weight + 0.2) : 0.2,
+          count: (existing?.count ?? 0) + 1,
+          lastSeenAt: now,
+          source: "plan_selection",
+        };
+      }
+    }
+
+    if (extracted.foodPreferences?.length) {
+      for (const food of extracted.foodPreferences) {
+        const key = `food_${food}`;
+        const existing = profileData.fields[key];
+        profileData.fields[key] = {
+          value: food,
+          weight: existing ? Math.min(1, existing.weight + 0.2) : 0.2,
+          count: (existing?.count ?? 0) + 1,
+          lastSeenAt: now,
+          source: "plan_selection",
+        };
+      }
+    }
+
+    if (extracted.budgetRange) {
+      profileData.fields["budgetRange"] = {
+        value: extracted.budgetRange,
+        weight: 0.5,
+        count: (profileData.fields["budgetRange"]?.count ?? 0) + 1,
+        lastSeenAt: now,
+        source: "plan_selection",
+      };
+    }
+
+    if (extracted.companionsPreference) {
+      profileData.fields["companions"] = {
+        value: extracted.companionsPreference,
+        weight: 0.5,
+        count: (profileData.fields["companions"]?.count ?? 0) + 1,
+        lastSeenAt: now,
+        source: "plan_selection",
+      };
+    }
+
+    profileData.planCount += 1;
+    profileData.updatedAt = now;
+
+    // 4. Build high-confidence tags for UserProfile update
+    const HIGH_CONFIDENCE_THRESHOLD = 0.6;
+    const activityTags = Object.entries(profileData.fields)
+      .filter(([k, v]) => k.startsWith("activity_") && v.weight >= HIGH_CONFIDENCE_THRESHOLD)
+      .map(([, v]) => v.value as string);
+    const foodTags = Object.entries(profileData.fields)
+      .filter(([k, v]) => k.startsWith("food_") && v.weight >= HIGH_CONFIDENCE_THRESHOLD)
+      .map(([, v]) => v.value as string);
+    const budgetRange = profileData.fields["budgetRange"]?.weight >= HIGH_CONFIDENCE_THRESHOLD
+      ? profileData.fields["budgetRange"].value as [number, number]
+      : undefined;
+
+    // 5. Upsert UserProfile using real schema fields
+    const updateData: Record<string, unknown> = {
+      preferences: {
+        ...storedPrefs,
+        __profileConfidence: profileData,
+      },
+      activityTags: JSON.stringify(activityTags),
+      avoidFoods: JSON.stringify(foodTags),
+      planCount: profileData.planCount,
+    };
+    if (budgetRange) {
+      updateData.budgetMin = budgetRange[0];
+      updateData.budgetMax = budgetRange[1];
+    }
+
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    if (existingProfile) {
+      await db.userProfile.update({
+        where: { id: existingProfile.id },
+        data: updateData as any,
+      });
+    } else {
+      await db.userProfile.create({
+        data: {
+          userId,
+          ...updateData,
+        } as any,
+      });
+    }
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+
+    // 6. Also persist to Memory table for agent prompt injection
+    const memRow = await db.memory.findFirst({
+      where: { userId, category: "route", title: "planning_profile" },
+    });
+
+    const memoryData: UserMemoryProfile = {
+      activityPreferences: activityTags,
+      foodPreferences: foodTags,
+      budgetRange: budgetRange ?? extracted.budgetRange,
+      companionsPreference: extracted.companionsPreference,
+      planCount: profileData.planCount,
+    };
+
+    if (memRow) {
+      await db.memory.update({
+        where: { id: memRow.id },
+        data: { detail: JSON.stringify(memoryData) },
+      });
+    } else {
+      await db.memory.create({
+        data: {
+          userId,
+          category: "route",
+          title: "planning_profile",
+          detail: JSON.stringify(memoryData),
+        },
+      });
+    }
+  } catch (err) {
+    console.warn("[memoryExtractor] syncProfileToDb error:", err instanceof Error ? err.message : err);
+  }
+}
