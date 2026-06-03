@@ -1,12 +1,21 @@
 import type { PlanningOption, PlanningExecutableAction, PlanningAction } from "../../lib/api";
+import type { ToastType } from "../GlassToast";
 import { formatMatchScore } from "./formatMatchScore";
 import styles from "../../pages/FeaturesPage.module.scss";
+
+type OnToast = (text: string, type?: ToastType) => void;
 
 /* ── Plan Card — structured view ── */
 export function PlanCardView({
   plan,
   selected,
   onSelect,
+  onAdjustPlan,
+  onGenerateCalendar,
+  onSavePlan,
+  onViewReservations,
+  onOpenNavigation,
+  onToast,
   planActions,
   onExecuteAction,
   busyActionId,
@@ -16,12 +25,23 @@ export function PlanCardView({
   plan: PlanningOption;
   selected: boolean;
   onSelect: (id: string) => void;
+  onAdjustPlan?: (plan: PlanningOption) => void;
+  onGenerateCalendar?: (plan: PlanningOption) => void;
+  onSavePlan?: (plan: PlanningOption) => void;
+  onViewReservations?: (plan: PlanningOption) => void;
+  onOpenNavigation?: (plan: PlanningOption) => void;
+  onToast?: OnToast;
   planActions?: PlanningExecutableAction[];
   onExecuteAction?: (action: PlanningExecutableAction) => void;
   busyActionId?: string | null;
   unifiedActions?: PlanningAction[];
   onUnifiedAction?: (action: PlanningAction) => void;
 }) {
+  /** Fallback toast when parent doesn't provide a callback */
+  const fallback = (text: string) => {
+    if (onToast) onToast(text, "info");
+    else console.info("[PlanCardView]", text);
+  };
   // Format duration nicely
   const formatDuration = (minutes: number) => {
     if (minutes <= 0) return null;
@@ -64,6 +84,20 @@ export function PlanCardView({
               <span className={styles.timelineTime}>{step.startTime}–{step.endTime}</span>
               <span className={styles.timelineTitle}>{step.title}</span>
               {step.poiName && <span className={styles.timelinePoi}>· {step.poiName}</span>}
+              {/* Phase 2: description / cost / bookingHint (optional, render when present) */}
+              {step.description && (
+                <span className={styles.timelineDesc}>{step.description}</span>
+              )}
+              {step.estimatedCost && (
+                <span className={styles.timelineCost}>💰 {step.estimatedCost}</span>
+              )}
+              {step.bookingHint && (
+                <span className={styles.bookingHint}>🎫 {step.bookingHint}</span>
+              )}
+              {/* Suggestions chips (optional) */}
+              {step.suggestions?.map((s, i) => (
+                <span key={i} className={styles.suggestionChip}>💡 {s}</span>
+              ))}
             </li>
           ))}
         </ul>
@@ -122,31 +156,52 @@ export function PlanCardView({
 
       {/* Action buttons */}
       <div className={styles.planCardActions}>
+        {/* Select plan */}
         <button
           className={`${styles.actionBtn} ${selected ? styles.actionBtnPrimary : styles.actionBtnSecondary}`}
           onClick={() => onSelect(plan.id)}
+          disabled={selected}
         >
           {selected ? "✓ 已选择" : "选这套方案"}
         </button>
-        <button
-          className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
-          onClick={() => onSelect(plan.id)}
-          title="继续调整此方案"
-        >
-          继续调整
-        </button>
-        {/* Calendar — implemented */}
+
+        {/* Continue adjusting — input box focus + prefill */}
         <button
           className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
           onClick={() => {
-            // Trigger calendar generation via parent
-            onSelect(plan.id);
+            if (onAdjustPlan) onAdjustPlan(plan);
+            else fallback("功能开发中");
           }}
-          title="添加到日历"
+          title="继续调整此方案"
+        >
+          ✏️ 继续调整
+        </button>
+
+        {/* Generate calendar — confirm dialog → download ICS */}
+        <button
+          className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
+          onClick={() => {
+            if (onGenerateCalendar) onGenerateCalendar(plan);
+            else fallback("日历功能开发中");
+          }}
+          title="生成日历提醒"
         >
           📅 生成日历
         </button>
-        {/* Share — implemented */}
+
+        {/* Save plan — API call + toast */}
+        <button
+          className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
+          onClick={() => {
+            if (onSavePlan) onSavePlan(plan);
+            else fallback("保存功能开发中");
+          }}
+          title="保存方案"
+        >
+          💾 保存方案
+        </button>
+
+        {/* Share — works now */}
         <button
           className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
           onClick={() => {
@@ -155,12 +210,39 @@ export function PlanCardView({
               navigator.share({ title: plan.title, text }).catch(() => {});
             } else {
               navigator.clipboard.writeText(text);
+              onToast?.("已复制到剪贴板", "success");
             }
           }}
           title="分享方案"
         >
           📤 分享
         </button>
+
+        {/* Open navigation — coordinate fallback */}
+        <button
+          className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
+          onClick={() => {
+            if (onOpenNavigation) onOpenNavigation(plan);
+            else fallback("导航功能开发中");
+          }}
+          title="打开高德导航"
+        >
+          🧭 打开导航
+        </button>
+
+        {/* View reservations — modal */}
+        {plan.timeline.some((s) => s.bookingNeeded) && (
+          <button
+            className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
+            onClick={() => {
+              if (onViewReservations) onViewReservations(plan);
+              else fallback("预约功能开发中");
+            }}
+            title="查看需要预约的步骤"
+          >
+            🎫 查看预约建议
+          </button>
+        )}
       </div>
 
       {/* Compact action chips */}
@@ -168,7 +250,11 @@ export function PlanCardView({
         <div className={styles.actionDock}>
           {planActions.map((action) => {
             // Mark unimplemented actions as coming soon
-            const implemented = ["navigation", "calendar_event", "add_to_calendar", "share_message", "memory_save"].includes(action.type);
+            // All action types are now implemented — no disabled chips
+            const implemented = [
+              "navigation", "calendar_event", "add_to_calendar", "share_message", "memory_save",
+              "book_restaurant", "reserve_activity", "book_hotel", "book_transport", "buy_ticket",
+            ].includes(action.type);
             const isComingSoon = !implemented && action.status === "waiting_confirm";
 
             return (

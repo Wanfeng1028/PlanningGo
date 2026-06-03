@@ -167,6 +167,7 @@ export interface SystemPromptContext {
   toolCallingEnabled?: boolean;
   agentState?: { phase?: string; planningDraft?: Record<string, unknown> };
   userMemory?: Record<string, unknown>;
+  userProfile?: Record<string, unknown>;
 }
 
 /**
@@ -185,6 +186,18 @@ export function buildSystemPrompt(context?: SystemPromptContext): string {
     if (context.agentState?.planningDraft) extras.push(`已收集的规划信息：${JSON.stringify(context.agentState.planningDraft)}`);
     if (context.userMemory && Object.keys(context.userMemory).length > 0) {
       extras.push(`用户历史偏好（仅供参考，不要覆盖用户本轮明确输入）：${JSON.stringify(context.userMemory)}`);
+    }
+    if (context.userProfile) {
+      const profileParts: string[] = [];
+      if (context.userProfile.transportMode) profileParts.push(`交通偏好：${context.userProfile.transportMode}`);
+      if ((context.userProfile.dietPreference as string[] | undefined)?.length) profileParts.push(`饮食偏好：${(context.userProfile.dietPreference as string[]).join("、")}`);
+      if ((context.userProfile.avoidFoods as string[] | undefined)?.length) profileParts.push(`忌口：${(context.userProfile.avoidFoods as string[]).join("、")}`);
+      if ((context.userProfile.activityTags as string[] | undefined)?.length) profileParts.push(`喜欢的活动：${(context.userProfile.activityTags as string[]).join("、")}`);
+      if (context.userProfile.queueTolerance) profileParts.push(`排队容忍度：${context.userProfile.queueTolerance}`);
+      if (context.userProfile.indoorPreference) profileParts.push(`室内偏好：${context.userProfile.indoorPreference}`);
+      if (profileParts.length > 0) {
+        extras.push(`\n【用户画像】\n${profileParts.join("\n")}`);
+      }
     }
     if (extras.length > 0) {
       prompt += `\n\n## 当前上下文\n${extras.join("\n")}`;

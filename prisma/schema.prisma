@@ -198,6 +198,11 @@ model PlanStep {
   durationMin   Int     @default(0) @map("duration_min")
   transport     String  @default("none")
   bookingNeeded Boolean @default(false) @map("booking_needed")
+  /* Phase 2: enhanced detail fields */
+  description   String?
+  estimatedCost String? @map("estimated_cost")
+  bookingHint   String? @map("booking_hint")
+  suggestions   Json    @default("[]")
   metadata      Json    @default("{}")
 
   planOption PlanOption @relation(fields: [planOptionId], references: [id], onDelete: Cascade)

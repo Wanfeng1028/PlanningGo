@@ -34,7 +34,10 @@
     "smoke:plan": "node scripts/smoke-plan.mjs",
     "smoke:all": "node scripts/smoke-all.mjs",
     "smoke:auth-history": "node scripts/smoke-auth-history.mjs",
-    "debug:conversations": "node scripts/debug-conversations.mjs"
+    "debug:conversations": "node scripts/debug-conversations.mjs",
+    "dev:clean-anonymous": "node scripts/dev-clean-anonymous.mjs",
+    "dev:seed-demo-history": "node scripts/dev-seed-demo-history.mjs",
+    "dev:reset-xiaoming": "node scripts/dev-reset-xiaoming.mjs"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

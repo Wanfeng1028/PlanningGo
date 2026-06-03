@@ -8,16 +8,20 @@ import { rankCandidates } from "../planning/ranking";
 import { generateMockPlans, generateLlmPlans } from "./planner";
 import { validatePlans } from "../planning/validator";
 import { createActionsForPlans } from "../execution/actionService";
+import { scoreAndFilterCandidates } from "../planning/poiScorer";
+import { enrichPlanWithPoiDetails } from "../planning/poiEnricher";
+import { calculateRouteTimes } from "../planning/routeCalculator";
+import { generateSuggestions } from "../suggestions/suggestionEngine";
 import type { PlanningResponse, PlanningProviders } from "../planning/schemas";
 
 /**
- * 主规划 Pipeline：intent -> context -> candidates -> rank -> plan -> validate -> actions
+ * 主规划 Pipeline：intent -> context -> candidates -> score -> plan -> enrich -> route -> validate -> suggestions -> actions
  *
  * 根据 PLANNING_MODE 环境变量决定使用 mock/llm/hybrid 模式。
  */
 export async function runPlanningPipeline(
   input: PlanningRequest & { modelMode?: "flash" | "pro"; providers?: PlanningProviders; userId?: string },
-): Promise<PlanningResponse & { summary: string; selectedPlanId: string }> {
+): Promise<PlanningResponse & { summary: string; selectedPlanId: string; suggestions?: ReturnType<typeof generateSuggestions> }> {
   const traceId = createTraceId();
   const planId = createId("plan");
   const mode = env.PLANNING_MODE;
@@ -56,11 +60,17 @@ export async function runPlanningPipeline(
   // 3. 生成候选 POI 池（通过 providers.map 获取真实数据）
   const candidates = await generateCandidates(context);
 
-  // 4. 排序候选
-  const ranked = rankCandidates(intent, candidates);
+  // 4. 评分过滤候选（fallback to rankCandidates if scoring produces empty results）
+  const scoredCandidates = scoreAndFilterCandidates(candidates, intent);
+  const effectiveCandidates =
+    scoredCandidates.activities.length === 0 &&
+    scoredCandidates.restaurants.length === 0 &&
+    scoredCandidates.events.length === 0
+      ? rankCandidates(intent, candidates)
+      : scoredCandidates;
 
   // 5. 生成方案
-  const plannerInput = { traceId, planId, intent, context, candidates: ranked, providers: input.providers };
+  const plannerInput = { traceId, planId, intent, context, candidates: effectiveCandidates, providers: input.providers };
   let options;
 
   if (mode === "llm") {
@@ -84,27 +94,51 @@ export async function runPlanningPipeline(
     options = generateMockPlans(plannerInput);
   }
 
-  // 6. 校验方案
-  const validation = validatePlans({ intent, candidates: ranked, options });
+  // 6. 补全 POI 详情
+  const enrichedOptions = enrichPlanWithPoiDetails(options, effectiveCandidates);
 
-  // 7. 生成可执行动作（绑定 userId）
-  const executableActions = createActionsForPlans({ planId, options, intent, userId: input.userId });
+  // 7. 计算路线交通时间
+  const routedOptions = calculateRouteTimes(enrichedOptions, effectiveCandidates);
 
-  // 8. 组装响应
+  // 8. 校验方案
+  const validation = validatePlans({ intent, candidates: effectiveCandidates, options: routedOptions });
+
+  // 9. 为最优方案生成推荐
+  const bestPlan = routedOptions[0];
+  let suggestions: ReturnType<typeof generateSuggestions> | undefined;
+  if (bestPlan) {
+    suggestions = generateSuggestions({
+      steps: bestPlan.timeline.map((step) => ({
+        type: step.type,
+        title: step.title,
+        poiName: step.poiName ?? null,
+        startTime: step.startTime,
+        endTime: step.endTime,
+      })),
+      participantMode: intent.participantMode,
+      city: intent.city,
+    });
+  }
+
+  // 10. 生成可执行动作（绑定 userId）
+  const executableActions = createActionsForPlans({ planId, options: routedOptions, intent, userId: input.userId });
+
+  // 11. 组装响应
   return {
     traceId,
     planId,
     mode,
     intent,
-    options,
-    selectedOptionId: options[0]?.id,
+    options: routedOptions,
+    selectedOptionId: routedOptions[0]?.id,
     validation,
     executableActions,
     toolLogs: [],
     nextActions: ["选择方案", "查看风险", "确认预约", "写入日历", "分享给同行人"],
-    summary: options[0]?.summary ?? "已生成可执行方案",
-    selectedPlanId: options[0]?.id ?? "",
-  } as PlanningResponse & { summary: string; selectedPlanId: string };
+    summary: routedOptions[0]?.summary ?? "已生成可执行方案",
+    selectedPlanId: routedOptions[0]?.id ?? "",
+    suggestions,
+  } as PlanningResponse & { summary: string; selectedPlanId: string; suggestions?: ReturnType<typeof generateSuggestions> };
 }
 
 function shouldFallbackToMock(error: unknown): boolean {

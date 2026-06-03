@@ -16,6 +16,8 @@ export function rankCandidates(intent: UserIntent, pool: CandidatePool): Candida
     restaurants: rank(pool.restaurants),
     movies: rank(pool.movies),
     events: rank(pool.events),
+    cafes: rank(pool.cafes ?? []),
+    cinemas: rank(pool.cinemas ?? []),
   };
 }
 

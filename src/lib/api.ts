@@ -282,6 +282,13 @@ export async function selectPlan(planId: string) {
   });
 }
 
+export async function savePlanToDb(input: { conversationId: string; planId: string; optionId: string }) {
+  return apiJson<{ planId: string; message: string }>("/api/plans/save", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 // ── Agent 规划工作台 ──
 
 export interface PlanningTimelineStep {
@@ -295,6 +302,11 @@ export interface PlanningTimelineStep {
   transport: string;
   reasoning: string;
   bookingNeeded: boolean;
+  /* Phase 2 optional fields — populated after schema migration */
+  description?: string;
+  estimatedCost?: string;
+  bookingHint?: string;
+  suggestions?: string[];
 }
 
 export interface PlanningOption {

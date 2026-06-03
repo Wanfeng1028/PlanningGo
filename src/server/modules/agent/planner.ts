@@ -37,7 +37,11 @@ const PLAN_JSON_SCHEMA_DESC = `{
       "durationMinutes": 数字,
       "transport": "driving|taxi|subway|walk|mixed|none",
       "reasoning": "为什么安排这个步骤",
-      "bookingNeeded": true/false
+      "bookingNeeded": true/false,
+      "description": "步骤详细描述，如推荐菜品、游览路线",
+      "estimatedCost": "预计花费，如人均80元",
+      "bookingHint": "预约提示，如提前1天预约",
+      "suggestions": ["可选建议，如带相机", "穿运动鞋"]
     }],
     "backupPlan": "备选方案说明"
   }]
@@ -65,6 +69,11 @@ const llmPlanItemSchema = z.object({
     transport: z.enum(["driving", "taxi", "subway", "walk", "mixed", "none"]).default("none"),
     reasoning: z.string(),
     bookingNeeded: z.boolean().default(false),
+    /* Phase 2: enhanced step detail fields */
+    description: z.string().optional(),
+    estimatedCost: z.string().optional(),
+    bookingHint: z.string().optional(),
+    suggestions: z.array(z.string()).optional(),
   })).min(2),
   backupPlan: z.string().optional(),
 });
@@ -73,7 +82,7 @@ const llmOutputSchema = z.object({
   plans: z.array(llmPlanItemSchema).min(1).max(3),
 });
 
-const SYSTEM_PROMPT = `你是"周末去哪儿"的行程规划 AI。用户会告诉你出行需求，你需要生成 1-2 套可执行的行程方案。
+const SYSTEM_PROMPT = `你是"周末去哪儿"的行程规划 AI。用户会告诉你出行需求，你需要生成 2-3 套差异化的可执行行程方案。
 
 要求：
 1. 只输出 JSON，不要输出任何其他文字
@@ -81,19 +90,24 @@ const SYSTEM_PROMPT = `你是"周末去哪儿"的行程规划 AI。用户会告�
 3. 每个方案的 timeline 必须合理衔接，时间不能重叠
 4. 所有地点必须基于提供的候选 POI 列表，不要编造地点
 5. reasoning 字段简要说明"为什么安排这个步骤"，不超过 50 字
-6. 评分基于可行性、用户匹配度、风险控制`;
+6. 评分基于可行性、用户匹配度、风险控制
+7. 3 套方案应有明显差异（如主题、节奏、预算），不要只微调人数
+8. description 字段给出具体的活动描述（如推荐菜品、游览路线、看点）
+9. estimatedCost 字段给出该步骤的预估花费（如"人均 80 元"、"免费"）
+10. bookingHint 字段给出预约提示（如"提前 1 天预约"、"现场购票"）
+11. suggestions 字段给出贴心建议（如"带相机"、"穿运动鞋"、"适合拍照"）`;
 
 // ─── Time Helpers ─────────────────────────────────────────
 
 /** 将 "HH:MM" 格式的时间转换为分钟数 */
-function timeToMinutes(time: string): number {
+export function timeToMinutes(time: string): number {
   const m = time.match(/(\d{1,2})[：:](\d{2})/);
   if (!m) return 14 * 60; // fallback
   return parseInt(m[1]!, 10) * 60 + parseInt(m[2]!, 10);
 }
 
 /** 将分钟数转换为 "HH:MM" 格式 */
-function minutesToTime(minutes: number): string {
+export function minutesToTime(minutes: number): string {
   const h = Math.floor(minutes / 60) % 24;
   const m = minutes % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
@@ -187,21 +201,22 @@ function extractSpecificDestination(raw: string): string | null {
 
 /**
  * Mock 方案生成（仅开发/演示用）。
- * 根据用户意图的 participantMode 动态选择方案模板，使用意图中的城市、出发地、预算等信息。
+ * 根据用户意图的 participantMode 动态选择方案模板，始终返回 3 套差异化方案。
  */
 export function generateMockPlans(input: PlannerInput): ActivityPlan[] {
   const mode = input.intent.participantMode;
   const primary = buildPrimaryPlan(input);
   const backup = buildIndoorBackupPlan(input);
+  const foodie = buildSocialFoodiePlan(input);
 
   if (mode === "friends") {
-    return [buildFriendsPlan(input), backup];
+    return [buildFriendsPlan(input), foodie, backup];
   }
   if (mode === "couple") {
-    return [buildCouplePlan(input), backup];
+    return [buildCouplePlan(input), foodie, backup];
   }
   // family, solo, unknown 均走通用主方案
-  return [primary, backup];
+  return [primary, foodie, backup];
 }
 
 /** 主方案：根据 participantMode 动态生成标题和内容 */
@@ -274,11 +289,11 @@ function buildPrimaryPlan(input: PlannerInput): ActivityPlan {
     highlights,
     risks: ["餐厅高峰可能等位", "天气变化需关注"],
     timeline: [
-      { id: createId("step"), startTime: t1, endTime: t2, type: "travel", title: travelTitle, poiId: null, poiName: hasUserOrigin ? origin : null, durationMinutes: 40, transport: hasUserOrigin ? "taxi" : "none", reasoning: hasUserOrigin ? "打车前往目的地，节省体力。" : "出发地未提供，交通方式待定。", bookingNeeded: false, actionId: null },
-      { id: createId("step"), startTime: t2, endTime: t3, type: "activity", title: activity?.name ?? "景点游览", poiId: activity?.id ?? null, poiName: activity?.name ?? null, durationMinutes: 100, transport: "none", reasoning: "该时段人流量适中，适合游览。", bookingNeeded: activity?.bookingRequired ?? false, actionId: null },
-      { id: createId("step"), startTime: t3, endTime: t4, type: "buffer", title: "休息与转场", poiId: null, poiName: null, durationMinutes: 40, transport: "walk", reasoning: "预留缓冲避免赶场。", bookingNeeded: false, actionId: null },
-      { id: createId("step"), startTime: t4, endTime: t5, type: "meal", title: restaurant?.name ?? "晚餐", poiId: restaurant?.id ?? null, poiName: restaurant?.name ?? null, durationMinutes: 70, transport: "none", reasoning: "较早用餐避开高峰。", bookingNeeded: true, actionId: null },
-      { id: createId("step"), startTime: t5, endTime: t6, type: "return", title: returnTitle, poiId: null, poiName: hasUserOrigin ? origin : null, durationMinutes: 30, transport: hasUserOrigin ? "taxi" : "none", reasoning: "保证总时长在合理范围内。", bookingNeeded: false, actionId: null },
+      { id: createId("step"), startTime: t1, endTime: t2, type: "travel", title: travelTitle, poiId: null, poiName: hasUserOrigin ? origin : null, durationMinutes: 40, transport: hasUserOrigin ? "taxi" : "none", reasoning: hasUserOrigin ? "打车前往目的地，节省体力。" : "出发地未提供，交通方式待定。", bookingNeeded: false, actionId: null, description: hasUserOrigin ? `从${origin}打车前往${city}目的地，约40分钟` : "前往目的地，交通方式待确认", estimatedCost: hasUserOrigin ? "打车约30-50元" : undefined, suggestions: hasUserOrigin ? ["提前叫车避开高峰"] : [] },
+      { id: createId("step"), startTime: t2, endTime: t3, type: "activity", title: activity?.name ?? "景点游览", poiId: activity?.id ?? null, poiName: activity?.name ?? null, durationMinutes: 100, transport: "none", reasoning: "该时段人流量适中，适合游览。", bookingNeeded: activity?.bookingRequired ?? false, actionId: null, description: activity?.name ? `游览${activity.name}，建议按推荐路线参观` : "参观景点，建议预留拍照时间", estimatedCost: activity?.avgPrice ? `人均${activity.avgPrice}元` : "免费或门票待定", bookingHint: activity?.bookingRequired ? "建议提前1天在线预约" : undefined, suggestions: ["穿舒适运动鞋", "带相机拍照"] },
+      { id: createId("step"), startTime: t3, endTime: t4, type: "buffer", title: "休息与转场", poiId: null, poiName: null, durationMinutes: 40, transport: "walk", reasoning: "预留缓冲避免赶场。", bookingNeeded: false, actionId: null, description: "在景点周边休息，喝杯咖啡或逛逛小店", estimatedCost: "约20-30元", suggestions: ["找家咖啡店歇脚"] },
+      { id: createId("step"), startTime: t4, endTime: t5, type: "meal", title: restaurant?.name ?? "晚餐", poiId: restaurant?.id ?? null, poiName: restaurant?.name ?? null, durationMinutes: 70, transport: "none", reasoning: "较早用餐避开高峰。", bookingNeeded: true, actionId: null, description: restaurant?.name ? `${restaurant.name}用餐，推荐招牌菜` : "在目的地附近用餐", estimatedCost: restaurant?.avgPrice ? `人均${restaurant.avgPrice}元` : "人均80-120元", bookingHint: "建议提前1天预约餐位", suggestions: ["较早到店避开排队高峰"] },
+      { id: createId("step"), startTime: t5, endTime: t6, type: "return", title: returnTitle, poiId: null, poiName: hasUserOrigin ? origin : null, durationMinutes: 30, transport: hasUserOrigin ? "taxi" : "none", reasoning: "保证总时长在合理范围内。", bookingNeeded: false, actionId: null, description: hasUserOrigin ? `打车返回${origin}` : "返程", estimatedCost: hasUserOrigin ? "打车约30-50元" : undefined, suggestions: ["避开晚高峰打车更顺畅"] },
     ],
     backupPlan: `如果天气不好，切换到${city}室内活动 + 同商圈晚餐。`,
   };
@@ -384,6 +399,59 @@ function buildCouplePlan(input: PlannerInput): ActivityPlan {
       { id: createId("step"), startTime: t5, endTime: t6, type: "meal", title: restaurant?.name ?? "浪漫晚餐", poiId: restaurant?.id ?? null, poiName: restaurant?.name ?? null, durationMinutes: 90, transport: "walk", reasoning: "提前预约好位子。", bookingNeeded: true, actionId: null },
     ],
     backupPlan: `如果下雨，改去${city}室内展览或商场，晚餐不变。`,
+  };
+}
+
+function buildSocialFoodiePlan(input: PlannerInput): ActivityPlan {
+  const { intent, candidates } = input;
+  const city = intent.city || "杭州";
+  const origin = intent.origin.label;
+  const hasUserOrigin = !!origin;
+  const userBudget = intent.budgetMax;
+  const budget = userBudget ?? 300;
+  const restaurant = candidates.restaurants[0] ?? candidates.restaurants[1];
+  const activity = candidates.activities[1] ?? candidates.activities[0];
+  const optionId = createId("option_foodie");
+  const startTime = resolveStartTime(intent);
+  const startMin = timeToMinutes(startTime);
+  const t1 = minutesToTime(startMin);
+  const t2 = minutesToTime(startMin + 30);
+  const t3 = minutesToTime(startMin + 30 + 90);
+  const t4 = minutesToTime(startMin + 30 + 90 + 30);
+  const t5 = minutesToTime(startMin + 30 + 90 + 30 + 90);
+  const t6 = minutesToTime(startMin + 30 + 90 + 30 + 90 + 30);
+
+  const budgetAssumption = userBudget !== undefined
+    ? `预算：${userBudget}元`
+    : "未提供预算，暂按人均 200-300 估算，可继续调整";
+
+  const assumptions: string[] = [];
+  if (hasUserOrigin) assumptions.push(`从${origin}出发`);
+  else assumptions.push("出发地未提供，以下暂不估算交通时间");
+  assumptions.push(budgetAssumption, "以美食体验为主线");
+
+  return {
+    id: optionId,
+    planId: input.planId,
+    title: buildPlanTitle(intent, "美食探索路线"),
+    targetGroup: intent.participantMode === "unknown" ? "friends" : intent.participantMode,
+    score: 85,
+    summary: `以${city}特色美食为主线的休闲路线${hasUserOrigin ? `，从${origin}出发` : ""}，适合喜欢美食探索的${userBudget !== undefined ? `，预算${userBudget}元` : ""}。`,
+    totalDurationMinutes: 270,
+    totalCostMin: Math.round(budget * 0.5),
+    totalCostMax: Math.round(budget * 0.9),
+    walkingKm: 2.0,
+    assumptions,
+    highlights: ["美食体验优先", "节奏轻松", "适合拍照打卡"],
+    risks: ["热门餐厅可能需要排队"],
+    timeline: [
+      { id: createId("step"), startTime: t1, endTime: t2, type: "travel", title: hasUserOrigin ? `从${origin}出发` : "前往美食街（出发地待确认）", poiId: null, poiName: hasUserOrigin ? origin : null, durationMinutes: 30, transport: hasUserOrigin ? "taxi" : "none", reasoning: "前往美食聚集地。", bookingNeeded: false, actionId: null, description: hasUserOrigin ? `从${origin}打车前往${city}美食街` : "前往美食目的地", estimatedCost: hasUserOrigin ? "打车约20-40元" : undefined },
+      { id: createId("step"), startTime: t2, endTime: t3, type: "meal", title: restaurant?.name ?? "特色午餐/晚餐", poiId: restaurant?.id ?? null, poiName: restaurant?.name ?? null, durationMinutes: 90, transport: "none", reasoning: "先吃主餐，胃口最好。", bookingNeeded: true, actionId: null, description: restaurant?.name ? `${restaurant.name}体验招牌菜` : "品尝当地特色美食", estimatedCost: restaurant?.avgPrice ? `人均${restaurant.avgPrice}元` : "人均80-150元", bookingHint: "建议提前1天预约餐位", suggestions: ["尝试招牌菜", "拍照打卡"] },
+      { id: createId("step"), startTime: t3, endTime: t4, type: "buffer", title: "甜品/咖啡", poiId: null, poiName: null, durationMinutes: 30, transport: "walk", reasoning: "餐后休闲。", bookingNeeded: false, actionId: null, description: "附近找家甜品店或咖啡馆小坐", estimatedCost: "约30-50元", suggestions: ["尝试当地特色甜品"] },
+      { id: createId("step"), startTime: t4, endTime: t5, type: "activity", title: activity?.name ?? "周边漫步", poiId: activity?.id ?? null, poiName: activity?.name ?? null, durationMinutes: 90, transport: "walk", reasoning: "餐后消食，轻松活动。", bookingNeeded: activity?.bookingRequired ?? false, actionId: null, description: activity?.name ? `逛${activity.name}及周边特色小店` : "在美食街周边漫步拍照", estimatedCost: activity?.avgPrice ? `人均${activity.avgPrice}元` : "免费", suggestions: ["穿舒适鞋子", "适合拍照"] },
+      { id: createId("step"), startTime: t5, endTime: t6, type: "return", title: hasUserOrigin ? "返程" : "返程（出发地待确认）", poiId: null, poiName: hasUserOrigin ? origin : null, durationMinutes: 30, transport: hasUserOrigin ? "taxi" : "none", reasoning: "行程结束。", bookingNeeded: false, actionId: null, description: hasUserOrigin ? `打车返回${origin}` : "返程", estimatedCost: hasUserOrigin ? "打车约20-40元" : undefined },
+    ],
+    backupPlan: `改为商场内美食广场 + 电影，预算更可控。`,
   };
 }
 
@@ -554,6 +622,11 @@ function parseAndValidateLlmOutput(content: string, planId: string): ActivityPla
       reasoning: step.reasoning,
       bookingNeeded: step.bookingNeeded,
       actionId: null,
+      /* Phase 2: pass through enhanced detail fields */
+      description: step.description,
+      estimatedCost: step.estimatedCost,
+      bookingHint: step.bookingHint,
+      suggestions: step.suggestions,
     })),
     backupPlan: plan.backupPlan,
   }));

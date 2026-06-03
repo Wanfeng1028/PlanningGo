@@ -13,7 +13,9 @@ import {
   type PlanningOption,
   type PlanningExecutableAction,
   selectAgentPlan,
+  savePlanToDb,
 } from "../lib/api";
+import { runPlanAction } from "../lib/runPlanAction";
 import type { AgentTraceEvent } from "../shared/agentResponse";
 import { GlassToast, useGlassToast } from "../components/GlassToast";
 import { validateInputLength } from "../lib/tokens";
@@ -29,6 +31,7 @@ import { AmbientBackground } from "../components/features/AmbientBackground";
 import { FeaturesSidebar } from "../components/features/FeaturesSidebar";
 import { Composer } from "../components/features/Composer";
 import { PlanCardView } from "../components/features/PlanCardView";
+import { usePlanActions } from "../components/features/usePlanActions";
 import { ErrorCardView } from "../components/features/ErrorCardView";
 import { MobileHandoffQRCode } from "../components/features/MobileHandoffQRCode";
 import styles from "./FeaturesPage.module.scss";
@@ -204,6 +207,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
   const [abortController, setAbortController] = useState<AbortController | null>(null);
   const [showHandoffQR, setShowHandoffQR] = useState(false);
   const [handoffPlanId, setHandoffPlanId] = useState<string | undefined>(undefined);
+  const [reservationPlan, setReservationPlan] = useState<PlanningOption | null>(null);
 
   const { toast: glassToast, show: showToast, dismiss: dismissToast } = useGlassToast();
 
@@ -1374,6 +1378,136 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     }
   }, [showToast]);
 
+  /* ── Phase 1: New plan action handlers ── */
+
+  /** Resolve relative Chinese date references to ISO date strings */
+  function resolveRelativeDate(dateStr: string): string {
+    if (!dateStr) return "";
+    // Already an absolute date (YYYY-MM-DD or YYYYMMDD)
+    if (/^\d{4}-?\d{2}-?\d{2}$/.test(dateStr)) {
+      return dateStr.replace(/-/g, "");
+    }
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayAfter = new Date(today);
+    dayAfter.setDate(dayAfter.getDate() + 2);
+
+    const fmt = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, "");
+
+    if (/明天|tomorrow/.test(dateStr)) return fmt(tomorrow);
+    if (/后天|day after/.test(dateStr)) return fmt(dayAfter);
+    if (/今天|today/.test(dateStr)) return fmt(today);
+
+    // Weekend references
+    if (/周六|saturday/.test(dateStr)) {
+      const d = new Date(today);
+      d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7 || 7));
+      return fmt(d);
+    }
+    if (/周日|sunday/.test(dateStr)) {
+      const d = new Date(today);
+      d.setDate(d.getDate() + ((7 - d.getDay() + 7) % 7 || 7));
+      return fmt(d);
+    }
+    if (/周末|weekend/.test(dateStr)) {
+      const d = new Date(today);
+      d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7 || 7));
+      return fmt(d);
+    }
+
+    // Fallback: use tomorrow
+    return fmt(tomorrow);
+  }
+
+  const handleAdjustPlan = useCallback((plan: PlanningOption) => {
+    setInputValue(`我想调整「${plan.title}」，希望…`);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }, []);
+
+  const handleGenerateCalendar = useCallback((plan: PlanningOption) => {
+    runPlanAction({
+      actionKey: `calendar-${plan.id}`,
+      showToast,
+      loadingText: "正在生成日历…",
+      successText: "日历文件已下载",
+      errorText: "日历生成失败",
+      run: () => {
+        const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//PlanningGo//CN"];
+        for (const step of plan.timeline) {
+          const date = resolveRelativeDate(step.startTime?.split(" ")[0] ?? "");
+          const stTime = step.startTime?.split(" ")[1]?.replace(/:/g, "") ?? "0900";
+          const edTime = step.endTime?.split(" ")[1]?.replace(/:/g, "") ?? "1800";
+          lines.push(
+            "BEGIN:VEVENT",
+            `UID:${plan.id}-${step.id}@planninggo`,
+            `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").split(".")[0]}Z`,
+            `DTSTART;TZID=Asia/Shanghai:${date}T${stTime}00`,
+            `DTEND;TZID=Asia/Shanghai:${date}T${edTime}00`,
+            `SUMMARY:${step.title}`,
+            step.poiName ? `LOCATION:${step.poiName}` : "",
+            `DESCRIPTION:${step.title}`,
+            "BEGIN:VALARM",
+            "TRIGGER:-PT30M",
+            "ACTION:DISPLAY",
+            `DESCRIPTION:即将开始：${step.title}`,
+            "END:VALARM",
+            "END:VEVENT",
+          );
+        }
+        lines.push("END:VCALENDAR");
+        const content = lines.filter(Boolean).join("\r\n");
+        const blob = new Blob([content], { type: "text/calendar;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${plan.title}.ics`;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+    });
+  }, [showToast]);
+
+  const handleSavePlan = useCallback(async (plan: PlanningOption) => {
+    await runPlanAction({
+      actionKey: `save-${plan.id}`,
+      showToast,
+      loadingText: "正在保存…",
+      successText: "方案已保存",
+      errorText: "保存失败，请重试",
+      run: async () => {
+        if (conversationIdRef.current) {
+          await savePlanToDb({
+            conversationId: conversationIdRef.current,
+            planId: plan.planId,
+            optionId: plan.id,
+          });
+        }
+      },
+    });
+  }, [showToast]);
+
+  const handleViewReservations = useCallback((plan: PlanningOption) => {
+    const steps = plan.timeline.filter((s) => s.bookingNeeded);
+    if (steps.length === 0) {
+      showToast("该方案没有需要预约的步骤", "info");
+      return;
+    }
+    setReservationPlan(plan);
+  }, [showToast]);
+
+  /* ── usePlanActions hook — provides handleOpenNavigation (Phase 1) ── */
+  const { handleOpenNavigation } = usePlanActions({
+    showToast,
+    conversationId: conversationIdRef.current,
+    city,
+    setInputValue,
+    textareaRef,
+    onSelectPlan: async ({ conversationId: cId, optionId }) => {
+      await selectAgentPlan({ conversationId: cId, optionId });
+    },
+  });
+
   const _handleNextAction = useCallback(
     (label: string) => {
       switch (label) {
@@ -1410,15 +1544,15 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
           break;
         case "打开导航": {
           const plan = messages.flatMap((m) => (m.role === "assistant" && "plans" in m ? m.plans ?? [] : [])).find((p) => p.id === selectedPlanId);
-          const dest = plan?.title ?? city;
-          window.open(`https://uri.amap.com/search?keyword=${encodeURIComponent(dest)}&city=${encodeURIComponent(city)}`, "_blank");
+          if (plan) handleOpenNavigation(plan as unknown as PlanningOption);
+          else showToast("当前方案缺少可导航地点", "info");
           break;
         }
         default:
           break;
       }
     },
-    [selectedPlanId, messages, city, showToast],
+    [selectedPlanId, messages, city, showToast, handleOpenNavigation],
   );
 
   /* ── Render: agent execution events panel ── */
@@ -1624,6 +1758,12 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
                           plan={plan}
                           selected={selectedPlanId === plan.id}
                           onSelect={handleSelectPlan}
+                          onAdjustPlan={handleAdjustPlan}
+                          onGenerateCalendar={handleGenerateCalendar}
+                          onSavePlan={handleSavePlan}
+                          onViewReservations={handleViewReservations}
+                          onOpenNavigation={handleOpenNavigation}
+                          onToast={showToast}
                           planActions={planActions}
                           onExecuteAction={handleExecuteAction}
                           busyActionId={busyActionId}
@@ -1635,13 +1775,35 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
                   </div>
                 )}
 
+                {/* Next action chips for plan_selected messages */}
+                {msg.nextActions && msg.nextActions.length > 0 && (
+                  <div className={styles.planSelectedActions}>
+                    {msg.nextActions.map((action) => (
+                      <button
+                        key={action.key}
+                        className={styles.planSelectedChip}
+                        type="button"
+                        onClick={() => doSubmit(action.label)}
+                      >
+                        {action.key === "save" ? "💾" :
+                         action.key === "navigation" ? "🗺️" :
+                         action.key === "calendar" ? "📅" :
+                         action.key === "share" ? "📤" :
+                         action.key === "reservation" ? "🎫" :
+                         action.key === "modify" ? "✏️" : "⚡"}
+                        {" "}{action.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
               </>
             )}
           </div>
         </div>
       );
     },
-    [selectedPlanId, handleRetryLast, handleNewChat, handleSelectPlan, handleExecuteAction, busyActionId, handleUnifiedAction],
+    [selectedPlanId, handleRetryLast, handleNewChat, handleSelectPlan, handleExecuteAction, busyActionId, handleUnifiedAction, handleAdjustPlan, handleGenerateCalendar, handleSavePlan, handleViewReservations, handleOpenNavigation, showToast, doSubmit],
   );
 
   /* ═══════════════════════════════════════════════
@@ -1844,6 +2006,76 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
             planId={handoffPlanId}
             onClose={() => setShowHandoffQR(false)}
           />
+        </WorkspaceModal>
+      )}
+
+      {/* 预约建议弹窗 */}
+      {reservationPlan && (
+        <WorkspaceModal
+          open={!!reservationPlan}
+          onClose={() => setReservationPlan(null)}
+          title="预约建议"
+        >
+          <div style={{ padding: "1rem" }}>
+            <p style={{ marginBottom: "1rem", color: "var(--text-secondary)" }}>
+              以下步骤建议提前预约：
+            </p>
+            {reservationPlan.timeline
+              .filter((s) => s.bookingNeeded)
+              .map((step) => (
+                <div
+                  key={step.id}
+                  style={{
+                    padding: "0.75rem",
+                    marginBottom: "0.5rem",
+                    borderRadius: "8px",
+                    background: "var(--surface-2, #f5f5f5)",
+                  }}
+                >
+                  <div style={{ fontWeight: 600 }}>{step.title}</div>
+                  {step.poiName && <div style={{ fontSize: "0.85rem", opacity: 0.8 }}>📍 {step.poiName}</div>}
+                  <div style={{ fontSize: "0.85rem", opacity: 0.7 }}>
+                    🕐 {step.startTime}–{step.endTime}
+                  </div>
+                  {step.bookingHint && (
+                    <div style={{ fontSize: "0.85rem", color: "var(--accent, #e6a817)" }}>
+                      🎫 {step.bookingHint}
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
+                    <Button
+                      variant="ghost"
+                      size="small"
+                      onClick={() => {
+                        window.open(
+                          `https://www.amap.com/search?query=${encodeURIComponent(step.poiName || step.title)}`,
+                          "_blank",
+                        );
+                      }}
+                    >
+                      在高德查看
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="small"
+                      onClick={() => {
+                        window.open(
+                          `https://i.meituan.com/s/${encodeURIComponent(step.poiName || step.title)}`,
+                          "_blank",
+                        );
+                      }}
+                    >
+                      查看美团
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1rem" }}>
+              <Button variant="ghost" onClick={() => setReservationPlan(null)}>
+                稍后再说
+              </Button>
+            </div>
+          </div>
         </WorkspaceModal>
       )}
 

@@ -88,6 +88,11 @@ export const timelineStepSchema = z.object({
   reasoning: z.string(),
   bookingNeeded: z.boolean().default(false),
   actionId: z.string().nullable().default(null),
+  /* Phase 2: enhanced step detail fields */
+  description: z.string().optional(),
+  estimatedCost: z.string().optional(),
+  bookingHint: z.string().optional(),
+  suggestions: z.array(z.string()).optional(),
 });
 
 export type TimelineStep = z.infer<typeof timelineStepSchema>;
@@ -108,6 +113,13 @@ export const executionActionSchema = z.object({
     "share_message",
     "navigation",
     "memory_save",
+    "book_hotel",
+    "book_restaurant",
+    "book_transport",
+    "buy_ticket",
+    "reserve_activity",
+    "add_to_calendar",
+    "set_reminder",
   ]),
   status: z.enum(["draft", "quoted", "waiting_confirm", "executing", "success", "failed", "expired", "cancelled"]),
   title: z.string(),

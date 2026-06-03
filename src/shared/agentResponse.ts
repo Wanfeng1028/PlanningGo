@@ -161,6 +161,8 @@ export interface UserMemoryProfile {
   activityPreferences?: string[];
   timePreferences?: string[];
   riskPreferences?: string[];
+  /* Phase 5: plan interaction tracking */
+  planCount?: number;
 }
 
 // ─── Agent Response (backend → frontend) ────────────────────

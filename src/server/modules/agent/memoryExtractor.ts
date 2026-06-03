@@ -138,3 +138,99 @@ function mergeArrays(existing?: string[], incoming?: string[]): string[] | undef
   if (!existing || existing.length === 0) return incoming;
   return [...new Set([...existing, ...incoming])];
 }
+
+// ─── Plan Selection Memory Extraction ──────────────────────
+
+/**
+ * 从用户选择/拒绝方案中提取记忆。
+ * 记录选中的方案特征：活动类型、餐厅偏好、预算实际值、出行模式。
+ */
+export function extractMemoryFromPlanSelection(input: {
+  selectedPlan: {
+    title: string;
+    targetGroup: string;
+    totalCostMin: number;
+    totalCostMax: number;
+    timeline: Array<{ type: string; title: string; poiName: string | null; estimatedCost?: string }>;
+  };
+  rejectedPlans?: Array<{ title: string; targetGroup: string }>;
+}): Partial<UserMemoryProfile> {
+  const memory: Partial<UserMemoryProfile> = {};
+
+  // Extract activity preferences from selected plan
+  const activityTypes = input.selectedPlan.timeline
+    .filter((s) => s.type === "activity")
+    .map((s) => s.title);
+  if (activityTypes.length > 0) {
+    memory.activityPreferences = [...new Set(activityTypes)];
+  }
+
+  // Extract food preferences from meal steps
+  const mealNames = input.selectedPlan.timeline
+    .filter((s) => s.type === "meal")
+    .map((s) => s.poiName || s.title)
+    .filter(Boolean);
+  if (mealNames.length > 0) {
+    memory.foodPreferences = [...new Set(mealNames as string[])];
+  }
+
+  // Record actual budget from selected plan
+  memory.budgetRange = [input.selectedPlan.totalCostMin, input.selectedPlan.totalCostMax];
+
+  // Record companion mode
+  memory.companionsPreference = input.selectedPlan.targetGroup;
+
+  return memory;
+}
+
+// ─── Profile Sync from Plan Selection ───────────────────────
+
+/**
+ * 从方案选择中更新用户画像。
+ * 更新 planCount、activityTags、dietPreference、budgetMin/Max。
+ */
+export function syncProfileFromPlan(input: {
+  existingProfile: Partial<UserMemoryProfile>;
+  selectedPlan: {
+    totalCostMin: number;
+    totalCostMax: number;
+    targetGroup: string;
+    timeline: Array<{ type: string; poiName: string | null; title: string }>;
+  };
+}): Partial<UserMemoryProfile> {
+  const existing = { ...input.existingProfile };
+
+  // Update plan count
+  existing.planCount = (existing.planCount ?? 0) + 1;
+
+  // Merge activity tags (accumulate, don't overwrite)
+  const newActivities = input.selectedPlan.timeline
+    .filter((s) => s.type === "activity")
+    .map((s) => s.title)
+    .filter(Boolean);
+  const existingActivities = existing.activityPreferences ?? [];
+  existing.activityPreferences = mergeWithDedup(existingActivities, newActivities);
+
+  // Merge food preferences
+  const newFoods = input.selectedPlan.timeline
+    .filter((s) => s.type === "meal")
+    .map((s) => s.poiName || s.title)
+    .filter(Boolean);
+  const existingFoods = existing.foodPreferences ?? [];
+  existing.foodPreferences = mergeWithDedup(existingFoods, newFoods as string[]);
+
+  // Update budget range (expand, not shrink)
+  if (input.selectedPlan.totalCostMin < (existing.budgetRange?.[0] ?? Infinity)) {
+    existing.budgetRange = [input.selectedPlan.totalCostMin, existing.budgetRange?.[1] ?? input.selectedPlan.totalCostMax];
+  }
+  if (input.selectedPlan.totalCostMax > (existing.budgetRange?.[1] ?? 0)) {
+    existing.budgetRange = [existing.budgetRange?.[0] ?? input.selectedPlan.totalCostMin, input.selectedPlan.totalCostMax];
+  }
+
+  return existing;
+}
+
+function mergeWithDedup(existing: string[], incoming: string[]): string[] {
+  const set = new Set([...existing, ...incoming]);
+  return [...set].slice(0, 20); // Cap at 20 items
+}

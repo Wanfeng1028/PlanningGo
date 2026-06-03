@@ -9,12 +9,16 @@ export interface CandidatePool {
   restaurants: CandidatePoi[];
   movies: CandidatePoi[];
   events: CandidatePoi[];
+  cafes: CandidatePoi[];
+  cinemas: CandidatePoi[];
 }
 
 const POI_CATEGORIES = {
   activities: { keywords: "景点 博物馆 展览 公园", types: "风景名胜;科教文化服务" },
   restaurants: { keywords: "餐厅 美食", types: "餐饮服务" },
   events: { keywords: "展览 演出 活动", types: "体育休闲服务;科教文化服务" },
+  cafes: { keywords: "咖啡 咖啡馆 咖啡厅", types: "餐饮服务" },
+  cinemas: { keywords: "电影院 影院", types: "科教文化服务" },
 } as const;
 
 /**
@@ -43,10 +47,12 @@ async function generateFromProvider(
 ): Promise<CandidatePool> {
   const city = context.intent.city || "杭州";
 
-  const [activityPois, restaurantPois, eventPois] = await Promise.all([
+  const [activityPois, restaurantPois, eventPois, cafePois, cinemaPois] = await Promise.all([
     searchPoisSafe(mapProvider, city, POI_CATEGORIES.activities.keywords, POI_CATEGORIES.activities.types),
     searchPoisSafe(mapProvider, city, POI_CATEGORIES.restaurants.keywords, POI_CATEGORIES.restaurants.types),
     searchPoisSafe(mapProvider, city, POI_CATEGORIES.events.keywords, POI_CATEGORIES.events.types),
+    searchPoisSafe(mapProvider, city, POI_CATEGORIES.cafes.keywords, POI_CATEGORIES.cafes.types),
+    searchPoisSafe(mapProvider, city, POI_CATEGORIES.cinemas.keywords, POI_CATEGORIES.cinemas.types),
   ]);
 
   const filterByCity = (pois: PoiResult[]) => pois.filter((poi) => isSameCity(poi, city));
@@ -54,8 +60,10 @@ async function generateFromProvider(
   return {
     activities: filterByCity(activityPois).map((poi) => mapAmapPoiToCandidate(poi, "activity")),
     restaurants: filterByCity(restaurantPois).map((poi) => mapAmapPoiToCandidate(poi, "restaurant")),
-    movies: [],
+    movies: filterByCity(cinemaPois).map((poi) => mapAmapPoiToCandidate(poi, "movie")),
     events: filterByCity(eventPois).map((poi) => mapAmapPoiToCandidate(poi, "event")),
+    cafes: filterByCity(cafePois).map((poi) => mapAmapPoiToCandidate(poi, "activity")),
+    cinemas: filterByCity(cinemaPois).map((poi) => mapAmapPoiToCandidate(poi, "movie")),
   };
 }
 
@@ -172,6 +180,8 @@ async function generateMockFallback(context: PlanningContext): Promise<Candidate
     restaurants: base.filter((item) => item.category === "restaurant"),
     movies: [],
     events: base.filter((item) => item.name.includes("展")),
+    cafes: [],
+    cinemas: [],
   };
 }
 

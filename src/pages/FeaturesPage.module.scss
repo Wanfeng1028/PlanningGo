@@ -772,6 +772,37 @@ $green: #22c55e;
   }
 }
 
+/* ── plan selected action chips ── */
+.planSelectedActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.planSelectedChip {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba($brand, 0.2);
+  background: rgba($brand, 0.06);
+  font-size: 13px;
+  font-weight: 500;
+  color: $text;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+
+  &:hover {
+    background: rgba($brand, 0.15);
+    border-color: rgba($brand, 0.35);
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
 /* ── health hint ── */
 .featureHealthHint {
   margin-top: 16px;
@@ -866,13 +897,6 @@ $green: #22c55e;
 
 /* ── composer dock (normal flex child — no longer overlays messages) ── */
 .featureComposerDock {
-  position: absolute;
-  left: 50%;
-  bottom: clamp(20px, 3vh, 40px);
-  bottom: clamp(calc(20px + env(safe-area-inset-bottom, 0px)), 3vh, calc(40px + env(safe-area-inset-bottom, 0px)));
-  transform: translateX(-50%);
-  z-index: 30;
-  width: min(960px, calc(100% - clamp(24px, 4vw, 48px)));
   position: relative;
   z-index: 20;
   width: min(960px, calc(100% - 48px));
@@ -884,7 +908,6 @@ $green: #22c55e;
   justify-content: center;
   box-sizing: border-box;
   padding: 8px 0 clamp(12px, 2vh, 24px);
-  /* --composer-height is used by featureMessagesInner for bottom padding */
 }
 
 /* ─────────────────────────────────────────────
@@ -916,7 +939,7 @@ $green: #22c55e;
 
 .composerInputRow {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 6px;
   min-height: 44px;
   padding: 2px 0;
@@ -925,7 +948,8 @@ $green: #22c55e;
 .composerTextarea {
   flex: 1;
   min-width: 0;
-  min-height: 38px;
+  height: 36px;
+  min-height: 36px;
   max-height: 200px;
   resize: none;
   border: 0;
@@ -933,10 +957,11 @@ $green: #22c55e;
   background: transparent;
   font-size: 14.5px;
   line-height: 1.5;
-  padding: 9px 6px;
+  padding: 7px 6px;
   color: $text;
   overflow-y: auto;
   font-family: inherit;
+  box-sizing: border-box;
 
   &::placeholder {
     color: rgba($text, 0.3);
@@ -1608,6 +1633,49 @@ $green: #22c55e;
 .timelinePoi {
   color: $text-secondary;
   margin-left: 4px;
+}
+
+/* Phase 1: enhanced timeline details */
+.timelineDesc {
+  display: block;
+  font-size: 12px;
+  color: $text-secondary;
+  margin-top: 2px;
+  line-height: 1.5;
+  opacity: 0.85;
+}
+
+.timelineCost {
+  display: inline-block;
+  font-size: 11px;
+  color: $text-secondary;
+  background: rgba($text, 0.04);
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.bookingHint {
+  display: inline-block;
+  font-size: 11px;
+  color: $text-secondary;
+  background: rgba(#E6A817, 0.08);
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.suggestionChip {
+  display: inline-block;
+  font-size: 11px;
+  color: $text-secondary;
+  background: rgba($text, 0.04);
+  border-radius: 10px;
+  padding: 1px 8px;
+  margin: 2px 4px 0 0;
+  cursor: default;
 }
 
 .actionChipDisabled {
@@ -2626,5 +2694,107 @@ $green: #22c55e;
   font-size: 11px;
   color: $text-secondary;
   opacity: 0.7;
+}
+
+/* ── Suggestion Chips ── */
+.suggestionStrip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 8px 0;
+  scrollbar-width: thin;
+}
+
+.suggestionChipBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border, #e0e0e0);
+  background: var(--surface-2, #f9f9f9);
+  cursor: pointer;
+  white-space: nowrap;
+  font-size: 12px;
+  transition: all 0.2s;
+
+  &:hover {
+    background: var(--surface-3, #f0f0f0);
+    border-color: var(--accent, #4A90D9);
+  }
+}
+
+.suggestionChipIcon {
+  font-size: 14px;
+}
+
+.suggestionChipLabel {
+  color: var(--text-primary, #333);
+}
+
+/* ── External Service Panel ── */
+.externalServicePanel {
+  margin-top: 8px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border, #e0e0e0);
+}
+
+.externalServiceToggle {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--surface-2, #f5f5f5);
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text-secondary, #666);
+
+  &:hover {
+    background: var(--surface-3, #eee);
+  }
+}
+
+.externalServiceBody {
+  padding: 8px 12px;
+}
+
+.externalServiceGroup {
+  margin-bottom: 8px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.externalServicePoi {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+  margin-bottom: 4px;
+}
+
+.externalServiceLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.externalServiceLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--accent, #4A90D9);
+  background: var(--surface-2, #f5f5f5);
+  text-decoration: none;
+  transition: background 0.2s;
+
+  &:hover {
+    background: var(--surface-3, #e8e8e8);
+    text-decoration: underline;
+  }
 }
 

@@ -85,24 +85,34 @@ export class PlanRepository {
     durationMin?: number;
     transport?: string;
     bookingNeeded?: boolean;
+    /* Phase 2: enhanced detail fields */
+    description?: string;
+    estimatedCost?: string;
+    bookingHint?: string;
+    suggestions?: string[];
     metadata?: Record<string, unknown>;
   }) {
-    return this.db.planStep.create({
-      data: {
-        planOptionId,
-        orderIndex: data.orderIndex,
-        startTime: data.startTime,
-        endTime: data.endTime,
-        type: data.type,
-        placeId: data.placeId ?? null,
-        placeName: data.placeName ?? null,
-        action: data.action ?? "",
-        durationMin: data.durationMin ?? 0,
-        transport: data.transport ?? "none",
-        bookingNeeded: data.bookingNeeded ?? false,
-        metadata: (data.metadata ?? {}) as unknown as Prisma.InputJsonValue,
-      },
-    });
+    // Phase 2 fields: use type assertion until Prisma client is regenerated
+    // with the new schema fields (description, estimatedCost, bookingHint, suggestions)
+    const stepData = {
+      planOptionId,
+      orderIndex: data.orderIndex,
+      startTime: data.startTime,
+      endTime: data.endTime,
+      type: data.type,
+      placeId: data.placeId ?? null,
+      placeName: data.placeName ?? null,
+      action: data.action ?? "",
+      durationMin: data.durationMin ?? 0,
+      transport: data.transport ?? "none",
+      bookingNeeded: data.bookingNeeded ?? false,
+      description: data.description ?? null,
+      estimatedCost: data.estimatedCost ?? null,
+      bookingHint: data.bookingHint ?? null,
+      suggestions: (data.suggestions ?? []) as unknown as Prisma.InputJsonValue,
+      metadata: (data.metadata ?? {}) as unknown as Prisma.InputJsonValue,
+    } as Record<string, unknown>;
+    return this.db.planStep.create({ data: stepData as Parameters<typeof this.db.planStep.create>[0]["data"] });
   }
 
   async selectOption(planId: string, optionId: string) {

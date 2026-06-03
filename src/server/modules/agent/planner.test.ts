@@ -82,6 +82,8 @@ const baseCandidates: CandidatePool = {
   restaurants: [mockRestaurant],
   movies: [],
   events: [],
+  cafes: [],
+  cinemas: [],
 }
 
 function makeInput(overrides: Partial<PlannerInput> = {}): PlannerInput {

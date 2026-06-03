@@ -34,6 +34,18 @@ export interface UserProfileInfo {
   preferences: string[];
   budgetRange: [number, number];
   permissions: Record<string, boolean>;
+  /* Phase 5: extended profile fields */
+  transportMode?: string;
+  distanceLimitKm?: number;
+  walkingTolerance?: number;
+  queueTolerance?: string;
+  dietPreference?: string[];
+  avoidFoods?: string[];
+  activityTags?: string[];
+  avoidActivityTags?: string[];
+  indoorPreference?: string;
+  pace?: string;
+  favoriteAreas?: string[];
 }
 
 export interface PlanningContext {
@@ -159,5 +171,16 @@ function buildUserProfile(intent: UserIntent): UserProfileInfo {
     family: intent.participantMode === "family" ? ["家人"] : [],
     preferences: intent.preferences,
     budgetRange: intent.budgetMax ? [0, intent.budgetMax] : DEFAULT_PROFILE.budgetRange,
+    transportMode: undefined,
+    distanceLimitKm: undefined,
+    walkingTolerance: undefined,
+    queueTolerance: undefined,
+    dietPreference: undefined,
+    avoidFoods: undefined,
+    activityTags: undefined,
+    avoidActivityTags: undefined,
+    indoorPreference: undefined,
+    pace: undefined,
+    favoriteAreas: undefined,
   };
 }

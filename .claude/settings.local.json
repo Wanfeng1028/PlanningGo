@@ -36,7 +36,11 @@
       "Bash(git push *)",
       "Bash(Get-ChildItem -Recurse \"E:\\\\code\\\\javascript\\\\project\\\\PlanningGo\\\\src\" -Name)",
       "Bash(cmd /c \"dir /s /b E:\\\\code\\\\javascript\\\\project\\\\PlanningGo\\\\src 2>nul\")",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(git fetch *)",
+      "Bash(gh run *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'fix: 修复 FeaturesPage.tsx 合并冲突残留导致的类型错误 *)"
     ]
   }
 }
