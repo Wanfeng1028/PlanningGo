@@ -5,6 +5,8 @@ import { createHandoffCode, getHandoffCode, claimHandoffCode } from "../modules/
 import type { PermissionScope } from "../modules/agent/middleware/permissionGuard";
 import { sendOk, sendError } from "../common/response.js";
 import { requireUserId } from "../common/uid.js";
+import { assertHandoffConversationOwnership } from "../common/ownership.js";
+import { sanitizeHandoffCode, shouldStripStack } from "../common/logSanitizer.js";
 
 const uid = requireUserId;
 
@@ -149,9 +151,25 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
    * Create a short-lived handoff code
    * POST /api/handoff/create
    */
-  fastify.post("/api/handoff/create", { preHandler: [fastify.optionalAuthGuard] }, async (request, reply) => {
+  fastify.post("/api/handoff/create", { preHandler: [fastify.authGuard] }, async (request, reply) => {
     const body = createCodeSchema.parse(request.body);
-    const userId = (request as unknown as { userId?: string }).userId;
+    const userId = uid(request);
+    const db = fastify.db;
+
+    // 校验 conversation 归属
+    if (db) {
+      try {
+        await assertHandoffConversationOwnership(db, body.conversationId, userId, null);
+      } catch (err) {
+        if (err instanceof Error && err.message.includes("HANDOFF_CONVERSATION_NOT_FOUND")) {
+          return sendError(reply, 404, "HANDOFF_CONVERSATION_NOT_FOUND", "会话不存在");
+        }
+        if (err instanceof Error && err.message.startsWith("FORBIDDEN")) {
+          return sendError(reply, 403, "FORBIDDEN", "只能创建自己会话的接续码");
+        }
+        throw err;
+      }
+    }
 
     try {
       const result = await createHandoffCode({
@@ -160,18 +178,19 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
         userId,
       });
 
+      // 日志中脱敏 code，不记录完整码
       fastify.log.info({
         route: "POST /api/handoff/create",
         userId: userId ?? null,
         conversationId: body.conversationId,
         planId: body.planId ?? null,
-        code: result.code,
+        code: sanitizeHandoffCode(result.code),
         expiresAt: result.expiresAt,
       }, "[handoff] code created");
 
       return sendOk(reply, result);
     } catch (error) {
-      fastify.log.error(error);
+      fastify.log.error({ stack: shouldStripStack() ? undefined : error });
       return sendError(reply, 500, "HANDOFF_CODE_CREATE_FAILED", "创建接续码失败");
     }
   });
@@ -205,9 +224,30 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
    * Claim a handoff code (mobile device scans QR)
    * POST /api/handoff/:code/claim
    */
-  fastify.post("/api/handoff/:code/claim", { preHandler: [fastify.optionalAuthGuard] }, async (request, reply) => {
+  fastify.post("/api/handoff/:code/claim", { preHandler: [fastify.authGuard] }, async (request, reply) => {
     const { code } = z.object({ code: z.string().min(4).max(12) }).parse(request.params);
     const body = claimCodeSchema.parse(request.body);
+    const userId = uid(request);
+
+    // 限流：每 IP + code 每分钟最多 5 次
+    const limiter = (request.server as unknown as { redis?: unknown }).redis;
+    if (limiter) {
+      // 使用 IP + code 作为限流 key
+      const rateLimitKey = `handoff_claim:${request.ip}:${code.toUpperCase()}`;
+      // 简单限流：使用 Redis INCR
+      // 如果 Redis 不可用则跳过
+      try {
+        const current = await (limiter as any).incr?.(`rl:${rateLimitKey}`);
+        if (current === 1) {
+          await (limiter as any).expire?.(`rl:${rateLimitKey}`, 60);
+        }
+        if (current && current > 5) {
+          return sendError(reply, 429, "RATE_LIMIT_EXCEEDED", "认领过于频繁，请稍后再试");
+        }
+      } catch {
+        // Redis 不可用时 fail-open
+      }
+    }
 
     try {
       const result = await claimHandoffCode({
@@ -215,16 +255,18 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
         deviceId: body.deviceId,
       });
 
+      // 日志中脱敏 code
       fastify.log.info({
         route: "POST /api/handoff/:code/claim",
-        code,
+        userId,
+        code: sanitizeHandoffCode(code),
         deviceId: body.deviceId,
         conversationId: result.conversationId,
       }, "[handoff] code claimed");
 
       return sendOk(reply, result);
     } catch (error) {
-      fastify.log.error(error);
+      fastify.log.error({ stack: shouldStripStack() ? undefined : error });
       if (error instanceof Error && error.message.includes("not found")) {
         return sendError(reply, 404, "HANDOFF_CODE_NOT_FOUND", "接续码不存在");
       }

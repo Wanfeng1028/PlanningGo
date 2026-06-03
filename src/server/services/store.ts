@@ -181,6 +181,7 @@ export function listShareRooms() {
 export function createShareRoom(input: Omit<ShareRoom, "id"> & { id?: string }) {
   const id = input.id ?? `share_${Date.now()}`;
   const room: ShareRoom = { ...input, id };
+  // 确保 userId 被保留
   shareStore.set(id, room);
   enforceCapacity(shareStore);
   return room;

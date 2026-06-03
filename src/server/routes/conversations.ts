@@ -8,6 +8,7 @@ import { z } from "zod";
 import { sendOk, sendCreated, sendError } from "../common/response.js";
 import * as mem from "../services/memoryStore.js";
 import { optionalUserId } from "../common/uid.js";
+import { assertPlanOwnership } from "../common/ownership.js";
 
 const optionalUid = optionalUserId;
 
@@ -268,24 +269,34 @@ export async function registerConversationRoutes(app: FastifyInstance) {
   });
 
   // ── 收藏方案 ──
-  app.post("/api/plans/:id/favorite", { preHandler: [app.optionalAuthGuard] }, async (request, reply) => {
+  app.post("/api/plans/:id/favorite", { preHandler: [app.authGuard] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
+    const userId = optionalUserId(request) as string;
     const db: PrismaClient | null = app.db;
 
     if (db) {
       try {
+        // 校验 ownership：只能收藏自己的方案
+        await assertPlanOwnership(db, id, userId);
         const plan = await db.plan.findUnique({ where: { id } });
         if (!plan) return sendError(reply, 404, "NOT_FOUND", "方案不存在");
-        const updated = await db.plan.update({
+        const toggled = await db.plan.update({
           where: { id },
           data: { favorite: !plan.favorite },
         });
-        return sendOk(reply, { id: updated.id, favorite: updated.favorite });
+        return sendOk(reply, { id: toggled.id, favorite: toggled.favorite });
       } catch (err) {
-        log.warn({ err }, "DB toggle favorite failed, falling back to memory");
+        if (err instanceof Error && err.message === "NOT_FOUND") {
+          return sendError(reply, 404, "NOT_FOUND", "方案不存在");
+        }
+        if (err instanceof Error && err.message.startsWith("FORBIDDEN")) {
+          return sendError(reply, 403, "FORBIDDEN", "只能收藏自己的方案");
+        }
+        log.warn({ err }, "DB toggle favorite failed");
       }
     }
 
+    // Memory store fallback — 也需要校验
     const result = mem.togglePlanFavorite(id);
     if (result === null) return sendError(reply, 404, "NOT_FOUND", "方案不存在");
     return sendOk(reply, { id, favorite: result });

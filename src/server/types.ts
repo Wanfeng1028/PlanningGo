@@ -62,6 +62,7 @@ export interface Reservation {
 export interface ShareRoom {
   id: string;
   planId: string;
+  userId?: string;
   title: string;
   members: Array<{ name: string; vote: "yes" | "no" | "pending"; comment?: string }>;
 }

@@ -1,5 +1,6 @@
 /**
  * Events & Client Errors 路由 — /api/events, /api/client-errors
+ * 安全加固：输入脱敏、长度限制、限流
  */
 
 import type { FastifyInstance } from "fastify";
@@ -7,6 +8,8 @@ import type { PrismaClient } from "../../generated/prisma/client.js";
 import { z } from "zod";
 import {  sendCreated } from "../common/response.js";
 import * as mem from "../services/memoryStore.js";
+import { sanitizeEventPayload, sanitizeErrorPayload, shouldStripStack } from "../common/logSanitizer.js";
+import { getRateLimiter, EVENT_SUBMIT_RULE } from "../common/rateLimiter.js";
 
 interface AuthenticatedRequest {
   userId?: string;
@@ -16,15 +19,27 @@ interface AuthenticatedRequest {
 export async function registerEventRoutes(app: FastifyInstance) {
   // ── 记录用户事件 ──
   app.post("/api/events", { preHandler: [app.optionalAuthGuard] }, async (request, reply) => {
+    // 限流
+    const limiter = getRateLimiter();
+    if (limiter) {
+      const rateLimit = await limiter.check(`event:${request.ip}`, EVENT_SUBMIT_RULE);
+      if (!rateLimit.allowed) {
+        return reply.status(429).send({ ok: false, error: { code: "RATE_LIMIT_EXCEEDED", message: "事件提交过于频繁" } });
+      }
+    }
+
     const body = z
       .object({
         eventName: z.string().min(1).max(100),
         payload: z.any().optional(),
         page: z.string().max(200).optional(),
-        guestId: z.string().optional(),
-        conversationId: z.string().optional(),
+        guestId: z.string().max(128).optional(),
+        conversationId: z.string().max(128).optional(),
       })
       .parse(request.body);
+
+    // 脱敏 payload
+    const sanitizedPayload = sanitizeEventPayload(body.payload);
 
     const userId = (request as AuthenticatedRequest).userId as string | undefined;
     const db: PrismaClient | null = app.db;
@@ -37,7 +52,7 @@ export async function registerEventRoutes(app: FastifyInstance) {
             guestId: !userId ? (body.guestId ?? null) : null,
             conversationId: body.conversationId ?? null,
             eventName: body.eventName,
-            eventPayloadJson: body.payload ?? {},
+            eventPayloadJson: sanitizedPayload ?? {},
             page: body.page ?? "",
             traceId: (request as AuthenticatedRequest).traceId ?? "",
           },
@@ -53,7 +68,7 @@ export async function registerEventRoutes(app: FastifyInstance) {
       guestId: !userId ? body.guestId : undefined,
       conversationId: body.conversationId,
       eventName: body.eventName,
-      eventPayloadJson: body.payload,
+      eventPayloadJson: sanitizedPayload,
       page: body.page,
       traceId: (request as AuthenticatedRequest).traceId,
     });
@@ -122,15 +137,30 @@ export async function registerEventRoutes(app: FastifyInstance) {
 
   // ── 客户端错误日志 ──
   app.post("/api/client-errors", { preHandler: [app.optionalAuthGuard] }, async (request, reply) => {
+    // 限流
+    const limiter = getRateLimiter();
+    if (limiter) {
+      const rateLimit = await limiter.check(`client-error:${request.ip}`, EVENT_SUBMIT_RULE);
+      if (!rateLimit.allowed) {
+        return reply.status(429).send({ ok: false, error: { code: "RATE_LIMIT_EXCEEDED", message: "错误提交过于频繁" } });
+      }
+    }
+
     const body = z
       .object({
         message: z.string().min(1).max(2000),
         stack: z.string().max(5000).optional(),
         route: z.string().max(200).optional(),
-        guestId: z.string().optional(),
+        guestId: z.string().max(128).optional(),
         payload: z.any().optional(),
       })
       .parse(request.body);
+
+    // 脱敏 payload
+    const sanitizedPayload = sanitizeErrorPayload(body.payload);
+
+    // 生产环境不保存完整 stack
+    const stack = shouldStripStack() ? undefined : body.stack;
 
     const userId = (request as AuthenticatedRequest).userId as string | undefined;
     const db: PrismaClient | null = app.db;
@@ -144,8 +174,8 @@ export async function registerEventRoutes(app: FastifyInstance) {
             traceId: (request as AuthenticatedRequest).traceId ?? "",
             route: body.route ?? "",
             message: body.message,
-            stack: body.stack ?? null,
-            payloadJson: body.payload ?? null,
+            stack: stack ?? null,
+            payloadJson: sanitizedPayload || undefined,
           },
         });
         return sendCreated(reply, { id: log.id });
@@ -160,8 +190,8 @@ export async function registerEventRoutes(app: FastifyInstance) {
       traceId: (request as AuthenticatedRequest).traceId,
       route: body.route,
       message: body.message,
-      stack: body.stack,
-      payloadJson: body.payload,
+      stack: stack,
+      payloadJson: sanitizedPayload,
     });
     return sendCreated(reply, { id: log.id });
   });

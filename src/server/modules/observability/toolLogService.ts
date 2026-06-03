@@ -2,9 +2,11 @@ import type { ToolExecutionResult, ToolExecutionContext } from "../tools/types";
 import { env } from "../../config/env";
 import { getPrismaClient } from "../../common/prisma";
 import type { Prisma } from "../../../generated/prisma/client.js";
+import { sanitizeToolCallInput, sanitizeToolCallOutput, shouldStripStack } from "../../common/logSanitizer.js";
 
 /**
  * Log a tool call to the database
+ * 安全加固：input/output 在落库前统一脱敏
  */
 export async function logToolCall(params: {
   userId?: string;
@@ -29,8 +31,8 @@ export async function logToolCall(params: {
         userId: params.userId,
         traceId: params.traceId,
         toolName: params.toolName,
-        input: params.input as unknown as Prisma.InputJsonValue,
-        output: params.output as unknown as Prisma.InputJsonValue,
+        input: sanitizeToolCallInput(params.input) as unknown as Prisma.InputJsonValue,
+        output: sanitizeToolCallOutput(params.output) as unknown as Prisma.InputJsonValue,
         latencyMs: params.latencyMs,
         status: params.status,
         errorCode: params.errorCode,
@@ -43,6 +45,7 @@ export async function logToolCall(params: {
 
 /**
  * Log multiple tool calls in batch
+ * 安全加固：input/output 在落库前统一脱敏
  */
 export async function logToolCallsBatch(
   results: ToolExecutionResult[],
@@ -59,8 +62,9 @@ export async function logToolCallsBatch(
     userId: ctx.userId,
     traceId: ctx.traceId,
     toolName: result.tool,
+    // 安全：batch 模式下 input 为空对象（不记录完整 input），output 脱敏
     input: {} as unknown as Prisma.InputJsonValue,
-    output: (result.success ? result.output : undefined) as unknown as Prisma.InputJsonValue,
+    output: (result.success ? sanitizeToolCallOutput(result.output) : undefined) as unknown as Prisma.InputJsonValue,
     latencyMs: result.latencyMs,
     status: (result.success ? "success" : "error") as "success" | "error",
     errorCode: result.success ? undefined : result.error,

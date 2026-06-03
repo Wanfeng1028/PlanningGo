@@ -12,6 +12,8 @@ import { DeveloperRepository } from "../repositories/developerRepository.js";
 import { requireUserId } from "../common/uid.js";
 import { env } from "../config/env.js";
 import { getProviderDiagnostics } from "../modules/agent/modelClient.js";
+import { validateWebhookUrlWithDns } from "../common/ssrfProtection.js";
+import { shouldStripStack } from "../common/logSanitizer.js";
 
 interface AuthenticatedRequest extends FastifyRequest {
   userId?: string;
@@ -268,11 +270,19 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
 
   app.post("/api/developer/webhooks", { preHandler: [app.authGuard] }, async (request, reply) => {
     const userId = uid(request);
-    const input = z.object({
+    const rawInput = z.object({
       url: z.string().url(),
       events: z.array(z.string()).min(1),
       appId: z.string().optional(),
     }).parse(request.body);
+
+    // SSRF 防护：校验 webhook URL
+    const urlValidation = await validateWebhookUrlWithDns(rawInput.url);
+    if (!urlValidation.ok) {
+      return sendError(reply, 400, "WEBHOOK_URL_INVALID", urlValidation.reason);
+    }
+
+    const input = { ...rawInput, url: urlValidation.url.href };
 
     const { webhook, secret } = await repo.createWebhook(userId, input);
 
@@ -292,14 +302,23 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
   app.patch("/api/developer/webhooks/:id", { preHandler: [app.authGuard] }, async (request, reply) => {
     const userId = uid(request);
     const { id } = z.object({ id: z.string() }).parse(request.params);
-    const input = z.object({
+    const rawInput = z.object({
       url: z.string().url().optional(),
       events: z.array(z.string()).optional(),
       enabled: z.boolean().optional(),
       appId: z.string().optional(),
     }).parse(request.body);
 
-    const updated = await repo.updateWebhook(id, userId, input);
+    // SSRF 防护：如果更新了 URL，需要校验
+    if (rawInput.url) {
+      const urlValidation = await validateWebhookUrlWithDns(rawInput.url);
+      if (!urlValidation.ok) {
+        return sendError(reply, 400, "WEBHOOK_URL_INVALID", urlValidation.reason);
+      }
+      rawInput.url = urlValidation.url.href;
+    }
+
+    const updated = await repo.updateWebhook(id, userId, rawInput);
     if (!updated) return sendError(reply, 404, "WEBHOOK_NOT_FOUND", "Webhook 不存在");
     return sendOk(reply, mapWebhook(updated));
   });
@@ -411,8 +430,20 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
       body: z.record(z.string(), z.unknown()).optional(),
     }).parse(request.body);
 
+    // 额外校验：禁止路径遍历
+    if (input.endpoint.includes("..") || input.endpoint.includes("//")) {
+      return sendError(reply, 400, "SANDBOX_ENDPOINT_INVALID", "端点包含非法路径");
+    }
+
     if (!SANDBOX_ALLOWED_ENDPOINTS.has(input.endpoint)) {
       return sendError(reply, 403, "SANDBOX_ENDPOINT_BLOCKED", `不允许访问端点 ${input.endpoint}，仅支持白名单内的端点`);
+    }
+
+    // 限制 request body 大小（1MB）
+    const maxBodySize = 1024 * 1024;
+    const bodyStr = input.body ? JSON.stringify(input.body) : "";
+    if (bodyStr.length > maxBodySize) {
+      return sendError(reply, 400, "SANDBOX_BODY_TOO_LARGE", "请求体不能超过 1MB");
     }
 
     const startTime = Date.now();
@@ -422,7 +453,8 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
       const response = await app.inject({
         method: input.method,
         url: input.endpoint,
-        payload: input.body ?? {},
+        // 限制 payload 大小
+        payload: bodyStr.length > maxBodySize ? {} : (input.body ?? {}),
         headers: {
           authorization: request.headers.authorization ?? "",
           "content-type": "application/json",
@@ -432,10 +464,27 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
       const latencyMs = Date.now() - startTime;
       let responseBody: unknown;
       try {
-        responseBody = JSON.parse(response.payload);
+        responseBody = JSON.parse(Buffer.from(response.payload).toString("utf-8"));
       } catch {
-        responseBody = response.payload;
+        responseBody = Buffer.from(response.payload).toString("utf-8");
       }
+
+      // 审计日志：记录 sandbox 调用
+      await db.auditLog.create({
+        data: {
+          userId,
+          action: "sandbox.run",
+          resourceType: "sandbox",
+          resourceId: traceId,
+          traceId,
+          metadata: {
+            endpoint: input.endpoint,
+            method: input.method,
+            statusCode: response.statusCode,
+            latencyMs,
+          },
+        } as unknown as Parameters<typeof db.auditLog.create>[0]["data"],
+      });
 
       // 记录请求日志
       await repo.createRequestLog(userId, {
@@ -457,6 +506,23 @@ export async function registerDeveloperRoutes(app: FastifyInstance) {
     } catch (error) {
       const latencyMs = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : "请求失败";
+
+      // 审计日志：记录失败
+      await db.auditLog.create({
+        data: {
+          userId,
+          action: "sandbox.run.failed",
+          resourceType: "sandbox",
+          resourceId: traceId,
+          traceId,
+          metadata: {
+            endpoint: input.endpoint,
+            method: input.method,
+            error: errorMessage,
+            latencyMs,
+          },
+        } as unknown as Parameters<typeof db.auditLog.create>[0]["data"],
+      });
 
       await repo.createRequestLog(userId, {
         method: input.method,
