@@ -74,9 +74,7 @@ const mockPlan: ActivityPlan = {
       actionId: null as string | null,
     },
   ],
-  backupPlan: null as unknown as string | undefined,
-  validationStatus: 'pending',
-  validationReport: null as unknown as string | undefined,
+  backupPlan: undefined,
 };
 
 describe('V3 Execution System Smoke Test', () => {
