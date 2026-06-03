@@ -71,9 +71,9 @@ export class ActionExecutor {
       data: { status },
     });
 
-    // Check if authorization is required
+    // Check if authorization is required (trading actions need user confirmation)
     if (action.confirmationRequired) {
-      const newStatus = transitionState(status, "waiting_authorization");
+      const newStatus = transitionState(status, "waiting_user_confirm");
       await prisma.action.update({
         where: { id: actionRecord.id },
         data: { status: newStatus },
@@ -91,6 +91,9 @@ export class ActionExecutor {
 
   /**
    * Perform the actual execution of an action
+   * V3: 绝不模拟 confirmed/succeeded！
+   * 所有需要第三方确认的动作，最终状态只能是 waiting_external_confirm
+   * 只有 calendar_event / navigation / share_message 等非交易动作可以 succeeded
    */
   private async performExecution(
     actionId: string,
@@ -108,47 +111,92 @@ export class ActionExecutor {
     try {
       // Execute based on action type
       let result: unknown;
+      let finalStatus: ActionStatus = "succeeded";
+
       switch (type) {
         case "navigation":
           result = await this.executeNavigation(payload);
+          finalStatus = "succeeded";
           break;
         case "calendar_event":
           result = await this.executeCalendar(payload);
+          finalStatus = "succeeded";
           break;
         case "share_message":
           result = await this.executeShare(payload);
+          finalStatus = "succeeded";
           break;
         case "restaurant_reservation":
         case "ticket_lock":
+        case "book_hotel":
+        case "book_restaurant":
+        case "book_transport":
+        case "buy_ticket":
+        case "reserve_activity":
+        case "add_to_calendar":
+        case "set_reminder":
+          // V3: 所有交易/预约类动作，绝不返回 succeeded
+          // 返回 prepared + redirectUrl，用户需到第三方平台确认
           result = await this.executeReservation(payload);
+          finalStatus = "waiting_external_confirm";
           break;
         default:
-          throw new Error(`Unknown action type: ${type}`);
+          // 未知类型默认走 reservation 逻辑（保守策略）
+          result = await this.executeReservation({ ...(payload as Record<string, unknown>), actionType: type });
+          finalStatus = "waiting_external_confirm";
+          break;
       }
 
-      // Update status to succeeded
+      // V3: 只有非交易动作才能到达 succeeded
+      // 交易动作的最终状态是 waiting_external_confirm（等第三方确认）
+      if (finalStatus === "succeeded") {
+        await prisma.action.update({
+          where: { id: actionId },
+          data: {
+            status: "succeeded",
+            result: result as unknown as Prisma.InputJsonValue,
+          },
+        });
+
+        await prisma.actionEvent.create({
+          data: {
+            actionId,
+            eventType: "execution_success",
+            fromStatus: "executing",
+            toStatus: "succeeded",
+            payload: result as unknown as Prisma.InputJsonValue,
+          },
+        });
+
+        return {
+          actionId,
+          status: "succeeded",
+          result,
+        };
+      }
+
+      // 交易动作: 更新为 waiting_external_confirm
       await prisma.action.update({
         where: { id: actionId },
         data: {
-          status: "succeeded",
+          status: finalStatus,
           result: result as unknown as Prisma.InputJsonValue,
         },
       });
 
-      // Log action event
       await prisma.actionEvent.create({
         data: {
           actionId,
-          eventType: "execution_success",
+          eventType: "redirect_to_third_party",
           fromStatus: "executing",
-          toStatus: "succeeded",
+          toStatus: finalStatus,
           payload: result as unknown as Prisma.InputJsonValue,
         },
       });
 
       return {
         actionId,
-        status: "succeeded",
+        status: finalStatus,
         result,
       };
     } catch (error) {
@@ -183,9 +231,10 @@ export class ActionExecutor {
   }
 
   /**
-   * Authorize an action for execution
+   * Confirm an action for execution (user has confirmed they want to proceed)
+   * V3: 确认后进入 executing，但交易动作不会直接 succeeded
    */
-  async authorizeAction(actionId: string): Promise<ActionResult> {
+  async confirmAction(actionId: string): Promise<ActionResult> {
     const prisma = getPrisma();
 
     const action = await prisma.action.findUnique({
@@ -196,28 +245,28 @@ export class ActionExecutor {
       throw new Error("Action not found");
     }
 
-    if (action.status !== "waiting_authorization") {
-      throw new Error(`Action is not waiting for authorization: ${action.status}`);
+    if (action.status !== "waiting_user_confirm") {
+      throw new Error(`Action is not waiting for user confirmation: ${action.status}`);
     }
 
-    // Transition to authorized
-    const newStatus = transitionState(action.status as ActionStatus, "authorized");
+    // Transition to redirect_required (user confirmed, now need to redirect to third party)
+    const newStatus = transitionState(action.status as ActionStatus, "redirect_required");
     await prisma.action.update({
       where: { id: actionId },
       data: { status: newStatus },
     });
 
-    // Log authorization event
+    // Log confirmation event
     await prisma.actionEvent.create({
       data: {
         actionId,
-        eventType: "authorized",
-        fromStatus: "waiting_authorization",
-        toStatus: "authorized",
+        eventType: "user_confirmed",
+        fromStatus: "waiting_user_confirm",
+        toStatus: "redirect_required",
       },
     });
 
-    // Execute the action
+    // Execute the action (performExecution handles V3 status logic internally)
     return await this.performExecution(actionId, action.type, action.payload);
   }
 
@@ -258,20 +307,21 @@ export class ActionExecutor {
 
   /**
    * Execute reservation action
-   * V3: 不返回 confirmed，只返回 prepared/waiting_user_confirm
-   * 所有预约/票务动作必须等待用户到第三方平台确认
+   * V3: 绝不返回 confirmed/succeeded！
+   * 返回 prepared 状态 + redirectUrl，用户需到第三方平台确认
    */
   private async executeReservation(payload: unknown): Promise<unknown> {
     const poiName = (payload as Record<string, unknown>)?.poiName as string | undefined;
     const poiId = (payload as Record<string, unknown>)?.poiId as string | undefined;
-    
-    // V3: 返回 prepared 状态，提示用户到第三方确认
+    const actionType = (payload as Record<string, unknown>)?.actionType as string | undefined;
+
     return {
       reservationId: `res_${Date.now()}`,
       poiId,
       poiName: poiName || "待选择",
+      actionType: actionType || "reservation",
       status: "prepared",
-      message: `已生成${poiName ? poiName + ' ' : ''}预约信息，请到第三方平台确认并支付`,
+      message: `已生成${poiName ? poiName + ' ' : ''}预约信息，请前往第三方平台确认并支付`,
       redirectUrl: this.buildThirdPartyUrl(payload),
       expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30分钟过期
     };

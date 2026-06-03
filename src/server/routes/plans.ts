@@ -11,6 +11,98 @@ import { sendOk } from "../common/response.js";
 import { optionalUserId } from "../common/uid.js";
 
 /**
+ * 从 DB messages 中按 conversationId 恢复方案数据
+ * 返回 { planId, optionId, planData, executableActions } 或 null
+ */
+async function restorePlanFromMessages(
+  db: NonNullable<FastifyInstance["db"]>,
+  conversationId: string,
+  targetOptionId?: string,
+) {
+  const messages = await db.message.findMany({
+    where: { conversationId },
+    orderBy: { createdAt: "asc" },
+    select: { role: true, payloadJson: true },
+  });
+
+  // 找到最近的 plan 消息 (type: "plan")
+  let planPayload: unknown = null;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]!;
+    if (msg.role === "assistant" && msg.payloadJson) {
+      const pj = msg.payloadJson as Record<string, unknown>;
+      if (pj.type === "plan" && pj.data) {
+        planPayload = pj.data;
+        break;
+      }
+    }
+  }
+
+  if (!planPayload || typeof planPayload !== "object") return null;
+
+  const data = planPayload as Record<string, unknown>;
+  const options = (data.options as Array<Record<string, unknown>> | undefined) ?? [];
+
+  // 找到目标 option
+  const targetOption = targetOptionId
+    ? options.find((o) => o.id === targetOptionId)
+    : options[0];
+
+  if (!targetOption) return null;
+
+  const timeline = (targetOption.timeline as Array<Record<string, unknown>> | undefined) ?? [];
+  const executableActions = (targetOption.executableActions as Array<Record<string, unknown>> | undefined) ?? [];
+
+  return {
+    planId: (targetOption.planId as string) || `plan-${Date.now()}`,
+    optionId: (targetOption.id as string) || "",
+    planData: {
+      title: (targetOption.title as string) || "方案",
+      summary: (targetOption.summary as string) ?? "",
+      targetGroup: (targetOption.targetGroup as string) ?? "unknown",
+      score: (targetOption.score as number) ?? 0,
+      totalDurationMinutes: (targetOption.totalDurationMinutes as number) ?? 0,
+      totalCostMin: (targetOption.totalCostMin as number) ?? 0,
+      totalCostMax: (targetOption.totalCostMax as number) ?? 0,
+      walkingKm: (targetOption.walkingKm as number) ?? 0,
+      assumptions: (targetOption.assumptions as string[]) ?? [],
+      risks: (targetOption.risks as string[]) ?? [],
+      highlights: (targetOption.highlights as string[]) ?? [],
+      timeline: timeline.map((s) => ({
+        id: s.id as string,
+        startTime: s.startTime as string,
+        endTime: s.endTime as string,
+        type: s.type as string,
+        title: s.title as string,
+        poiName: s.poiName ?? null,
+        durationMinutes: (s.durationMinutes as number) ?? 0,
+        transport: (s.transport as string) ?? "none",
+        bookingNeeded: (s.bookingNeeded as boolean) ?? false,
+        description: (s.description as string) ?? null,
+        estimatedCost: (s.estimatedCost as string) ?? null,
+        bookingHint: (s.bookingHint as string) ?? null,
+        suggestions: (s.suggestions as string[]) ?? [],
+      })),
+    },
+    executableActions: executableActions.map((a) => ({
+      id: a.id as string,
+      planId: a.planId as string,
+      optionId: a.optionId as string,
+      userId: a.userId as string,
+      type: a.type as string,
+      status: a.status as string,
+      title: a.title as string,
+      description: a.description as string,
+      confirmationRequired: (a.confirmationRequired as boolean) ?? false,
+      idempotencyKey: (a.idempotencyKey as string) || `idem-${a.id}`,
+      priceEstimate: (a.priceEstimate as string) ?? null,
+      expiresAt: (a.expiresAt as string) ?? undefined,
+      payload: (a.payload as Record<string, unknown>) ?? {},
+    })),
+  };
+}
+
+/**
  * ExecutableAction 的 Zod schema，用于验证前端传入的 action 数据
  */
 const executableActionSchema = z.object({
@@ -48,6 +140,7 @@ export async function registerPlanRoutes(app: FastifyInstance) {
       conversationId: z.string().optional(),
       planId: z.string().optional(),
       optionId: z.string(),
+      // planData 和 executableActions 作为 fallback，前端传了就用，没传就从 DB 恢复
       planData: z.object({
         title: z.string(),
         summary: z.string().optional(),
@@ -89,12 +182,24 @@ export async function registerPlanRoutes(app: FastifyInstance) {
       return reply.status(503).send({ error: "数据库不可用" });
     }
 
+    // ── V3: 优先从 DB messages 恢复方案（source of truth）──
+    let restored = null;
+    if (input.conversationId) {
+      restored = await restorePlanFromMessages(db, input.conversationId, input.optionId);
+    }
+
+    // 如果恢复成功，用恢复的数据覆盖前端传来的数据
+    const usePlanData = restored?.planData ?? input.planData;
+    const useActions = restored?.executableActions ?? input.executableActions;
+    const usePlanId = restored?.planId ?? input.planId;
+    const useOptionId = restored?.optionId ?? input.optionId;
+
     // Idempotent: check if already saved for this conversation + plan + option
     const existing = await db.plan.findFirst({
       where: {
         userId,
         conversationId: input.conversationId ?? undefined,
-        intent: { path: ["optionId"], equals: input.optionId },
+        intent: { path: ["optionId"], equals: useOptionId },
       },
     });
 
@@ -102,40 +207,37 @@ export async function registerPlanRoutes(app: FastifyInstance) {
       return sendOk(reply, { planId: existing.id, message: "方案已保存（重复）" });
     }
 
-    const pd = input.planData;
-    const actions = input.executableActions;
-
     // Create Plan
     const plan = await db.plan.create({
       data: {
         userId,
         conversationId: input.conversationId ?? null,
-        title: pd?.title ?? `方案 ${input.optionId.slice(0, 8)}`,
-        summary: pd?.summary ?? "",
+        title: usePlanData?.title ?? `方案 ${useOptionId?.slice?.(0, 8) ?? "unknown"}`,
+        summary: usePlanData?.summary ?? "",
         status: "saved",
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        intent: { planId: input.planId, optionId: input.optionId } as Record<string, unknown> as any,
+        intent: { planId: usePlanId, optionId: useOptionId } as Record<string, unknown> as any,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         contextSnapshot: {} as Record<string, unknown> as any,
       },
     });
 
     // Create PlanOption if planData provided
-    if (pd) {
+    if (usePlanData) {
       const option = await db.planOption.create({
         data: {
           planId: plan.id,
-          title: pd.title,
-          targetGroup: pd.targetGroup ?? "unknown",
-          score: pd.score ?? 0,
-          totalDurationMin: pd.totalDurationMinutes ?? 0,
-          costMin: pd.totalCostMin ?? 0,
-          costMax: pd.totalCostMax ?? 0,
-          summary: pd.summary ?? "",
+          title: usePlanData.title,
+          targetGroup: usePlanData.targetGroup ?? "unknown",
+          score: usePlanData.score ?? 0,
+          totalDurationMin: usePlanData.totalDurationMinutes ?? 0,
+          costMin: usePlanData.totalCostMin ?? 0,
+          costMax: usePlanData.totalCostMax ?? 0,
+          summary: usePlanData.summary ?? "",
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          assumptions: (pd.assumptions ?? []) as any,
+          assumptions: (usePlanData.assumptions ?? []) as any,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          risks: (pd.risks ?? []) as any,
+          risks: (usePlanData.risks ?? []) as any,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           backupPlan: {} as any,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -144,9 +246,9 @@ export async function registerPlanRoutes(app: FastifyInstance) {
       });
 
       // Create PlanSteps for each timeline step
-      if (pd.timeline && pd.timeline.length > 0) {
-        for (let i = 0; i < pd.timeline.length; i++) {
-          const step = pd.timeline[i]!;
+      if (usePlanData.timeline && usePlanData.timeline.length > 0) {
+        for (let i = 0; i < usePlanData.timeline.length; i++) {
+          const step = usePlanData.timeline[i]!;
           const stepData: Record<string, unknown> = {
             planOptionId: option.id,
             orderIndex: i,
@@ -171,8 +273,8 @@ export async function registerPlanRoutes(app: FastifyInstance) {
     }
 
     // Create ExecutableActions if provided
-    if (actions && actions.length > 0) {
-      for (const action of actions) {
+    if (useActions && useActions.length > 0) {
+      for (const action of useActions) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await db.executionAction.create({
           data: {
