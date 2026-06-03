@@ -71,12 +71,12 @@ const mockPlan: ActivityPlan = {
       transport: 'walk',
       reasoning: '适合亲子',
       bookingNeeded: false,
-      actionId: null as string | null | undefined,
+      actionId: null as string | null,
     },
   ],
-  backupPlan: null as string | undefined,
+  backupPlan: null as unknown as string | undefined,
   validationStatus: 'pending',
-  validationReport: null as string | undefined,
+  validationReport: null as unknown as string | undefined,
 };
 
 describe('V3 Execution System Smoke Test', () => {
