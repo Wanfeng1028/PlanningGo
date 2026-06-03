@@ -1,5 +1,11 @@
 /**
  * Plans 路由 — GET /api/plans/demo, POST /api/plans/select, POST /api/plans/save
+ *
+ * V3 核心原则:
+ *   - 后端 message payload 是方案数据的唯一可信来源
+ *   - 生产环境禁止前端 planData fallback
+ *   - 所有 action status 入库前必须 normalize 到 V3 状态
+ *   - 统一使用 Action 表（不是 ExecutionAction）
  */
 
 import type { FastifyInstance } from "fastify";
@@ -9,6 +15,7 @@ import { planOptions } from "../data/mockData.js";
 import { NotFoundError } from "../common/errors.js";
 import { sendOk } from "../common/response.js";
 import { optionalUserId } from "../common/uid.js";
+import { normalizeActionStatus } from "../modules/execution/statusNormalizer.js";
 
 /**
  * 从 DB messages 中按 conversationId 恢复方案数据
@@ -74,7 +81,7 @@ async function restorePlanFromMessages(
         endTime: s.endTime as string,
         type: s.type as string,
         title: s.title as string,
-        poiName: s.poiName ?? null,
+        poiName: typeof s.poiName === "string" ? s.poiName : (s.poiName as string | null),
         durationMinutes: (s.durationMinutes as number) ?? 0,
         transport: (s.transport as string) ?? "none",
         bookingNeeded: (s.bookingNeeded as boolean) ?? false,
@@ -90,7 +97,7 @@ async function restorePlanFromMessages(
       optionId: a.optionId as string,
       userId: a.userId as string,
       type: a.type as string,
-      status: a.status as string,
+      status: normalizeActionStatus(a.status as string),
       title: a.title as string,
       description: a.description as string,
       confirmationRequired: (a.confirmationRequired as boolean) ?? false,
@@ -188,11 +195,35 @@ export async function registerPlanRoutes(app: FastifyInstance) {
       restored = await restorePlanFromMessages(db, input.conversationId, input.optionId);
     }
 
-    // 如果恢复成功，用恢复的数据覆盖前端传来的数据
-    const usePlanData = restored?.planData ?? input.planData;
-    const useActions = restored?.executableActions ?? input.executableActions;
-    const usePlanId = restored?.planId ?? input.planId;
-    const useOptionId = restored?.optionId ?? input.optionId;
+    // ── 生产环境: 禁止前端 planData fallback ──
+    const isProduction = process.env.NODE_ENV === "production";
+    const allowFallback = process.env.ALLOW_CLIENT_PLAN_FALLBACK === "true";
+
+    let usePlanData: typeof input.planData;
+    let useActions: typeof input.executableActions;
+    let usePlanId: string | undefined;
+    let useOptionId: string;
+
+    if (restored) {
+      // 恢复成功，用恢复的数据
+      usePlanData = restored.planData;
+      useActions = restored.executableActions;
+      usePlanId = restored.planId;
+      useOptionId = restored.optionId;
+    } else if (isProduction && !allowFallback) {
+      // 生产环境: 恢复失败 + 没有前端 planData → 拒绝
+      if (!input.planData) {
+        return reply.status(400).send({ error: "无法从后端恢复方案数据，请重新生成方案" });
+      }
+      // 有前端 planData 但恢复失败 → 仍然拒绝（不信任前端数据）
+      return reply.status(400).send({ error: "生产环境不允许使用前端 planData 作为方案数据源" });
+    } else {
+      // 开发环境或明确允许 fallback → 使用前端数据
+      usePlanData = input.planData;
+      useActions = input.executableActions;
+      usePlanId = input.planId;
+      useOptionId = input.optionId;
+    }
 
     // Idempotent: check if already saved for this conversation + plan + option
     const existing = await db.plan.findFirst({
@@ -272,20 +303,19 @@ export async function registerPlanRoutes(app: FastifyInstance) {
       }
     }
 
-    // Create ExecutableActions if provided
+    // Create Actions (统一使用 Action 表，不是 ExecutionAction)
     if (useActions && useActions.length > 0) {
       for (const action of useActions) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await db.executionAction.create({
+        await db.action.create({
           data: {
+            userId,
             planId: plan.id,
             type: action.type,
-            title: action.title,
-            description: action.description,
-            status: action.status,
-            priceEstimate: action.priceEstimate ?? null,
+            status: normalizeActionStatus(action.status),
+            confirmationRequired: action.confirmationRequired,
+            idempotencyKey: action.idempotencyKey || `idem-${action.id}`,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            metadata: (action.payload ?? {}) as any,
+            payload: (action.payload ?? {}) as any,
           },
         });
       }

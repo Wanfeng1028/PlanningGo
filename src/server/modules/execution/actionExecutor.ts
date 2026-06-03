@@ -59,7 +59,10 @@ export class ActionExecutor {
         status: "proposed",
         confirmationRequired: action.confirmationRequired,
         idempotencyKey: action.idempotencyKey,
-        payload: action.payload as unknown as Prisma.InputJsonValue,
+        payload: {
+          ...action.payload,
+          _provider: action.type.includes("meituan") || action.type.includes("restaurant") ? "meituan" : action.type.includes("calendar") || action.type.includes("add_to_calendar") ? "calendar" : action.type.includes("amap") || action.type.includes("navigation") ? "amap" : "mock",
+        } as unknown as Prisma.InputJsonValue,
         quote: action.priceEstimate ? { price: action.priceEstimate } : undefined,
       },
     });

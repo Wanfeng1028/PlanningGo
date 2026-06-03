@@ -1,11 +1,14 @@
 /**
- * Actions 路由 — V3: 接 Connector Registry + DB，不再只走 services/store 内存动作
+ * Actions 路由 — V3: 统一使用 Action 表 + Connector Registry
  *
  * 流程:
- *   GET /api/actions      → 从 DB ExecutionAction 表查询
+ *   GET /api/actions      → 从 DB Action 表查询
  *   POST /api/actions/:id/quote   → 通过 Connector Registry 执行 quote
  *   POST /api/actions/:id/confirm → 通过 Connector Registry 执行 prepare → redirect
  *   POST /api/actions/:id/cancel  → 更新 DB 状态为 cancelled
+ *
+ * 注意: 所有 action 操作统一使用 Action 表（不是 ExecutionAction），
+ *       与 actionExecutor.ts 共享同一套状态机和数据源。
  */
 
 import type { FastifyInstance } from "fastify";
@@ -15,9 +18,10 @@ import { ForbiddenError, NotFoundError } from "../common/errors.js";
 import { sendOk } from "../common/response.js";
 import { optionalUserId } from "../common/uid.js";
 import { getConnectorRegistry } from "../modules/connectors/registry.js";
+import { isTerminalState } from "../modules/execution/stateMachine.js";
 
 export async function registerActionRoutes(app: FastifyInstance) {
-  // ── GET /api/actions — 从 DB 查询 ──
+  // ── GET /api/actions — 从 DB Action 表查询 ──
   app.get("/api/actions", { preHandler: [app.authGuard] }, async (request, reply) => {
     const query = z.object({ planId: z.string().optional() }).parse(request.query);
     const db = app.db;
@@ -30,7 +34,7 @@ export async function registerActionRoutes(app: FastifyInstance) {
       where.planId = query.planId;
     }
 
-    const actions = await db.executionAction.findMany({
+    const actions = await db.action.findMany({
       where,
       orderBy: { createdAt: "desc" },
     });
@@ -46,12 +50,12 @@ export async function registerActionRoutes(app: FastifyInstance) {
       throw new NotFoundError("DB_UNAVAILABLE");
     }
 
-    const action = await db.executionAction.findUnique({
+    const action = await db.action.findUnique({
       where: { id: params.id },
     });
 
     if (!action) throw new NotFoundError("ACTION_NOT_FOUND");
-    if (action.status === "cancelled" || action.status === "expired") {
+    if (isTerminalState(action.status as any)) {
       throw new NotFoundError("ACTION_EXPIRED");
     }
 
@@ -59,49 +63,50 @@ export async function registerActionRoutes(app: FastifyInstance) {
     const registry = getConnectorRegistry();
     const actionType = action.type;
 
-    // 根据 action type 推断 provider
-    let provider = "mock";
-    if (actionType.includes("meituan") || actionType.includes("restaurant")) provider = "meituan";
-    else if (actionType.includes("calendar") || actionType.includes("add_to_calendar")) provider = "calendar";
-    else if (actionType.includes("amap") || actionType.includes("navigation")) provider = "amap";
-
-    const connector = registry.get(provider as any);
+    // 根据 action 的 provider 字段选择 connector（从 payload 中读取 _provider）
+    const payload = (action.payload as Record<string, unknown>) ?? {};
+    const provider = payload._provider as string | undefined;
+    const connectorProvider = (provider || "mock") as any;
+    const connector = registry.get(connectorProvider);
 
     if (!connector?.quote) {
       // Fallback: 更新 DB 状态为 quoted
-      await db.executionAction.update({
+      await db.action.update({
         where: { id: params.id },
         data: { status: "quoted" },
       });
       return sendOk(reply, {
         quoteId: `quote-${params.id}`,
         status: "available",
-        warnings: [`Connector ${provider} 未实现 quote，使用 fallback`],
+        warnings: [`Connector ${connectorProvider} 未实现 quote，使用 fallback`],
       });
     }
 
     try {
-      const metadata = action.metadata as Record<string, unknown>;
+      const poi = payload.poi as Record<string, unknown> | undefined;
       const quoteResult = await connector.quote({
-        provider: provider as any,
+        provider: connectorProvider,
         actionType,
-        poi: metadata.poi ? {
-          provider: "mock",
-          name: (metadata.poi as Record<string, unknown>)?.name as string | undefined || action.title,
-          address: (metadata.poi as Record<string, unknown>)?.address as string | undefined,
-          lat: (metadata.poi as Record<string, unknown>)?.lat as number | undefined,
-          lng: (metadata.poi as Record<string, unknown>)?.lng as number | undefined,
+        poi: poi ? {
+          provider: connectorProvider,
+          name: (poi.name as string) || action.type,
+          address: (poi.address as string) || undefined,
+          lat: (poi.lat as number) || undefined,
+          lng: (poi.lng as number) || undefined,
         } : undefined,
-        items: metadata.items as Array<{ name: string; quantity: number; price?: number }> | undefined,
-        partySize: metadata.partySize as number | undefined,
-        startTime: metadata.startTime as string | undefined,
+        items: payload.items as Array<{ name: string; quantity: number; price?: number }> | undefined,
+        partySize: payload.partySize as number | undefined,
+        startTime: payload.startTime as string | undefined,
         userId: request.userId!,
       });
 
       // 更新 DB 状态
-      await db.executionAction.update({
+      await db.action.update({
         where: { id: params.id },
-        data: { status: "quoted", metadata: { ...(metadata as Record<string, unknown>), quote: quoteResult as unknown as Prisma.InputJsonValue } },
+        data: {
+          status: "quoted",
+          quote: quoteResult as unknown as Prisma.InputJsonValue,
+        },
       });
 
       return sendOk(reply, quoteResult);
@@ -124,64 +129,62 @@ export async function registerActionRoutes(app: FastifyInstance) {
       throw new NotFoundError("DB_UNAVAILABLE");
     }
 
-    const action = await db.executionAction.findUnique({
+    const action = await db.action.findUnique({
       where: { id: params.id },
     });
 
     if (!action) throw new NotFoundError("ACTION_NOT_FOUND");
-    if (action.status === "cancelled" || action.status === "expired") {
+    if (isTerminalState(action.status as any)) {
       throw new NotFoundError("ACTION_EXPIRED");
     }
 
     // V3: 所有交易动作不直接 succeeded，走 Connector prepare → redirect
     const registry = getConnectorRegistry();
     const actionType = action.type;
+    const payload = (action.payload as Record<string, unknown>) ?? {};
 
-    let provider = "mock";
-    if (actionType.includes("meituan") || actionType.includes("restaurant")) provider = "meituan";
-    else if (actionType.includes("calendar") || actionType.includes("add_to_calendar")) provider = "calendar";
-    else if (actionType.includes("amap") || actionType.includes("navigation")) provider = "amap";
-
-    const connector = registry.get(provider as any);
+    const provider = payload._provider as string | undefined;
+    const connectorProvider = (provider || "mock") as any;
+    const connector = registry.get(connectorProvider);
 
     if (!connector?.prepare) {
       // Fallback: 更新为 redirect_required
-      await db.executionAction.update({
+      await db.action.update({
         where: { id: params.id },
         data: { status: "redirect_required" },
       });
       return sendOk(reply, {
         preparedActionId: `prepared-${params.id}`,
         status: "redirect_required",
-        message: `请前往 ${provider} 平台完成确认`,
-        redirectUrl: `https://www.${provider}.com/search?keyword=${encodeURIComponent(action.title)}`,
+        message: `请前往 ${connectorProvider} 平台完成确认`,
+        redirectUrl: `https://www.${connectorProvider}.com/search?keyword=${encodeURIComponent(action.type)}`,
       });
     }
 
     try {
-      const metadata = action.metadata as Record<string, unknown>;
+      const poi = payload.poi as Record<string, unknown> | undefined;
       const prepared = await connector.prepare({
-        provider: provider as any,
+        provider: connectorProvider,
         actionType,
-        poi: metadata.poi ? {
-          provider: "mock",
-          name: (metadata.poi as Record<string, unknown>)?.name as string | undefined || action.title,
-          address: (metadata.poi as Record<string, unknown>)?.address as string | undefined,
-          lat: (metadata.poi as Record<string, unknown>)?.lat as number | undefined,
-          lng: (metadata.poi as Record<string, unknown>)?.lng as number | undefined,
+        poi: poi ? {
+          provider: connectorProvider,
+          name: (poi.name as string) || action.type,
+          address: (poi.address as string) || undefined,
+          lat: (poi.lat as number) || undefined,
+          lng: (poi.lng as number) || undefined,
         } : undefined,
-        items: metadata.items as Array<{ name: string; quantity: number; price?: number }> | undefined,
-        partySize: metadata.partySize as number | undefined,
-        startTime: metadata.startTime as string | undefined,
+        items: payload.items as Array<{ name: string; quantity: number; price?: number }> | undefined,
+        partySize: payload.partySize as number | undefined,
+        startTime: payload.startTime as string | undefined,
         userId: request.userId!,
       });
 
       // 更新 DB 状态
-      await db.executionAction.update({
+      await db.action.update({
         where: { id: params.id },
         data: {
           status: prepared.status,
-          metadata: { ...(metadata as Record<string, unknown>), preparedAction: prepared as unknown as Prisma.InputJsonValue },
+          payload: { ...(payload as Record<string, unknown>), preparedAction: prepared as unknown as Prisma.InputJsonValue },
         },
       });
 
@@ -203,19 +206,18 @@ export async function registerActionRoutes(app: FastifyInstance) {
       throw new NotFoundError("DB_UNAVAILABLE");
     }
 
-    const action = await db.executionAction.findUnique({
+    const action = await db.action.findUnique({
       where: { id: params.id },
     });
 
     if (!action) throw new NotFoundError("ACTION_NOT_FOUND");
 
-    // 只有非终态才能取消
-    const terminalStates = ["cancelled", "expired", "success"];
-    if (terminalStates.includes(action.status)) {
+    // 只有非终态才能取消 — 复用 V3 isTerminalState
+    if (isTerminalState(action.status as any)) {
       throw new NotFoundError("ACTION_ALREADY_TERMINAL");
     }
 
-    const result = await db.executionAction.update({
+    const result = await db.action.update({
       where: { id: params.id },
       data: { status: "cancelled" },
     });
