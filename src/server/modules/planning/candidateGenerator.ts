@@ -118,8 +118,8 @@ function mapAmapPoiToCandidate(poi: PoiResult, defaultCategory: CandidatePoi["ca
     city: poi.city,
     adcode: poi.adcode,
     /* V4: deep POI fields */
-    tel: poi.tel || undefined,
-    distanceMeters: poi.distance || undefined,
+    tel: poi.tel,
+    distanceMeters: poi.distance,
     deepLink: undefined,
     recommendedItems: undefined,
     reservationHints: undefined,
