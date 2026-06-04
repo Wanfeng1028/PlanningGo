@@ -118,9 +118,9 @@ function mapAmapPoiToCandidate(poi: PoiResult, defaultCategory: CandidatePoi["ca
     city: poi.city,
     adcode: poi.adcode,
     /* V4: deep POI fields */
-    tel: poi.phone || undefined,
+    tel: poi.tel || undefined,
     distanceMeters: poi.distance || undefined,
-    deepLink: poi.deepLink || undefined,
+    deepLink: undefined,
     recommendedItems: undefined,
     reservationHints: undefined,
   };
