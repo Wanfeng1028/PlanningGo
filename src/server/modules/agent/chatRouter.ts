@@ -128,6 +128,26 @@ export function isContinuationIntent(message: string): boolean {
 export function extractPlanningSlots(message: string): PlanningSlots {
   const slots: PlanningSlots = {};
   const normalized = message.replace(/[】\]）》〉」』\u3000]/g, "").trim();
+  const chineseDigitMap: Record<string, string> = {
+    "零": "0",
+    "一": "1",
+    "二": "2",
+    "两": "2",
+    "三": "3",
+    "四": "4",
+    "五": "5",
+    "六": "6",
+    "七": "7",
+    "八": "8",
+    "九": "9",
+    "十": "10",
+  };
+  const normalizeTimeText = (value: string) =>
+    value.replace(/[零一二两三四五六七八九十]/g, (char) => chineseDigitMap[char] ?? char);
+  const pushUnique = (items: string[], value: string | undefined) => {
+    const clean = value?.replace(/[，,。.！!？?、；;]/g, "").trim();
+    if (clean && clean.length <= 30 && !items.includes(clean)) items.push(clean);
+  };
 
   // origin
   const originMatch = normalized.match(/从(.+?)出发/) || normalized.match(/(.+?)出发/);
@@ -136,6 +156,11 @@ export function extractPlanningSlots(message: string): PlanningSlots {
     if (origin.length > 0 && origin.length < 30) {
       slots.origin = origin;
     }
+  }
+
+  const returnMatch = normalized.match(/(?:回|返回|回到)([^，,。.！!？?、；;\s]{2,30})/);
+  if (returnMatch) {
+    slots.returnPoint = returnMatch[1].replace(/[，,。.！!？?、]/g, "").trim();
   }
 
   // destination — "去西湖" / "去杭州西湖" / "去北京天安门" / "目的地：西湖"
@@ -165,6 +190,20 @@ export function extractPlanningSlots(message: string): PlanningSlots {
       }
     }
   }
+
+  const routeStops: string[] = [];
+  pushUnique(routeStops, typeof slots.destination === "string" ? slots.destination : undefined);
+  const stopPattern = /(?:去|逛|游览|打卡|到|前往)([^，,。.！!？?、；;\s]{2,24})/g;
+  for (const match of normalized.matchAll(stopPattern)) {
+    const candidate = match[1].replace(/^附近的?/, "");
+    const isVerbPattern = /^(吃|看|玩|逛|买|喝|坐|拍|找|选|试|听|学|做|体验|享受|参加|参观)/.test(candidate);
+    if (!isVerbPattern) pushUnique(routeStops, candidate);
+  }
+  const namedFoodPlacePattern = /(海底捞|星巴克|瑞幸|喜茶|奈雪|霸王茶姬|麦当劳|肯德基|火锅店|咖啡店|咖啡厅|奶茶店|茶饮店)/g;
+  for (const match of normalized.matchAll(namedFoodPlacePattern)) {
+    pushUnique(routeStops, match[1]);
+  }
+  if (routeStops.length > 0) slots.routeStops = routeStops;
 
   // budget
   const budgetMatch = normalized.match(/预算\s*(\d+)/) || normalized.match(/(\d+)\s*[元块]/);
@@ -209,14 +248,14 @@ export function extractPlanningSlots(message: string): PlanningSlots {
   else if (/明天/.test(normalized)) slots.date = "明天";
   else if (/下周/.test(normalized)) slots.date = "下周";
 
-  // time — extract specific time like "明天上午9点"、"明天早上10点"、"今天下午3点"
-  const timeMatch = normalized.match(/(明天|下周[一二三四五六日]?|周末|周[一二三四五六日]|今天)(上午|早上|下午|晚上)(\d{1,2}[点时:：]\d{0,2}(?:分)?)?/) ||
-                    normalized.match(/(明天|下周[一二三四五六日]?|周末|周[一二三四五六日]|今天)(\d{1,2}[点时:：]\d{0,2}(?:分)?)/) ||
-                    normalized.match(/(\d{1,2}[点时:：]\d{0,2}(?:分)?)/);
+  // time — extract specific time like "明天上午9点"、"明天早上10点"、"今天下午3点"、"明天下午两点"
+  const timeMatch = normalized.match(/(明天|下周[一二三四五六日]?|周末|周[一二三四五六日]|今天)(上午|早上|下午|晚上)([零一二两三四五六七八九十\d]{1,3}[点时:：]\d{0,2}(?:分)?)?/) ||
+                    normalized.match(/(明天|下周[一二三四五六日]?|周末|周[一二三四五六日]|今天)([零一二两三四五六七八九十\d]{1,3}[点时:：]\d{0,2}(?:分)?)/) ||
+                    normalized.match(/([零一二两三四五六七八九十\d]{1,3}[点时:：]\d{0,2}(?:分)?)/);
   if (timeMatch) {
     const parts = [timeMatch[1], timeMatch[2], timeMatch[3]].filter(Boolean);
     if (parts.length > 0) {
-      slots.time = parts.join("");
+      slots.time = normalizeTimeText(parts.join(""));
     }
   }
 
@@ -234,6 +273,8 @@ export function extractPlanningSlots(message: string): PlanningSlots {
   if (/户外|公园|自然/.test(normalized)) preferences.push("户外");
   if (/少走|不要太累|轻松/.test(normalized)) preferences.push("低负担");
   if (/咖啡|咖啡厅|cafe/.test(normalized)) preferences.push("咖啡厅");
+  if (/奶茶|茶饮|喜茶|奈雪|霸王茶姬/.test(normalized)) preferences.push("奶茶");
+  if (/海底捞/.test(normalized)) preferences.push("海底捞");
   if (/火锅/.test(normalized)) preferences.push("火锅");
   if (/午饭|午餐|吃饭|吃午饭/.test(normalized)) preferences.push("午饭");
   if (/晚饭|晚餐|吃晚饭/.test(normalized)) preferences.push("晚饭");
@@ -243,6 +284,20 @@ export function extractPlanningSlots(message: string): PlanningSlots {
     slots.preferences = preferences;
     slots.preference = preferences; // backward compat
   }
+
+  const foodPreferences = preferences.filter((item) =>
+    ["咖啡厅", "奶茶", "海底捞", "火锅", "午饭", "晚饭"].includes(item),
+  );
+  if (foodPreferences.length > 0) slots.foodPreferences = foodPreferences;
+
+  if (/地铁|公交|公共交通/.test(normalized)) slots.transportMode = "transit";
+  else if (/打车|叫车|网约车|出租车/.test(normalized)) slots.transportMode = "taxi";
+  else if (/自驾|开车/.test(normalized)) slots.transportMode = "driving";
+  else if (/步行|走路/.test(normalized)) slots.transportMode = "walk";
+
+  if (/预约|订座|排号|取号|订位|提前约|海底捞/.test(normalized)) slots.bookingIntent = "needs_booking_check";
+  if (/门票|购票|买票|票价|灵隐寺/.test(normalized)) slots.purchaseIntent = "needs_ticket_check";
+  if (/下单|点单|奶茶|咖啡|外卖|支付/.test(normalized)) slots.orderingIntent = "needs_order_draft";
 
   return slots;
 }
@@ -677,6 +732,13 @@ function askMissingSlots(
     preference: "有什么偏好",
     preferences: "有什么偏好",
     companions: "和谁一起去",
+    returnPoint: "从哪里返回",
+    routeStops: "途中想经过哪些地方",
+    transportMode: "交通方式偏好",
+    foodPreferences: "饮食偏好",
+    bookingIntent: "是否需要预约",
+    orderingIntent: "是否需要代下单",
+    purchaseIntent: "是否需要代购",
   };
 
   // Only ask up to 2 questions to keep it conversational

@@ -42,11 +42,19 @@ export type PlanningSlotKey =
   | "timeWindow"
   | "preference"
   | "preferences"
-  | "companions";
+  | "companions"
+  | "returnPoint"
+  | "routeStops"
+  | "transportMode"
+  | "foodPreferences"
+  | "bookingIntent"
+  | "orderingIntent"
+  | "purchaseIntent";
 
 export type PlanningSlots = Partial<Record<PlanningSlotKey, string | number | string[]>> & {
   destinationCity?: string;
   budgetFlexible?: boolean;
+  assumptions?: string[];
 };
 
 // ─── Next Action & Pending Action ───────────────────────────
