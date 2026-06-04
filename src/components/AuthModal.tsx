@@ -277,7 +277,7 @@ export function AuthModal({
         result.accessToken ?? result.token,
       );
       onClose();
-    } catch {
+    } catch (err: unknown) {
       if (mode === "guest") {
         onSuccess({
           id: "local_guest",
@@ -292,11 +292,24 @@ export function AuthModal({
         onClose();
         return;
       }
-      setError(
-        mode === "login"
+      const errMsg = err instanceof Error ? err.message : "";
+      let hint: string;
+      if (errMsg.includes("无法连接") || errMsg.includes("NetworkError") || errMsg.includes("fetch")) {
+        hint = "无法连接后端服务，请确认已启动（npm run dev:api）";
+      } else if (errMsg.includes("邮箱或密码")) {
+        hint = errMsg;
+      } else if (errMsg.includes("已被禁用")) {
+        hint = errMsg;
+      } else if (errMsg.includes("已被注册")) {
+        hint = errMsg;
+      } else if (errMsg) {
+        hint = errMsg;
+      } else {
+        hint = mode === "login"
           ? "登录失败，请检查邮箱或密码。"
-          : "注册失败，请稍后重试或换一个邮箱。",
-      );
+          : "注册失败，请稍后重试或换一个邮箱。";
+      }
+      setError(hint);
     } finally {
       setLoading(false);
     }

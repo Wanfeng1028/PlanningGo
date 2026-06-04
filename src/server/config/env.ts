@@ -11,8 +11,10 @@ const envSchema = z.object({
   REDIS_URL: z.string().default("redis://localhost:6379/0"),
 
   // ── JWT ──
-  JWT_ACCESS_SECRET: z.string().default("dev-access-secret-change-me-in-production-32b"),
-  JWT_REFRESH_SECRET: z.string().default("dev-refresh-secret-change-me-in-production-32b"),
+  JWT_ACCESS_SECRET: z.string().default("dev-access-secret-change-me-in-production-32b")
+    .transform((v) => v || "dev-access-secret-change-me-in-production-32b"),
+  JWT_REFRESH_SECRET: z.string().default("dev-refresh-secret-change-me-in-production-32b")
+    .transform((v) => v || "dev-refresh-secret-change-me-in-production-32b"),
   JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
   JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
   BCRYPT_ROUNDS: z.coerce.number().int().default(10),

@@ -782,7 +782,7 @@ async function ensureConversation(
       log.info(`[agentRuntime] ensureConversation CREATED DB conv=${conv.id} userId=${userId ?? "null"} guestId=${input.guestId ?? "null"}`);
       return conv.id;
     } catch (err) {
-      log.error({ err }, "[agentRuntime] Failed to create conversation in DB, falling back to memory");
+      log.error({ err }, "[agentRuntime] Failed to create conversation in DB — conversation will be MEMORY ONLY and LOST on server restart!");
     }
   }
 

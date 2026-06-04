@@ -170,11 +170,27 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
     }
 
     // Handle optionalAuthGuard signal: token was present but invalid
-    // Proactively refresh in the background for next request
+    // Synchronously refresh and retry — fire-and-forget causes the first
+    // request (e.g. listConversations) to return empty/anonymous results
     if (response.headers.get("x-token-expired") === "1" && _authToken) {
-      refreshToken().then((newToken) => {
-        if (newToken) setAuthToken(newToken);
-      }).catch(() => {});
+      const newToken = await refreshToken();
+      if (newToken) {
+        // Retry the same request with the fresh token
+        const retryHeaders: Record<string, string> = {
+          ...(init?.headers as Record<string, string> ?? {}),
+          "content-type": "application/json",
+          authorization: `Bearer ${newToken}`,
+        };
+        response = await fetch(`${API_BASE}${path}`, {
+          ...init,
+          headers: retryHeaders,
+          signal: AbortSignal.timeout(30000),
+          credentials: "include",
+        });
+      } else {
+        // Refresh failed — clear stale token, user needs to re-login
+        setAuthToken(null);
+      }
     }
 
     let body: unknown;

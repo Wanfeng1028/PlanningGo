@@ -45,7 +45,20 @@ export function App() {
   const [user, setUser] = useState<SessionUser | null>(() => {
     try {
       const stored = localStorage.getItem("pg_user");
-      return stored ? (JSON.parse(stored) as SessionUser) : null;
+      if (!stored) return null;
+      const parsed = JSON.parse(stored) as SessionUser;
+      // Validate user ID is a proper UUID — stale localStorage data from
+      // older code versions may contain non-UUID IDs (e.g. "demo_xiaoming")
+      // which break DB queries (conversations.userId is UUID type)
+      const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (parsed?.id && !uuidRe.test(parsed.id)) {
+        console.warn(`[App] stale pg_user detected (id="${parsed.id}" is not UUID), clearing`);
+        localStorage.removeItem("pg_user");
+        localStorage.removeItem("pg_token");
+        localStorage.removeItem("pg_refresh_token");
+        return null;
+      }
+      return parsed;
     } catch {
       return null;
     }

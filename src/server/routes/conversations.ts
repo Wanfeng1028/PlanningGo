@@ -88,6 +88,20 @@ export async function registerConversationRoutes(app: FastifyInstance) {
           take: query.limit,
           include: { _count: { select: { messages: true, plans: true } } },
         });
+
+        // 诊断日志：当认证用户拿到空结果时，额外查询全局信息辅助排查
+        if (userId && convs.length === 0) {
+          const totalConvCount = await db.conversation.count().catch(() => -1);
+          const userConvCount = await db.conversation.count({ where: { userId } }).catch(() => -1);
+          const nullUserIdCount = await db.conversation.count({ where: { userId: null } }).catch(() => -1);
+          log.info({
+            userId,
+            totalConvCount,
+            userConvCount,
+            nullUserIdCount,
+          }, "[conversations:list] DIAGNOSTIC — authenticated user got empty list, checking DB state");
+        }
+
         log.info({ userId, count: convs.length, conversationIds: convs.map((c) => c.id), conversations: convs.map((c) => ({ id: c.id, title: c.title, userId: c.userId, updatedAt: c.updatedAt, messageCount: c._count?.messages })) }, "[conversations:list] result");
         return sendOk(reply, convs);
       } catch (err) {

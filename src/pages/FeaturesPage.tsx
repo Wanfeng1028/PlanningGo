@@ -11,6 +11,7 @@ import {
   trackEvent as apiTrackEvent,
   reportClientError,
   trackAction,
+  getApiBase,
   type PlanningOption,
   type PlanningExecutableAction,
   type ServiceActionPrepareInput,
@@ -523,12 +524,34 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
               }).catch(() => {});
             }
           } else {
-            // Empty list from DB for logged-in user — this is expected for new users
-            console.info("[FeaturesPage] DB conversations empty for userId=" + user?.id + ", showing empty history");
+            // Empty list from DB for logged-in user — check backend DB status
+            console.info("[FeaturesPage] DB conversations empty for userId=" + user?.id + ", checking backend status...");
             // Clear any stale active conversation reference
             localStorage.removeItem("pg_active_conversation_id");
             setChatSessions([]);
             messagesBySessionRef.current = new Map();
+
+            // Diagnostic: check if backend DB is connected
+            checkHealth().then((health) => {
+              if (health.ok) {
+                // Backend is up but conversations are empty — either new user or conversations were lost
+                // Try to fetch /api/ready for more detail
+                fetch(`${getApiBase()}/api/ready`, {
+                  credentials: "include",
+                  signal: AbortSignal.timeout(5000),
+                }).then((r) => r.json()).then((ready: Record<string, unknown>) => {
+                  if (ready.db === "memory") {
+                    console.warn("[FeaturesPage] ⚠️ 后端数据库未连接（memory 模式）！之前的对话可能存储在内存中，服务器重启后已丢失。请确保 PostgreSQL 已启动并运行 npx prisma migrate deploy。");
+                  } else if (ready.db === "ok") {
+                    console.info("[FeaturesPage] 后端数据库连接正常。当前用户尚无对话记录（新用户或历史数据已被清理）。");
+                  } else {
+                    console.warn("[FeaturesPage] 后端数据库状态异常:", ready.db);
+                  }
+                }).catch(() => {
+                  console.info("[FeaturesPage] 无法获取后端状态，数据库连接未知。");
+                });
+              }
+            }).catch(() => {});
           }
         })
         .catch((err) => {
