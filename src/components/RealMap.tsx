@@ -51,13 +51,14 @@ function getSdk(): Promise<any> {
   if (!sdkLoadPromise) {
     sdkLoadPromise = doLoad().catch((firstError) => {
       // 首次失败：可能是 HMR 残留的 failed 状态导致的。
-      // 尝试 reset 清除 AMapLoader 内部状态后重试一次。
+      // 尝试清除 AMapLoader 内部状态后重试一次。
       console.warn(
-        "[RealMap] SDK 首次加载失败，尝试 reset + 重试:",
+        "[RealMap] SDK 首次加载失败，尝试重试:",
         firstError instanceof Error ? firstError.message : firstError,
       );
+      // AMapLoader 的 reset 方法没有类型定义，强制 any 调用
       try {
-        AMapLoader.reset();
+        (AMapLoader as any).reset?.();
       } catch {
         // ignore
       }
@@ -89,12 +90,11 @@ export function RealMap({
   /** AMap 实际使用的容器（由 document.createElement 创建，不在 React 树中） */
   const mapContainerElRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
-  const onMarkerClickRef = useRef(onMarkerClick);
-  // 用 ref 存储 center/city，避免每次渲染创建新数组导致 useEffect 无限循环
+  // 用 ref 存储最新 props，避免每次渲染创建新数组导致 useEffect 无限循环
   const centerRef = useRef(center);
   const cityRef = useRef(city);
-  centerRef.current = center;
-  cityRef.current = city;
+  const onMarkerClickRef = useRef(onMarkerClick);
+  const initializedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [poiList, setPoiList] =
@@ -102,11 +102,22 @@ export function RealMap({
       [],
     );
 
-  onMarkerClickRef.current = onMarkerClick;
+  // 将 ref 更新移到 useEffect 中，避免在渲染期间修改 ref
+  useEffect(() => {
+    centerRef.current = center;
+    cityRef.current = city;
+    onMarkerClickRef.current = onMarkerClick;
+  }, [center, city, onMarkerClick]);
 
   // 只在 mount 时加载地图（空依赖数组），通过 ref 获取最新 center/city
   useEffect(() => {
     let destroyed = false;
+
+    // ── 已在之前初始化过，跳过 ──
+    if (initializedRef.current) {
+      return;
+    }
+    initializedRef.current = true;
 
     // ── 在 React 树之外创建地图容器 ──
     // AMap SDK 初始化后会深度修改容器内部 DOM（添加 canvas、
@@ -227,7 +238,6 @@ export function RealMap({
 
     return () => {
       destroyed = true;
-      loadAttempted.current = false;
 
       // 先 destroy 地图（释放 WebGL 等资源）
       if (mapInstanceRef.current) {
@@ -252,6 +262,25 @@ export function RealMap({
       mapContainerElRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 当 center/city 变化时，更新地图中心和重新搜索 POI
+  useEffect(() => {
+    centerRef.current = center;
+    cityRef.current = city;
+
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    // 更新中心点
+    const currentCenter = centerRef.current;
+    if (currentCenter && map.setCenter) {
+      try {
+        map.setCenter(currentCenter);
+      } catch {
+        // ignore
+      }
+    }
   }, [center, city]);
 
   // 处理 POI 点击
@@ -266,9 +295,11 @@ export function RealMap({
   );
 
   const handleRetry = useCallback(() => {
-    loadAttempted.current = false;
     setError(null);
     setLoading(true);
+    // 重新触发初始化（清除单例状态）
+    sdkLoadPromise = null;
+    initializedRef.current = false;
   }, []);
 
   if (error) {
