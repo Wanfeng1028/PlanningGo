@@ -1,0 +1,232 @@
+
+[1m[46m RUN [49m[22m [36mv3.2.4 [39m[90me:/code/javascript/project/PlanningGo[39m
+
+[04:26:31] [32mINFO[39m: [36m? PostgreSQL connected[39m
+[04:26:31] [32mINFO[39m: [36m✅ Redis connected[39m
+[90mstdout[2m | src/server/modules/execution/v3-api-smoke.test.ts[2m > [22m[2mV3 API End-to-End Smoke Test
+[22m[39m[providers] ✅ LLM provider=mimo model=mimo-v2.5-pro
+
+[04:26:31] [32mINFO[39m: [36m✅ Providers initialized[39m
+[04:26:32] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-1"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/auth/guest",
+      "host": "localhost:80",
+      "remoteAddress": "127.0.0.1"
+    }
+[04:26:32] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-1"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 101.57449999451637
+[04:26:32] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-2"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/actions",
+      "host": "localhost:80",
+      "remoteAddress": "127.0.0.1"
+    }
+[04:26:32] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-2"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 11.390900015830994
+[04:26:32] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-3"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/plans/save",
+      "host": "localhost:80",
+      "remoteAddress": "127.0.0.1"
+    }
+[90mstdout[2m | src/server/modules/execution/v3-api-smoke.test.ts[2m > [22m[2mV3 API End-to-End Smoke Test[2m > [22m[2mshould create action via plans/save and return action with provider
+[22m[39mPLANS SAVE RESPONSE: [33m200[39m {"ok":true,"data":{"planId":"7713e6f5-7da6-4d79-ac7f-fbd9ef09f599","message":"方案已保存"},"traceId":"trace_1780518392687_89d7c4ddafe77d79"}
+
+[04:26:32] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-3"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 38.027900010347366
+[04:26:32] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-4"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/actions",
+      "host": "localhost:80",
+      "remoteAddress": "127.0.0.1"
+    }
+[90mstdout[2m | src/server/modules/execution/v3-api-smoke.test.ts[2m > [22m[2mV3 API End-to-End Smoke Test[2m > [22m[2mshould list actions with correct provider field
+[22m[39mACTIONS LIST: [
+  {
+    "id": "8afb42a8-1f52-4ea0-bcff-18cfe8690e36",
+    "userId": "651d1ada-c46b-4cd3-8db5-64d137a6a3ea",
+    "planId": "7713e6f5-7da6-4d79-ac7f-fbd9ef09f599",
+    "planOptionId": null,
+    "type": "restaurant_reservation",
+    "provider": "meituan",
+    "status": "waiting_user_confirm",
+    "confirmationRequired": true,
+    "idempotencyKey": "idem-e2e-1780518392686",
+    "payload": {
+      "poiName": "测试餐厅",
+      "partySize": 2
+    },
+    "quote": null,
+    "result": null,
+    "errorCode": null,
+    "errorMessage": null,
+    "expiresAt": null,
+    "createdAt": "2026-06-03T20:26:32.721Z",
+    "updatedAt": "2026-06-03T20:26:32.721Z"
+  }
+]
+
+[04:26:32] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-4"
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 3.441200017929077
+[04:26:32] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-5"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/actions/undefined",
+      "host": "localhost:80",
+      "remoteAddress": "127.0.0.1"
+    }
+[04:26:32] [32mINFO[39m: [36mRoute GET:/api/actions/undefined not found[39m
+    [35mreqId[39m: "req-5"
+[04:26:32] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-5"
+    [35mres[39m: {
+      "statusCode": 404
+    }
+    [35mresponseTime[39m: 0.5178000032901764
+[04:26:32] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-6"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/actions/undefined/quote",
+      "host": "localhost:80",
+      "remoteAddress": "127.0.0.1"
+    }
+[04:26:32] [31mERROR[39m:
+    [35mtraceId[39m: "trace_1780518392742_a6428e9baaee7503"
+    error: "\nInvalid `db.action.findFirst()` invocation in\ne:\\code\\javascript\\project\\PlanningGo\\src\\server\\routes\\actions.ts:33:20\n\n  30  * 防止用户 A 通过用户 B 的 action id 执行 quote/confirm/cancel\n  31  */\n  32 async function findActionOwnedByUser(db: NonNullable<FastifyInstance[\"db\"]>, id: string, userId: string) {\n→ 33   return db.action.findFirst(\nInvalid input value: invalid input syntax for type uuid: \"undefined\""
+[04:26:32] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-6"
+    [35mres[39m: {
+      "statusCode": 500
+    }
+    [35mresponseTime[39m: 27.740000009536743
+[04:26:32] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-7"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/actions/undefined/confirm",
+      "host": "localhost:80",
+      "remoteAddress": "127.0.0.1"
+    }
+[04:26:32] [31mERROR[39m:
+    [35mtraceId[39m: "trace_1780518392771_1878cca04f586f85"
+    error: "\nInvalid `db.action.findFirst()` invocation in\ne:\\code\\javascript\\project\\PlanningGo\\src\\server\\routes\\actions.ts:33:20\n\n  30  * 防止用户 A 通过用户 B 的 action id 执行 quote/confirm/cancel\n  31  */\n  32 async function findActionOwnedByUser(db: NonNullable<FastifyInstance[\"db\"]>, id: string, userId: string) {\n→ 33   return db.action.findFirst(\nInvalid input value: invalid input syntax for type uuid: \"undefined\""
+[04:26:32] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-7"
+    [35mres[39m: {
+      "statusCode": 500
+    }
+    [35mresponseTime[39m: 16.64579999446869
+[04:26:32] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-8"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/actions/undefined/cancel",
+      "host": "localhost:80",
+      "remoteAddress": "127.0.0.1"
+    }
+[04:26:32] [31mERROR[39m:
+    [35mtraceId[39m: "trace_1780518392790_45860585dda4e8b3"
+    error: "\nInvalid `db.action.findFirst()` invocation in\ne:\\code\\javascript\\project\\PlanningGo\\src\\server\\routes\\actions.ts:33:20\n\n  30  * 防止用户 A 通过用户 B 的 action id 执行 quote/confirm/cancel\n  31  */\n  32 async function findActionOwnedByUser(db: NonNullable<FastifyInstance[\"db\"]>, id: string, userId: string) {\n→ 33   return db.action.findFirst(\nInvalid input value: invalid input syntax for type uuid: \"undefined\""
+[04:26:32] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-8"
+    [35mres[39m: {
+      "statusCode": 500
+    }
+    [35mresponseTime[39m: 18.097000002861023
+[04:26:32] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-9"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/actions/undefined/cancel",
+      "host": "localhost:80",
+      "remoteAddress": "127.0.0.1"
+    }
+[04:26:32] [31mERROR[39m:
+    [35mtraceId[39m: "trace_1780518392810_09f5344c31beb1c5"
+    error: "\nInvalid `db.action.findFirst()` invocation in\ne:\\code\\javascript\\project\\PlanningGo\\src\\server\\routes\\actions.ts:33:20\n\n  30  * 防止用户 A 通过用户 B 的 action id 执行 quote/confirm/cancel\n  31  */\n  32 async function findActionOwnedByUser(db: NonNullable<FastifyInstance[\"db\"]>, id: string, userId: string) {\n→ 33   return db.action.findFirst(\nInvalid input value: invalid input syntax for type uuid: \"undefined\""
+[04:26:32] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-9"
+    [35mres[39m: {
+      "statusCode": 500
+    }
+    [35mresponseTime[39m: 16.322400003671646
+[04:26:32] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-a"
+    [35mreq[39m: {
+      "method": "POST",
+      "url": "/api/auth/guest",
+      "host": "localhost:80",
+      "remoteAddress": "127.0.0.1"
+    }
+[04:26:32] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-a"
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 50.75809997320175
+[04:26:32] [32mINFO[39m: [36mincoming request[39m
+    [35mreqId[39m: "req-b"
+    [35mreq[39m: {
+      "method": "GET",
+      "url": "/api/actions/undefined",
+      "host": "localhost:80",
+      "remoteAddress": "127.0.0.1"
+    }
+[04:26:32] [32mINFO[39m: [36mRoute GET:/api/actions/undefined not found[39m
+    [35mreqId[39m: "req-b"
+[04:26:32] [32mINFO[39m: [36mrequest completed[39m
+    [35mreqId[39m: "req-b"
+    [35mres[39m: {
+      "statusCode": 404
+    }
+    [35mresponseTime[39m: 0.27789998054504395
+ [31m❯[39m src/server/modules/execution/v3-api-smoke.test.ts [2m([22m[2m10 tests[22m[2m | [22m[31m7 failed[39m[2m)[22m[33m 2412[2mms[22m[39m
+   [32m✓[39m V3 API End-to-End Smoke Test[2m > [22mshould create a guest user and return token[32m 119[2mms[22m[39m
+   [32m✓[39m V3 API End-to-End Smoke Test[2m > [22mshould return empty actions list for new user[32m 12[2mms[22m[39m
+   [32m✓[39m V3 API End-to-End Smoke Test[2m > [22mshould create action via plans/save and return action with provider[32m 39[2mms[22m[39m
+[31m   [31m×[31m V3 API End-to-End Smoke Test[2m > [22mshould list actions with correct provider field[39m[32m 11[2mms[22m[39m
+[31m     → expected undefined to be defined[39m
+[31m   [31m×[31m V3 API End-to-End Smoke Test[2m > [22mshould get single action by id[39m[32m 5[2mms[22m[39m
+[31m     → expected 404 to be 200 // Object.is equality[39m
+[31m   [31m×[31m V3 API End-to-End Smoke Test[2m > [22mshould quote action and return quote result[39m[32m 29[2mms[22m[39m
+[31m     → expected 500 to be 200 // Object.is equality[39m
+[31m   [31m×[31m V3 API End-to-End Smoke Test[2m > [22mshould reject confirm when action is not in waiting_user_confirm state[39m[32m 18[2mms[22m[39m
+[31m     → expected 500 to be 403 // Object.is equality[39m
+[31m   [31m×[31m V3 API End-to-End Smoke Test[2m > [22mshould cancel action successfully[39m[32m 20[2mms[22m[39m
+[31m     → expected 500 to be 200 // Object.is equality[39m
+[31m   [31m×[31m V3 API End-to-End Smoke Test[2m > [22mshould reject cancel when action is already in terminal state[39m[32m 18[2mms[22m[39m
+[31m     → expected 500 to be 404 // Object.is equality[39m
+[31m   [31m×[31m V3 API End-to-End Smoke Test[2m > [22mshould reject action access from different user[39m[32m 53[2mms[22m[39m
+[31m     → expected undefined to be 'ACTION_NOT_FOUND' // Object.is equality[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m7 failed[39m[22m[2m | [22m[1m[32m3 passed[39m[22m[90m (10)[39m
+[2m   Start at [22m 04:26:29
+[2m   Duration [22m 3.80s[2m (transform 883ms, setup 0ms, collect 745ms, tests 2.41s, environment 0ms, prepare 214ms)[22m
+
