@@ -333,8 +333,7 @@ export async function registerAgentRoutes(app: FastifyInstance) {
           onActions: (data: { count: number }) => sendSse("actions", data),
         };
 
-        // Note: orchestrator sends the first "正在理解你的需求..." status at start of runPlanningPipeline
-        // No need to send a duplicate here
+        // 注：orchestrator 已在 runPlanningPipeline 开头发送首个 "正在理解你的需求..." 状态，此处无需重复发送
 
         let result: Awaited<ReturnType<typeof runPlanningPipeline>>;
         try {

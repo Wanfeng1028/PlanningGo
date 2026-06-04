@@ -166,8 +166,18 @@ const envSchema = z.object({
   MOCK_BOOKING_FAILURES: z
     .string()
     .default("")
-    .transform((v) => v.split(",").map((s) => s.trim()).filter(Boolean)),
-  MOCK_LATENCY_MS: z.coerce.number().int().min(0).default(0),
+    .transform((v) => v.split(",").map((s) => s.trim()).filter(Boolean))
+    .refine(
+      (arr) => arr.every((v) => ["no_seat", "no_ticket", "time_conflict"].includes(v)),
+      { message: "MOCK_BOOKING_FAILURES 只允许: no_seat, no_ticket, time_conflict" },
+    ),
+  MOCK_LATENCY_MS: z
+    .string()
+    .default("0")
+    .transform((v) => {
+      const n = Number(v);
+      return Number.isInteger(n) && n >= 0 ? n : 0;
+    }),
 
   // ── 生产环境安全开关 ──
   ENABLE_DEMO_AUTH: z

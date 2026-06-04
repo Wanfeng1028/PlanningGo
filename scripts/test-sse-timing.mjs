@@ -101,21 +101,29 @@ async function main() {
           } else if (data.startsWith("[FINAL_RESULT]")) {
             console.log(`[${elapsed}ms] [FINAL_RESULT]`);
           } else if (currentEvent === "status") {
-            const msg = JSON.parse(data).message;
+            let msg;
+            try { msg = JSON.parse(data).message; } catch { console.log(`[${elapsed}ms] event:status → (malformed JSON)`); continue; }
             console.log(`[${elapsed}ms] event:status → "${msg}"`);
           } else if (currentEvent === "candidates") {
-            const d = JSON.parse(data);
+            let d;
+            try { d = JSON.parse(data); } catch { console.log(`[${elapsed}ms] event:candidates → (malformed JSON)`); continue; }
             console.log(`[${elapsed}ms] event:candidates → activities:${d.activities} restaurants:${d.restaurants} cafes:${d.cafes} events:${d.events}`);
           } else if (currentEvent === "partial_plan") {
-            const d = JSON.parse(data);
+            let d;
+            try { d = JSON.parse(data); } catch { console.log(`[${elapsed}ms] event:partial_plan → (malformed JSON)`); continue; }
             console.log(`[${elapsed}ms] event:partial_plan → "${d.title}" (${d.stepsCount} steps)`);
           } else if (currentEvent === "actions") {
-            const d = JSON.parse(data);
+            let d;
+            try { d = JSON.parse(data); } catch { console.log(`[${elapsed}ms] event:actions → (malformed JSON)`); continue; }
             console.log(`[${elapsed}ms] event:actions → ${d.count} actions`);
           } else if (currentEvent === "final") {
             console.log(`[${elapsed}ms] event:final → plan complete`);
-          } else if (data.startsWith("{") && JSON.parse(data).content) {
-            console.log(`[${elapsed}ms] content chunk → "${JSON.parse(data).content.slice(0, 50)}..."`);
+          } else if (data.startsWith("{")) {
+            let parsed;
+            try { parsed = JSON.parse(data); } catch { console.log(`[${elapsed}ms] content chunk → (malformed JSON)`); continue; }
+            if (parsed.content) {
+              console.log(`[${elapsed}ms] content chunk → "${parsed.content.slice(0, 50)}..."`);
+            }
           }
 
           if (!firstEventTime) firstEventTime = elapsed;
