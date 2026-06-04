@@ -124,6 +124,9 @@ const baseProdEnv = {
   REQUIRE_DB_IN_PRODUCTION: true,
   REQUIRE_REDIS_IN_PRODUCTION: true,
   COOKIE_SECRET: "a-very-long-cookie-secret-for-production-use-32chars",
+  DEMO_MODE: false,
+  MOCK_BOOKING_FAILURES: [],
+  MOCK_LATENCY_MS: 0,
 };
 
 describe("validateProductionRuntime", () => {
