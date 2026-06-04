@@ -36,6 +36,7 @@ import { usePlanActions } from "../components/features/usePlanActions";
 import { ErrorCardView } from "../components/features/ErrorCardView";
 import { MobileHandoffQRCode } from "../components/features/MobileHandoffQRCode";
 import { OrderDraftModal } from "../components/features/OrderDraftModal";
+import { RealMap } from "../components/RealMap";
 import styles from "./FeaturesPage.module.scss";
 
 /* ═══════════════════════════════════════════════
@@ -171,6 +172,8 @@ const STREAM_FLUSH_INTERVAL_MS = 40;
 
 export default function FeaturesPage({ user, onOpenModal, onNavigate, location }: FeaturesPageProps) {
   const [mode, setMode] = useState<"idle" | "chat">("idle");
+  // 移动端视图模式：'chat' | 'map'
+  const [viewMode, setViewMode] = useState<"chat" | "map">("chat");
   const [inputValue, setInputValue] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [, setPhase] = useState<ChatPhase>("idle");
@@ -196,7 +199,9 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
   const [typedText, setTypedText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [agentEvents, setAgentEvents] = useState<AgentTraceEvent[]>([]);
-  const [agentEventsCollapsed, setAgentEventsCollapsed] = useState(false);
+  // 移动端默认折叠，桌面端默认展开
+  const isMobile = typeof window !== "undefined" && window.innerWidth <= 860;
+  const [agentEventsCollapsed, setAgentEventsCollapsed] = useState(isMobile);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -2056,7 +2061,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
                 >
                   <span>执行过程</span>
                   <span className={styles.agentEventsToggle}>
-                    {agentEventsCollapsed ? "▸" : "▾"}
+                    {agentEventsCollapsed ? "▸ 点击展开" : "▾ 点击收起"}
                   </span>
                 </div>
                 {!agentEventsCollapsed && (
