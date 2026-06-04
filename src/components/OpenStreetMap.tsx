@@ -51,10 +51,6 @@ export function OpenStreetMap({
   const [isDragging, setIsDragging] = useState(false);
   const [mapStyle, setMapStyle] = useState<"standard" | "satellite">("standard");
 
-  onMarkerClickRef.current = onMarkerClick;
-  centerRef.current = center;
-  cityRef.current = city;
-
   type MapPoi = {
     id: string;
     name: string;
@@ -216,11 +212,15 @@ export function OpenStreetMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── 更新中心点 ──
+  // ── 同步 props 到 ref ──
   useEffect(() => {
+    onMarkerClickRef.current = onMarkerClick;
     centerRef.current = center;
     cityRef.current = city;
+  }, [onMarkerClick, center, city]);
 
+  // ── 更新中心点 ──
+  useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
