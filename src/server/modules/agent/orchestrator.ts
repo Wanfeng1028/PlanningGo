@@ -187,6 +187,11 @@ export async function runPlanningPipeline(
     });
   }
 
+  // TODO(V4): 客户端断开时真正中断 pipeline — 需要 threading AbortSignal 到
+  // generateCandidates → amap API, generateLlmPlans → LLM client,
+  // enrichPlanWithPoiDetails → amap API, calculateRouteTimes → amap API
+  // 当前仅跳过写入 closed socket，pipeline 仍会跑完
+
   // 10.5 画像沉淀：方案生成后异步更新用户画像
   if (input.userId && serviceEnhancedOptions[0]) {
     try {

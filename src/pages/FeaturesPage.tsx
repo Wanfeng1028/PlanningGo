@@ -714,6 +714,10 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
               },
               onAgentEvent: (event) => {
                 const traceEvent = event as AgentTraceEvent;
+                // V4: SSE pipeline events (status/candidates/partial_plan/actions) — log for debugging
+                if (traceEvent.type && ["status", "candidates", "partial_plan", "actions"].includes(traceEvent.type)) {
+                  console.info("[SSE]", traceEvent.type, traceEvent);
+                }
                 setAgentEvents((prev) => {
                   // Upsert by id: if same id exists, update it; otherwise append
                   if (traceEvent.id) {

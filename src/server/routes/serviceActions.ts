@@ -41,6 +41,11 @@ const prepareActionBodySchema = z.object({
   lat: z.number().optional(),
   lng: z.number().optional(),
   userNote: z.string().optional(),
+  recommendedItems: z.array(z.object({
+    name: z.string(),
+    quantity: z.number().int().positive(),
+    estimatedPrice: z.number().optional(),
+  })).optional(),
 });
 
 const prepareActionResponseSchema = z.object({
@@ -166,6 +171,7 @@ export async function registerServiceActionRoutes(app: FastifyInstance) {
               userNote: body.userNote ?? null,
               redirectUrl: redirectUrl ?? null,
               copyText: copyText ?? null,
+              recommendedItems: body.recommendedItems ?? null,
               createdAt: new Date().toISOString(),
             } as unknown as Prisma.InputJsonValue,
             createdAt: new Date(),

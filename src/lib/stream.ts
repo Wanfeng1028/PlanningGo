@@ -61,6 +61,7 @@ export async function streamFetch(
     const decoder = new TextDecoder();
     let buffer = "";
     let completed = false;
+    let currentEvent = ""; // Track SSE event name (e.g. "status", "candidates", "final")
 
     try {
       while (true) {
@@ -74,6 +75,16 @@ export async function streamFetch(
         buffer = lines.pop() || "";
 
         for (const line of lines) {
+          // Track SSE event name
+          if (line.startsWith("event: ")) {
+            currentEvent = line.slice(7).trim();
+            continue;
+          }
+          // Empty line separates SSE records — reset event name after processing
+          if (line === "") {
+            currentEvent = "";
+            continue;
+          }
           if (line.startsWith("data: ")) {
             const data = line.slice(6);
             if (data === "[DONE]") {
@@ -95,6 +106,10 @@ export async function streamFetch(
               if (typeof parsed.error === "string") {
                 throw new Error(parsed.error);
               }
+              // V4: SSE event name takes precedence — e.g. event: status → type: "status"
+              if (currentEvent && !parsed.type) {
+                parsed.type = currentEvent;
+              }
               if (parsed.type === "agent_event" && parsed.event) {
                 onAgentEvent?.(parsed.event);
                 continue;
@@ -105,6 +120,11 @@ export async function streamFetch(
               }
               if (parsed.done === true && parsed.result) {
                 onFinalResult?.(parsed.result as PlanningResult);
+                continue;
+              }
+              // V4: SSE status/candidates/partial_plan/actions events → onAgentEvent
+              if (currentEvent && parsed.type === currentEvent) {
+                onAgentEvent?.({ type: currentEvent, ...parsed });
                 continue;
               }
             } catch (parseError) {
