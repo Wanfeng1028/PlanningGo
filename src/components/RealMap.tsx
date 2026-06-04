@@ -12,18 +12,13 @@ export interface RealMapProps {
 const SDK_LOAD_TIMEOUT = 15_000;
 
 /* ═══════════════════════════════════════════
-   模块级单例：SDK 只加载一次
+   SDK 加载函数
    ═══════════════════════════════════════════
 
-   策略：
-   - 首次加载直接调用 AMapLoader.load()，不做 reset（避免干扰 SDK 初始化）
-   - 如果加载失败（如 HMR 残留了旧的 failed 状态），才 reset + 重试一次
-   - 所有 RealMap 实例共享同一个 Promise（单例模式）
+   每次组件挂载都重新加载 SDK，避免单例模式导致的时序问题
 */
 
-let sdkLoadPromise: Promise<any> | null = null;
-
-function doLoad(): Promise<any> {
+function loadSdk(): Promise<any> {
   return Promise.race([
     AMapLoader.load({
       key: import.meta.env.VITE_AMAP_KEY || "",
@@ -45,31 +40,6 @@ function doLoad(): Promise<any> {
       ),
     ),
   ]);
-}
-
-function getSdk(): Promise<any> {
-  if (!sdkLoadPromise) {
-    sdkLoadPromise = doLoad().catch((firstError) => {
-      // 首次失败：可能是 HMR 残留的 failed 状态导致的。
-      // 尝试清除 AMapLoader 内部状态后重试一次。
-      console.warn(
-        "[RealMap] SDK 首次加载失败，尝试重试:",
-        firstError instanceof Error ? firstError.message : firstError,
-      );
-      // AMapLoader 的 reset 方法没有类型定义，强制 any 调用
-      try {
-        (AMapLoader as any).reset?.();
-      } catch {
-        // ignore
-      }
-      return doLoad();
-    }).catch((err) => {
-      // 重试也失败，清除单例让后续可以再次尝试
-      sdkLoadPromise = null;
-      throw err;
-    });
-  }
-  return sdkLoadPromise;
 }
 
 /**
@@ -94,13 +64,14 @@ export function RealMap({
   const centerRef = useRef(center);
   const cityRef = useRef(city);
   const onMarkerClickRef = useRef(onMarkerClick);
-  const initializedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [poiList, setPoiList] =
     useState<Array<{ name: string; location: [number, number]; type: string }>>(
       [],
     );
+  const [viewMode, setViewMode] = useState<"2D" | "3D">("2D");
+  const [mapStyle, setMapStyle] = useState<"standard" | "satellite">("standard");
 
   // 将 ref 更新移到 useEffect 中，避免在渲染期间修改 ref
   useEffect(() => {
@@ -112,12 +83,7 @@ export function RealMap({
   // 只在 mount 时加载地图（空依赖数组），通过 ref 获取最新 center/city
   useEffect(() => {
     let destroyed = false;
-
-    // ── 已在之前初始化过，跳过 ──
-    if (initializedRef.current) {
-      return;
-    }
-    initializedRef.current = true;
+    const abortController = new AbortController();
 
     // ── 在 React 树之外创建地图容器 ──
     // AMap SDK 初始化后会深度修改容器内部 DOM（添加 canvas、
@@ -138,16 +104,33 @@ export function RealMap({
       try {
         setLoading(true);
 
-        // ── 单例加载 SDK ──
-        const AMap = await getSdk();
-
-        // ── 容器安全检查 ──
-        if (
-          destroyed ||
-          !mapContainer.isConnected
-        ) {
-          console.warn("[RealMap] 地图容器已不在 DOM 中，跳过初始化");
+        // ── 检查组件是否已卸载 ──
+        if (destroyed || abortController.signal.aborted) {
+          console.warn("[RealMap] 组件已卸载，取消地图初始化");
           return;
+        }
+
+        // ── 加载 SDK ──
+        const AMap = await loadSdk();
+
+        // ── 再次检查组件是否已卸载 ──
+        if (destroyed || abortController.signal.aborted) {
+          console.warn("[RealMap] 组件已卸载，取消地图初始化");
+          return;
+        }
+
+        // ── 确保容器在 DOM 中 ──
+        const wrapper = mapWrapperRef.current;
+        if (!wrapper || !mapContainerElRef.current) {
+          console.warn("[RealMap] 地图容器或 wrapper 不存在，跳过初始化");
+          setError("地图容器异常，请退出地图视图后重新进入");
+          setLoading(false);
+          return;
+        }
+
+        // ── 如果容器不在 DOM 中，重新添加 ──
+        if (!mapContainerElRef.current.isConnected && wrapper) {
+          wrapper.appendChild(mapContainerElRef.current);
         }
 
         // ── 创建地图实例 ──
@@ -157,8 +140,14 @@ export function RealMap({
         const map = new AMap.Map(mapContainer, {
           zoom: 15,
           center: currentCenter,
-          mapStyle: "amap://styles/light",
+          mapStyle: mapStyle === "satellite" ? "amap://styles/satellite" : "amap://styles/light",
+          viewMode: viewMode === "3D" ? "3D" : "2D",
+          pitch: viewMode === "3D" ? 50 : 0,
           resizeEnable: true,
+          dragEnable: true,
+          zoomEnable: true,
+          rotateEnable: true,
+          pitchEnable: true,
         });
 
         mapInstanceRef.current = map;
@@ -238,6 +227,7 @@ export function RealMap({
 
     return () => {
       destroyed = true;
+      abortController.abort();
 
       // 先 destroy 地图（释放 WebGL 等资源）
       if (mapInstanceRef.current) {
@@ -283,6 +273,20 @@ export function RealMap({
     }
   }, [center, city]);
 
+  // 当 viewMode 或 mapStyle 变化时，更新地图配置
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    try {
+      map.setViewMode(viewMode === "3D" ? "3D" : "2D");
+      map.setPitch(viewMode === "3D" ? 50 : 0);
+      map.setMapStyle(mapStyle === "satellite" ? "amap://styles/satellite" : "amap://styles/light");
+    } catch {
+      // ignore
+    }
+  }, [viewMode, mapStyle]);
+
   // 处理 POI 点击
   const handlePoiClick = useCallback(
     (poi: typeof poiList[0]) => {
@@ -297,9 +301,8 @@ export function RealMap({
   const handleRetry = useCallback(() => {
     setError(null);
     setLoading(true);
-    // 重新触发初始化（清除单例状态）
-    sdkLoadPromise = null;
-    initializedRef.current = false;
+    // 重新触发初始化（通过强制重新挂载组件）
+    window.location.reload();
   }, []);
 
   if (error) {
@@ -330,6 +333,37 @@ export function RealMap({
             <p>正在加载地图...</p>
           </div>
         )}
+      </div>
+
+      <div className={styles.mapControls}>
+        <button
+          className={`${styles.mapControlBtn} ${viewMode === "2D" ? styles.active : ""}`}
+          onClick={() => setViewMode("2D")}
+          type="button"
+        >
+          2D
+        </button>
+        <button
+          className={`${styles.mapControlBtn} ${viewMode === "3D" ? styles.active : ""}`}
+          onClick={() => setViewMode("3D")}
+          type="button"
+        >
+          3D
+        </button>
+        <button
+          className={`${styles.mapControlBtn} ${mapStyle === "standard" ? styles.active : ""}`}
+          onClick={() => setMapStyle("standard")}
+          type="button"
+        >
+          标准
+        </button>
+        <button
+          className={`${styles.mapControlBtn} ${mapStyle === "satellite" ? styles.active : ""}`}
+          onClick={() => setMapStyle("satellite")}
+          type="button"
+        >
+          卫星
+        </button>
       </div>
 
       <div className={styles.poiPanel}>
