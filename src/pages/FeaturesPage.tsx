@@ -39,6 +39,8 @@ import { ErrorCardView } from "../components/features/ErrorCardView";
 import { MobileHandoffQRCode } from "../components/features/MobileHandoffQRCode";
 import { OrderDraftModal } from "../components/features/OrderDraftModal";
 import { RealMap } from "../components/RealMap";
+import { OpenStreetMap } from "../components/OpenStreetMap";
+import { MapSelector } from "../components/MapSelector";
 import styles from "./FeaturesPage.module.scss";
 
 /* ═══════════════════════════════════════════════
@@ -180,6 +182,8 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
   const [internalViewMode, setInternalViewMode] = useState<"chat" | "map">("chat");
   const viewMode = externalViewMode ?? internalViewMode;
   const setViewMode = onSetViewMode ?? setInternalViewMode;
+  // 地图提供商选择
+  const [mapProvider, setMapProvider] = useState<"amap" | "osm">("amap");
   const [inputValue, setInputValue] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [, setPhase] = useState<ChatPhase>("idle");
@@ -2124,11 +2128,20 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
             >
               ← 返回
             </button>
-            <RealMap
-              key="realmap"
-              center={location?.latitude && location?.longitude ? [location.longitude, location.latitude] : undefined}
-              city={city}
-            />
+            <MapSelector value={mapProvider} onChange={setMapProvider} />
+            {mapProvider === "amap" ? (
+              <RealMap
+                key="amap"
+                center={location?.latitude && location?.longitude ? [location.longitude, location.latitude] : undefined}
+                city={city}
+              />
+            ) : (
+              <OpenStreetMap
+                key="osm"
+                center={location?.latitude && location?.longitude ? [location.longitude, location.latitude] : undefined}
+                city={city}
+              />
+            )}
           </div>
         ) : mode === "idle" ? (
           /* ── Idle: centered title + composer ── */
