@@ -70,6 +70,7 @@ export async function calculateRouteTimes(
   plans: ActivityPlan[],
   candidates: CandidatePool,
   amapClient?: AmapClient,
+  signal?: AbortSignal,
 ): Promise<ActivityPlan[]> {
   const poiMap = buildPoiMap(candidates);
 
@@ -90,7 +91,7 @@ export async function calculateRouteTimes(
 
       // Try real Amap route API first
       if (amapClient && amapClient.isConfigured() && fromPoi?.lat && fromPoi?.lng && toPoi?.lat && toPoi?.lng) {
-        transportTime = await fetchRealRouteTime(amapClient, fromPoi, toPoi, next.transport);
+        transportTime = await fetchRealRouteTime(amapClient, fromPoi, toPoi, next.transport, signal);
         if (transportTime > 0) usedRealApi = true;
       }
 
@@ -141,6 +142,7 @@ async function fetchRealRouteTime(
   from: CandidatePoi,
   to: CandidatePoi,
   mode: string,
+  signal?: AbortSignal,
 ): Promise<number> {
   const origin = `${from.lng},${from.lat}`;
   const destination = `${to.lng},${to.lat}`;
@@ -149,12 +151,12 @@ async function fetchRealRouteTime(
     let response: { route?: { paths?: Array<{ duration?: string }> } } | undefined;
 
     if (mode === "walk" || mode === "walking") {
-      response = await client.routeWalking({ origin, destination });
+      response = await client.routeWalking({ origin, destination }, signal);
     } else if (mode === "driving" || mode === "taxi") {
-      response = await client.routeDriving({ origin, destination });
+      response = await client.routeDriving({ origin, destination }, signal);
     } else {
       // Default to transit for subway/mixed
-      response = await client.routeTransit({ origin, destination });
+      response = await client.routeTransit({ origin, destination }, signal);
     }
 
     const duration = response?.route?.paths?.[0]?.duration;

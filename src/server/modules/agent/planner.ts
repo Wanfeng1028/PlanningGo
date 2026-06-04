@@ -13,6 +13,7 @@ export interface PlannerInput {
   context: PlanningContext;
   candidates: CandidatePool;
   providers?: PlanningProviders;
+  signal?: AbortSignal;
 }
 
 // LLM 输出 JSON schema 描述（发给 LLM 的 prompt 里用）
@@ -244,9 +245,14 @@ function extractSpecificDestination(raw: string): string | null {
  */
 export function generateMockPlans(input: PlannerInput): ActivityPlan[] {
   const mode = input.intent.participantMode;
+  const specifiedRoute = buildSpecifiedRoutePlan(input);
   const primary = buildPrimaryPlan(input);
   const backup = buildIndoorBackupPlan(input);
   const foodie = buildSocialFoodiePlan(input);
+
+  if (specifiedRoute) {
+    return [specifiedRoute, backup, foodie];
+  }
 
   if (mode === "friends") {
     return [buildFriendsPlan(input), foodie, backup];
@@ -256,6 +262,264 @@ export function generateMockPlans(input: PlannerInput): ActivityPlan[] {
   }
   // family, solo, unknown 均走通用主方案
   return [primary, foodie, backup];
+}
+
+function buildSpecifiedRoutePlan(input: PlannerInput): ActivityPlan | null {
+  const { intent } = input;
+  const routeStops = intent.routeStops.filter((stop) => stop && stop !== intent.origin.label);
+  if (routeStops.length < 2) return null;
+
+  const optionId = createId("option_route");
+  const startTime = resolveStartTime(intent);
+  let cursor = timeToMinutes(startTime);
+  const transport = intent.transportMode === "subway" || intent.transportMode === "transit"
+    ? "subway"
+    : intent.transportMode === "driving"
+      ? "driving"
+      : intent.transportMode === "walk"
+        ? "walk"
+        : "taxi";
+  const timeline: ActivityPlan["timeline"] = [];
+  const origin = intent.origin.label;
+  const returnPoint = intent.returnPoint || origin;
+
+  const addStep = (inputStep: Omit<ActivityPlan["timeline"][number], "id" | "actionId">) => {
+    timeline.push({ ...inputStep, id: createId("step"), actionId: null });
+  };
+
+  const firstStop = routeStops[0]!;
+  addStep({
+    startTime,
+    endTime: minutesToTime(cursor + 35),
+    type: "travel",
+    title: `从${origin}出发去${firstStop}`,
+    poiId: null,
+    poiName: firstStop,
+    durationMinutes: 35,
+    transport,
+    reasoning: "用户已指定出发地和第一站，优先按原路线执行。",
+    bookingNeeded: false,
+    description: `从${origin}前往${firstStop}，建议出发前打开导航确认实时路况。`,
+    estimatedCost: transport === "subway" ? "地铁约3-8元" : transport === "walk" ? "免费" : "打车约35-60元",
+    suggestions: ["出发前确认实时路况", "保留10分钟缓冲"],
+  });
+  cursor += 35;
+
+  for (let index = 0; index < routeStops.length; index += 1) {
+    const stop = routeStops[index]!;
+    const detail = buildSpecifiedStopDetail(stop, intent);
+    addStep({
+      startTime: minutesToTime(cursor),
+      endTime: minutesToTime(cursor + detail.durationMinutes),
+      type: detail.type,
+      title: detail.title,
+      poiId: null,
+      poiName: stop,
+      durationMinutes: detail.durationMinutes,
+      transport: "none",
+      reasoning: detail.reasoning,
+      bookingNeeded: detail.bookingNeeded,
+      description: detail.description,
+      estimatedCost: detail.estimatedCost,
+      bookingHint: detail.bookingHint,
+      suggestions: detail.suggestions,
+      whyRecommended: detail.whyRecommended,
+      recommendedItems: detail.recommendedItems,
+      bookingAdvice: detail.bookingAdvice,
+      queueRisk: detail.queueRisk,
+      businessHours: detail.businessHours,
+      actionHints: detail.actionHints,
+      fallbackPois: detail.fallbackPois,
+    });
+    cursor += detail.durationMinutes;
+
+    if (index === 0 && intent.foodPreferences.some((item) => /咖啡|奶茶/.test(item)) && !/咖啡|奶茶|星巴克|瑞幸|喜茶|奈雪|霸王茶姬/.test(stop)) {
+      addStep({
+        startTime: minutesToTime(cursor),
+        endTime: minutesToTime(cursor + 35),
+        type: "rest",
+        title: `${stop}附近咖啡/饮品补给`,
+        poiId: null,
+        poiName: `${stop}附近咖啡店`,
+        durationMinutes: 35,
+        transport: "walk",
+        reasoning: "用户明确提到喝咖啡，安排在首个景点后短暂停留。",
+        bookingNeeded: false,
+        description: `在${stop}附近选择咖啡或茶饮，推荐生椰拿铁、冰拿铁或低糖茶饮。`,
+        estimatedCost: "约20-45元",
+        suggestions: ["优先选择离下一站近的门店", "可提前查看排队"],
+        whyRecommended: "放在游览后补充体力，不影响后续前往下一站。",
+        recommendedItems: ["生椰拿铁", "冰拿铁", "低糖茶饮"],
+        bookingAdvice: "无需预约，可生成下单草稿后由用户到平台确认",
+        queueRisk: "medium",
+        businessHours: "08:00-22:00，具体以门店为准",
+        actionHints: ["生成下单草稿", "打开平台确认支付", "导航到店"],
+        fallbackPois: ["Manner Coffee", "%Arabica", "瑞幸咖啡"],
+      });
+      cursor += 35;
+    }
+
+    const nextStop = routeStops[index + 1];
+    if (nextStop) {
+      addStep({
+        startTime: minutesToTime(cursor),
+        endTime: minutesToTime(cursor + 25),
+        type: "travel",
+        title: `前往${nextStop}`,
+        poiId: null,
+        poiName: nextStop,
+        durationMinutes: 25,
+        transport,
+        reasoning: "按用户指定顺序继续前往下一站。",
+        bookingNeeded: false,
+        description: `从${stop}前往${nextStop}，实际耗时以地图实时路线为准。`,
+        estimatedCost: transport === "subway" ? "地铁约3-8元" : transport === "walk" ? "免费" : "打车约20-45元",
+        suggestions: ["出发前打开导航确认入口"],
+      });
+      cursor += 25;
+    }
+  }
+
+  if (returnPoint) {
+    addStep({
+      startTime: minutesToTime(cursor),
+      endTime: minutesToTime(cursor + 35),
+      type: "return",
+      title: `返回${returnPoint}`,
+      poiId: null,
+      poiName: returnPoint,
+      durationMinutes: 35,
+      transport,
+      reasoning: "用户明确要求回到起点，安排回程闭环。",
+      bookingNeeded: false,
+      description: `从最后一站返回${returnPoint}，建议到点前确认实时路线。`,
+      estimatedCost: transport === "subway" ? "地铁约3-8元" : transport === "walk" ? "免费" : "打车约35-60元",
+      suggestions: ["返程前确认打车排队情况"],
+    });
+    cursor += 35;
+  }
+
+  const hasBudget = typeof intent.budgetMax === "number";
+  const assumptions = [
+    `按用户指定路线执行：${[origin, ...routeStops, returnPoint].filter(Boolean).join(" → ")}`,
+    hasBudget ? `预算上限：${intent.budgetMax}元` : "用户未提供预算，先按一人半日 250-450 元估算",
+    "门票、预约、排队和价格以第三方平台最终页面为准",
+  ];
+
+  return {
+    id: optionId,
+    planId: input.planId,
+    title: `${intent.city}${routeStops[0]}细致执行路线`,
+    targetGroup: intent.participantMode === "unknown" ? "solo" : intent.participantMode,
+    score: 92,
+    summary: `按你指定的${routeStops.join(" → ")}顺序安排，包含交通、游玩、饮品/用餐和回程动作。`,
+    totalDurationMinutes: cursor - timeToMinutes(startTime),
+    totalCostMin: hasBudget ? Math.round(intent.budgetMax! * 0.55) : 250,
+    totalCostMax: hasBudget ? intent.budgetMax! : 450,
+    walkingKm: 2.8,
+    assumptions,
+    highlights: ["严格按用户路线排序", "每站带执行动作", "交易类仅生成草稿"],
+    risks: ["景区/寺庙预约和门票需平台确认", "海底捞高峰可能排队", "价格以第三方平台为准"],
+    timeline,
+    backupPlan: "若灵隐寺门票或预约不可用，改为西湖周边咖啡 + 湖滨慢逛 + 提前去海底捞取号。",
+  };
+}
+
+function buildSpecifiedStopDetail(stop: string, intent: UserIntent): {
+  type: ActivityPlan["timeline"][number]["type"];
+  title: string;
+  durationMinutes: number;
+  reasoning: string;
+  bookingNeeded: boolean;
+  description: string;
+  estimatedCost: string;
+  bookingHint?: string;
+  suggestions: string[];
+  whyRecommended: string;
+  recommendedItems?: string[];
+  bookingAdvice: string;
+  queueRisk: ActivityPlan["timeline"][number]["queueRisk"];
+  businessHours?: string;
+  actionHints: string[];
+  fallbackPois: string[];
+} {
+  if (/海底捞|火锅|餐厅|饭店/.test(stop)) {
+    return {
+      type: "meal",
+      title: `${stop}用餐`,
+      durationMinutes: 80,
+      reasoning: "用户指定晚些时候吃海底捞，需预留排队和用餐时间。",
+      bookingNeeded: true,
+      description: `安排${stop}用餐，推荐提前在美团/海底捞小程序查看排队、预约和套餐。`,
+      estimatedCost: intent.partySize <= 1 ? "一人约120-180元" : `约人均120-180元，共${intent.partySize}人`,
+      bookingHint: "建议提前取号或预约，最终以平台确认为准",
+      suggestions: ["先取号再前往", "避开19:00-20:00高峰"],
+      whyRecommended: "用户明确指定海底捞，适合作为行程末段正餐。",
+      recommendedItems: ["番茄锅", "毛肚", "捞派肥牛", "小酥肉"],
+      bookingAdvice: "生成预约草稿，跳转美团/海底捞页面由用户确认",
+      queueRisk: "high",
+      businessHours: "10:00-次日02:00，具体以门店为准",
+      actionHints: ["生成预约草稿", "打开美团确认", "导航到店"],
+      fallbackPois: ["凑凑火锅", "湊湊火锅", "新白鹿餐厅"],
+    };
+  }
+  if (/咖啡|奶茶|星巴克|瑞幸|喜茶|奈雪|霸王茶姬/.test(stop)) {
+    return {
+      type: "rest",
+      title: `在${stop}附近喝咖啡/饮品`,
+      durationMinutes: 40,
+      reasoning: "用户希望行程中喝咖啡，安排短暂停留补充体力。",
+      bookingNeeded: false,
+      description: `在${stop}附近选择咖啡或茶饮，推荐生椰拿铁、冰拿铁或低糖茶饮。`,
+      estimatedCost: "约20-45元",
+      suggestions: ["优先选离下一站近的门店", "可提前在平台查看排队"],
+      whyRecommended: "作为游览间隙停留点，节奏轻，不影响后续行程。",
+      recommendedItems: ["生椰拿铁", "冰拿铁", "低糖茶饮"],
+      bookingAdvice: "无需预约，可生成下单草稿后由用户到平台确认",
+      queueRisk: "medium",
+      businessHours: "08:00-22:00，具体以门店为准",
+      actionHints: ["生成下单草稿", "打开平台确认支付", "导航到店"],
+      fallbackPois: ["Manner Coffee", "%Arabica", "瑞幸咖啡"],
+    };
+  }
+  if (/灵隐寺|寺|景区|公园|西湖/.test(stop)) {
+    const isTemple = /灵隐寺|寺/.test(stop);
+    return {
+      type: "activity",
+      title: `${stop}游览`,
+      durationMinutes: isTemple ? 75 : 85,
+      reasoning: "用户明确指定该景点，安排足够游览和拍照时间。",
+      bookingNeeded: isTemple,
+      description: isTemple
+        ? `${stop}通常涉及景区/寺庙预约或门票，建议先确认开放、门票和入园要求。`
+        : `${stop}按轻松路线游览，建议选择入口清晰、步行压力较低的路线。`,
+      estimatedCost: isTemple ? "门票/香花券以平台为准" : "免费，部分项目另计",
+      bookingHint: isTemple ? "需跳转平台确认门票/预约，不自动购票" : "无需预约，热门时段注意人流",
+      suggestions: isTemple ? ["提前确认入园要求", "保留安检和步行时间"] : ["带相机", "穿舒适鞋"],
+      whyRecommended: "用户明确指定，属于本次行程核心目的地。",
+      recommendedItems: isTemple ? ["门票预约", "导航入口"] : ["断桥方向", "湖滨步道"],
+      bookingAdvice: isTemple ? "生成购票/预约入口，用户到第三方平台确认" : "现场游览，必要时查看团购/门票入口",
+      queueRisk: isTemple ? "medium" : "low",
+      businessHours: isTemple ? "约07:00-18:00，具体以景区公告为准" : "开放空间，具体以景区公告为准",
+      actionHints: isTemple ? ["查看门票/预约", "打开导航"] : ["打开导航", "查看附近入口"],
+      fallbackPois: isTemple ? ["飞来峰景区", "法喜寺", "北高峰"] : ["断桥残雪", "湖滨步行街", "曲院风荷"],
+    };
+  }
+  return {
+    type: "activity",
+    title: `${stop}停留`,
+    durationMinutes: 50,
+    reasoning: "用户指定该站点，纳入路线。",
+    bookingNeeded: false,
+    description: `在${stop}停留并根据现场情况调整节奏。`,
+    estimatedCost: "费用待平台确认",
+    suggestions: ["到达前确认开放状态"],
+    whyRecommended: "用户明确指定。",
+    bookingAdvice: "如涉及预约或门票，请跳转平台确认",
+    queueRisk: "unknown",
+    actionHints: ["打开导航", "复制地点信息"],
+    fallbackPois: [],
+  };
 }
 
 /** 主方案：根据 participantMode 动态生成标题和内容 */
@@ -575,6 +839,7 @@ export async function generateLlmPlans(input: PlannerInput): Promise<ActivityPla
         model,
         maxTokens: 4096,
         temperature: 0.7,
+        signal: input.signal,
       };
 
       const result = await llmProvider.chat(query);

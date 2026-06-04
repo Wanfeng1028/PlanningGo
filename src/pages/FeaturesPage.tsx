@@ -204,6 +204,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
   const composerDockRef = useRef<HTMLDivElement>(null);
   const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const currentSessionIdRef = useRef<string | null>(null);
+  const requestInFlightRef = useRef(false);
 
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const city = selectedCity || location?.city || user?.city || "选择城市";
@@ -561,7 +562,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
   /* ── Core submit flow ── */
   const doSubmit = useCallback(
     async (prompt: string) => {
-      if (!prompt || isBusy) return;
+      if (!prompt || requestInFlightRef.current) return;
 
       // Clear draft for current session on send
       if (currentSessionIdRef.current) {
@@ -588,6 +589,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
       setAbortController(controller);
 
       setMode("chat");
+      requestInFlightRef.current = true;
       setIsBusy(true);
       setPhase("understanding");
       setAgentEvents([]); // Clear events from previous request
@@ -730,6 +732,14 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
                   }
                   return [...prev, traceEvent];
                 });
+                if (traceEvent.type === "stage" && traceEvent.stage === "finalizing" && traceEvent.status === "done") {
+                  setIsBusy(false);
+                  setAbortController(null);
+                }
+              },
+              onComplete: () => {
+                setIsBusy(false);
+                setAbortController(null);
               },
             }
           );
@@ -963,6 +973,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
         apiTrackEvent({ eventName: "planning_failed", payload: { error: rawError }, page: "features" }).catch(() => {});
         reportClientError({ message: rawError, route: "/api/agent/plan" }).catch(() => {});
       } finally {
+        requestInFlightRef.current = false;
         setIsBusy(false);
         setAbortController(null);
       }
@@ -972,6 +983,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
 
   const handleStopGeneration = useCallback(() => {
     abortController?.abort();
+    requestInFlightRef.current = false;
     setAbortController(null);
     setIsBusy(false);
     if (!currentSessionIdRef.current) return;
@@ -1699,9 +1711,17 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
         statusClass = styles.eventWarning;
       }
 
+      void icon;
+      const publicIcon =
+        statusClass === styles.eventSuccess ? "成" :
+        statusClass === styles.eventError ? "错" :
+        statusClass === styles.eventWarning ? "!" :
+        statusClass === styles.eventSkipped ? "-" :
+        "中";
+
       return (
         <div key={evt.id ?? `${evt.type}-${_index}`} className={`${styles.agentEventItem} ${statusClass}`}>
-          <span className={styles.agentEventIcon}>{icon}</span>
+          <span className={styles.agentEventIcon}>{publicIcon}</span>
           <div className={styles.agentEventBody}>
             <span className={styles.agentEventTitle}>{evt.label}</span>
 
@@ -1731,7 +1751,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
             )}
 
             {/* Tool output summary */}
-            {evt.type === "tool" && evt.outputSummary && (
+            {evt.type === "tool" && evt.outputSummary && evt.status === "error" && (
               <div className={styles.agentEventDetail}>{evt.outputSummary}</div>
             )}
 
@@ -2041,7 +2061,9 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
                 </div>
                 {!agentEventsCollapsed && (
                   <div className={styles.agentEventsList}>
-                    {agentEvents.map((evt, i) => renderAgentEvent(evt, i))}
+                    {agentEvents
+                      .filter((evt) => evt.type !== "tool" || evt.status === "error")
+                      .map((evt, i) => renderAgentEvent(evt, i))}
                   </div>
                 )}
               </div>

@@ -34,12 +34,13 @@ export interface PlanningProgressCallback {
  * V4: 支持 progress 回调实现真流式 SSE
  */
 export async function runPlanningPipeline(
-  input: PlanningRequest & { modelMode?: "flash" | "pro"; providers?: PlanningProviders; userId?: string; progress?: PlanningProgressCallback },
+  input: PlanningRequest & { modelMode?: "flash" | "pro"; providers?: PlanningProviders; userId?: string; progress?: PlanningProgressCallback; signal?: AbortSignal },
 ): Promise<PlanningResponse & { summary: string; selectedPlanId: string; suggestions?: ReturnType<typeof generateSuggestions> }> {
   const traceId = createTraceId();
   const planId = createId("plan");
   const mode = env.PLANNING_MODE;
   const progress = input.progress;
+  const signal = input.signal;
 
   // 1. 抽取意图
   progress?.onStatus("正在理解你的需求...");
@@ -76,7 +77,7 @@ export async function runPlanningPipeline(
 
   // 3. 生成候选 POI 池（通过 providers.map 获取真实数据）
   progress?.onStatus(`正在搜索${intent.city || "目的地"}附近的景点、餐厅和咖啡店...`);
-  const candidates = await generateCandidates(context);
+  const candidates = await generateCandidates(context, signal);
 
   // V4: 推送候选 POI 数量
   progress?.onCandidates({
@@ -97,7 +98,7 @@ export async function runPlanningPipeline(
 
   // 5. 生成方案
   progress?.onStatus("正在规划行程方案...");
-  const plannerInput = { traceId, planId, intent, context, candidates: effectiveCandidates, providers: input.providers };
+  const plannerInput = { traceId, planId, intent, context, candidates: effectiveCandidates, providers: input.providers, signal };
   let options;
 
   if (mode === "llm") {
@@ -127,7 +128,7 @@ export async function runPlanningPipeline(
 
   // 7. 计算路线交通时间
   progress?.onStatus("正在计算路线和交通时间...");
-  const routedOptions = await calculateRouteTimes(enrichedOptions, effectiveCandidates, input.providers?.map ? getAmapClientIfAvailable(input.providers.map) : undefined);
+  const routedOptions = await calculateRouteTimes(enrichedOptions, effectiveCandidates, input.providers?.map ? getAmapClientIfAvailable(input.providers.map) : undefined, signal);
 
   // 7.5. 为每个方案生成 serviceActions（外部服务入口）
   const serviceEnhancedOptions = routedOptions.map((option) => {
@@ -187,10 +188,9 @@ export async function runPlanningPipeline(
     });
   }
 
-  // TODO(V4): 客户端断开时真正中断 pipeline — 需要 threading AbortSignal 到
+  // Client disconnect now aborts pipeline via AbortSignal threaded through:
   // generateCandidates → amap API, generateLlmPlans → LLM client,
-  // enrichPlanWithPoiDetails → amap API, calculateRouteTimes → amap API
-  // 当前仅跳过写入 closed socket，pipeline 仍会跑完
+  // calculateRouteTimes → amap API
 
   // 10.5 画像沉淀：方案生成后异步更新用户画像
   if (input.userId && serviceEnhancedOptions[0]) {

@@ -4,7 +4,7 @@ import { createMobileHandoff, getHandoffByToken, claimHandoff, getHandoffStatus 
 import { createHandoffCode, getHandoffCode, claimHandoffCode } from "../modules/handoff/handoffCodeService";
 import type { PermissionScope } from "../modules/agent/middleware/permissionGuard";
 import { sendOk, sendError } from "../common/response.js";
-import { requireUserId } from "../common/uid.js";
+import { optionalUserId, requireUserId } from "../common/uid.js";
 import { assertHandoffConversationOwnership } from "../common/ownership.js";
 import { sanitizeHandoffCode, shouldStripStack } from "../common/logSanitizer.js";
 
@@ -26,6 +26,81 @@ const claimHandoffSchema = z.object({
 const authorizeHandoffSchema = z.object({
   scopes: z.array(z.string()).default([]),
 });
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function latestPlanPayload(messages: Array<{ role: string; payloadJson: unknown }>) {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i]!;
+    const payload = asRecord(message.payloadJson);
+    if (message.role !== "assistant" || payload?.type !== "plan") continue;
+    const data = asRecord(payload.data);
+    if (data) return data;
+  }
+  return null;
+}
+
+async function buildHandoffDetail(fastify: FastifyInstance, code: string) {
+  const handoff = await getHandoffCode(code);
+  if (!handoff) return null;
+
+  const db = fastify.db;
+  if (!db) throw new Error("Database not available");
+
+  const conversation = await db.conversation.findUnique({
+    where: { id: handoff.conversationId },
+    include: {
+      messages: {
+        orderBy: { createdAt: "asc" },
+        select: { id: true, role: true, content: true, payloadJson: true, createdAt: true },
+      },
+    },
+  });
+  if (!conversation) return null;
+
+  const planPayload = latestPlanPayload(conversation.messages);
+  const options = asArray(planPayload?.options).filter((option) => asRecord(option));
+  const selectedOptionId = conversation.selectedOptionId
+    ?? (typeof planPayload?.selectedOptionId === "string" ? planPayload.selectedOptionId : null)
+    ?? (typeof handoff.planId === "string" ? null : null);
+
+  const selectedOption = (selectedOptionId
+    ? options.find((option) => asRecord(option)?.id === selectedOptionId)
+    : null) ?? options[0] ?? null;
+
+  return {
+    code: handoff.code,
+    conversation: {
+      id: conversation.id,
+      title: conversation.title,
+      city: conversation.city,
+      selectedOptionId: conversation.selectedOptionId,
+      updatedAt: conversation.updatedAt.toISOString(),
+    },
+    handoff: {
+      conversationId: handoff.conversationId,
+      planId: handoff.planId,
+      expiresAt: handoff.expiresAt,
+    },
+    plan: planPayload ? {
+      planId: typeof planPayload.planId === "string" ? planPayload.planId : handoff.planId,
+      summary: typeof planPayload.summary === "string" ? planPayload.summary : "",
+      selectedOptionId,
+      selectedOption,
+      options,
+      executableActions: asArray(planPayload.executableActions),
+      planningActions: asArray(planPayload.planningActions),
+    } : null,
+  };
+}
 
 export async function registerHandoffRoutes(fastify: FastifyInstance) {
   /**
@@ -230,6 +305,28 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
     }
   });
 
+  /**
+   * Query handoff detail for the mobile browser.
+   * The short-lived code is the access proof; do not expose auth tokens or account data.
+   * GET /api/handoff/:code/detail
+   */
+  fastify.get("/api/handoff/:code/detail", { preHandler: [fastify.optionalAuthGuard] }, async (request, reply) => {
+    const { code } = z.object({ code: z.string().min(4).max(12) }).parse(request.params);
+
+    try {
+      const detail = await buildHandoffDetail(fastify, code);
+
+      if (!detail) {
+        return sendError(reply, 404, "HANDOFF_CODE_NOT_FOUND", "接续码不存在或已过期");
+      }
+
+      return sendOk(reply, detail);
+    } catch (error) {
+      fastify.log.error(error);
+      return sendError(reply, 500, "HANDOFF_DETAIL_FETCH_FAILED", "获取接续详情失败");
+    }
+  });
+
   const claimCodeSchema = z.object({
     deviceId: z.string().min(1).max(128),
   });
@@ -238,10 +335,10 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
    * Claim a handoff code (mobile device scans QR)
    * POST /api/handoff/:code/claim
    */
-  fastify.post("/api/handoff/:code/claim", { preHandler: [fastify.authGuard] }, async (request, reply) => {
+  fastify.post("/api/handoff/:code/claim", { preHandler: [fastify.optionalAuthGuard] }, async (request, reply) => {
     const { code } = z.object({ code: z.string().min(4).max(12) }).parse(request.params);
     const body = claimCodeSchema.parse(request.body);
-    const userId = uid(request);
+    const userId = optionalUserId(request);
 
     // 限流：每 IP + code 每分钟最多 5 次
     const limiter = (request.server as unknown as { redis?: unknown }).redis;

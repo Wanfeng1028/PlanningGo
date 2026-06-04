@@ -13,6 +13,8 @@ const mockIntent: UserIntent = {
   budgetMax: 500,
   distanceLimitMinutes: 40,
   preferences: [],
+  routeStops: [],
+  foodPreferences: [],
   mustAsk: [],
         isPlanningRequest: true,
 }
@@ -206,6 +208,8 @@ const planningMockIntent: UserIntent = {
   partySize: 1,
   timeWindow: 'morning',
   preferences: ['咖啡厅', '火锅'],
+  routeStops: [],
+  foodPreferences: ['咖啡厅', '火锅'],
   distanceLimitMinutes: 40,
   durationHours: [4, 6],
   isPlanningRequest: true,

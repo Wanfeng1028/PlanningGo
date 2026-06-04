@@ -68,6 +68,7 @@ export interface LlmQuery {
   model?: string
   temperature?: number
   maxTokens?: number
+  signal?: AbortSignal
 }
 
 export interface LlmResult {
@@ -96,7 +97,7 @@ export interface BookingResult {
 }
 
 export interface MapProvider {
-  searchPois(query: PoiQuery): Promise<PoiResult[]>
+  searchPois(query: PoiQuery, signal?: AbortSignal): Promise<PoiResult[]>
   getWeather(query: WeatherQuery): Promise<WeatherResult>
   planRoute(query: RouteQuery): Promise<RouteResult>
 }

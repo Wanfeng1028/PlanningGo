@@ -311,5 +311,25 @@ describe("chatRouter", () => {
       expect(slots.time).toContain("上午");
       expect(slots.time).toContain("9");
     });
+
+    it("extracts route, return point, Chinese time, and execution intents from the West Lake acceptance prompt", () => {
+      const slots = extractPlanningSlots("我明天下午两点要去西湖，从浙大紫金港出发，逛西湖喝咖啡去灵隐寺，然后去附近的海底捞，然后回浙大紫金港，你帮我安排一下。就我一个人：小明。");
+
+      expect(slots.origin).toBe("浙大紫金港");
+      expect(slots.destination).toBe("西湖");
+      expect(slots.destinationCity).toBe("杭州");
+      expect(slots.returnPoint).toBe("浙大紫金港");
+      expect(slots.partySize).toBe(1);
+      expect(slots.companions).toBe("solo");
+      expect(slots.time).toBe("明天下午2点");
+      expect(slots.timeWindow).toBe("afternoon");
+      expect(slots.routeStops).toEqual(expect.arrayContaining(["西湖", "灵隐寺", "海底捞"]));
+      expect(slots.preferences).toEqual(expect.arrayContaining(["咖啡厅", "海底捞"]));
+      expect(slots.foodPreferences).toEqual(expect.arrayContaining(["咖啡厅", "海底捞"]));
+      expect(slots.bookingIntent).toBe("needs_booking_check");
+      expect(slots.purchaseIntent).toBe("needs_ticket_check");
+      expect(slots.orderingIntent).toBe("needs_order_draft");
+      expect(getMissingSlots(slots)).toEqual([]);
+    });
   });
 });

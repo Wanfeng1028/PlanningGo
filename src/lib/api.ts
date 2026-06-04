@@ -1050,11 +1050,10 @@ export async function createHandoffCode(input: {
   conversationId: string;
   planId?: string;
 }): Promise<HandoffCodeResult> {
-  const resp = await apiJson<{ data: HandoffCodeResult }>("/api/handoff/create", {
+  return apiJson<HandoffCodeResult>("/api/handoff/create", {
     method: "POST",
     body: JSON.stringify(input),
   });
-  return resp.data;
 }
 
 export async function getHandoffCode(code: string): Promise<{
@@ -1066,15 +1065,14 @@ export async function getHandoffCode(code: string): Promise<{
   expiresAt: string;
 } | null> {
   try {
-    const resp = await apiJson<{ data: {
+    return await apiJson<{
       code: string;
       conversationId: string;
       planId: string | null;
       userId: string | null;
       status: string;
       expiresAt: string;
-    } | null }>(`/api/handoff/${encodeURIComponent(code)}`);
-    return resp.data;
+    } | null>(`/api/handoff/${encodeURIComponent(code)}`);
   } catch {
     return null;
   }
@@ -1085,15 +1083,57 @@ export async function claimHandoffCode(code: string, deviceId: string): Promise<
   conversationId: string;
   planId: string | null;
 }> {
-  const resp = await apiJson<{ data: {
+  return apiJson<{
     success: boolean;
     conversationId: string;
     planId: string | null;
-  } }>(`/api/handoff/${encodeURIComponent(code)}/claim`, {
+  }>(`/api/handoff/${encodeURIComponent(code)}/claim`, {
     method: "POST",
     body: JSON.stringify({ deviceId }),
   });
-  return resp.data;
+}
+
+export interface HandoffDetail {
+  code: string;
+  conversation: {
+    id: string;
+    title: string;
+    city: string;
+    selectedOptionId?: string | null;
+    updatedAt: string;
+  };
+  handoff: {
+    conversationId: string;
+    planId: string | null;
+    expiresAt: string;
+  };
+  plan: {
+    planId?: string | null;
+    summary: string;
+    selectedOptionId?: string | null;
+    selectedOption?: PlanningOption | null;
+    options: PlanningOption[];
+    executableActions: PlanningExecutableAction[];
+    planningActions: Array<{
+      key?: string;
+      type?: string;
+      label?: string;
+      title?: string;
+      description?: string;
+      url?: string;
+      redirectUrl?: string;
+      copyText?: string;
+      payload?: Record<string, unknown>;
+    }>;
+  } | null;
+}
+
+export async function getHandoffDetail(code: string): Promise<HandoffDetail | null> {
+  try {
+    return await apiJson<HandoffDetail>(`/api/handoff/${encodeURIComponent(code)}/detail`);
+  } catch {
+    return null;
+  }
 }
 
 // ── Shared type re-exports ──

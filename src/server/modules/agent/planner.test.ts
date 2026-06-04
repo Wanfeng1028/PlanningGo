@@ -16,6 +16,8 @@ const baseIntent: UserIntent = {
   budgetMax: 500,
   distanceLimitMinutes: 40,
   preferences: [],
+  routeStops: [],
+  foodPreferences: [],
   mustAsk: [],
         isPlanningRequest: true,
 }
@@ -139,5 +141,53 @@ describe('generateMockPlans', () => {
   it('should set planId correctly', () => {
     const plans = generateMockPlans(makeInput())
     expect(plans[0].planId).toBe('plan-1')
+  })
+
+  it('generates a detailed route-first plan for the West Lake acceptance prompt', () => {
+    const intent: UserIntent = {
+      ...baseIntent,
+      raw: '我明天下午两点要去西湖，从浙大紫金港出发，逛西湖喝咖啡去灵隐寺，然后去附近的海底捞，然后回浙大紫金港，就我一个人：小明。',
+      city: '杭州',
+      origin: { label: '浙大紫金港' },
+      departAt: '明天下午2点',
+      timeWindow: 'afternoon',
+      participantMode: 'solo',
+      partySize: 1,
+      routeStops: ['西湖', '灵隐寺', '海底捞'],
+      returnPoint: '浙大紫金港',
+      foodPreferences: ['咖啡厅', '海底捞'],
+      bookingIntent: 'needs_booking_check',
+      orderingIntent: 'needs_order_draft',
+      purchaseIntent: 'needs_ticket_check',
+    }
+
+    const plans = generateMockPlans(makeInput({ intent }))
+    const primary = plans[0]
+    const titles = primary.timeline.map((step) => step.title).join(' ')
+    const poiNames = primary.timeline.map((step) => step.poiName).filter(Boolean)
+
+    expect(primary.summary).toContain('西湖')
+    expect(primary.timeline[0].startTime).toBe('14:00')
+    expect(poiNames).toEqual(expect.arrayContaining(['西湖', '灵隐寺', '海底捞', '浙大紫金港']))
+    expect(titles).toContain('返回浙大紫金港')
+    expect(primary.timeline.some((step) => step.poiName === '灵隐寺' && step.bookingNeeded)).toBe(true)
+    expect(primary.timeline.some((step) => step.poiName === '海底捞' && step.type === 'meal' && step.bookingNeeded)).toBe(true)
+    expect(primary.timeline.some((step) => step.actionHints?.some((hint) => hint.includes('下单草稿') || hint.includes('确认支付')))).toBe(true)
+    expect(primary.risks.join(' ')).toContain('平台')
+    expect(plans.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('marks optional missing budget as an explicit assumption instead of blocking planning', () => {
+    const plans = generateMockPlans(makeInput({
+      intent: {
+        ...baseIntent,
+        budgetMax: undefined,
+        preferences: ['咖啡厅'],
+      },
+    }))
+
+    expect(plans[0].assumptions.join(' ')).toContain('未提供预算')
+    expect(plans[0].assumptions.join(' ')).toContain('估算')
+    expect(plans[0].timeline.length).toBeGreaterThan(0)
   })
 })

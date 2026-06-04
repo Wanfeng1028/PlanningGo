@@ -195,7 +195,13 @@ export function extractPlanningSlots(message: string): PlanningSlots {
   pushUnique(routeStops, typeof slots.destination === "string" ? slots.destination : undefined);
   const stopPattern = /(?:去|逛|游览|打卡|到|前往)([^，,。.！!？?、；;\s]{2,24})/g;
   for (const match of normalized.matchAll(stopPattern)) {
-    const candidate = match[1].replace(/^附近的?/, "");
+    let candidate = match[1].replace(/^附近的?/, "");
+    if (candidate.includes("去")) {
+      candidate = candidate.slice(candidate.lastIndexOf("去") + 1);
+    }
+    if (candidate.includes("喝咖啡")) {
+      candidate = candidate.replace(/^.*喝咖啡/, "");
+    }
     const isVerbPattern = /^(吃|看|玩|逛|买|喝|坐|拍|找|选|试|听|学|做|体验|享受|参加|参观)/.test(candidate);
     if (!isVerbPattern) pushUnique(routeStops, candidate);
   }
@@ -309,12 +315,19 @@ export function mergeSlots(existing: PlanningSlots, incoming: PlanningSlots): Pl
   for (const [key, value] of Object.entries(incoming)) {
     if (value !== undefined && value !== null && value !== "") {
       // Array fields: merge and deduplicate
-      if ((key === "preference" || key === "preferences") && Array.isArray(value)) {
-        const existingArr = Array.isArray(merged.preference) ? merged.preference :
-                           Array.isArray(merged.preferences) ? merged.preferences : [];
+      if ((key === "preference" || key === "preferences" || key === "routeStops" || key === "foodPreferences") && Array.isArray(value)) {
+        const existingValue = (merged as Record<string, unknown>)[key];
+        const existingArr = Array.isArray(existingValue)
+          ? existingValue
+          : key === "preference" || key === "preferences"
+            ? (Array.isArray(merged.preference) ? merged.preference : Array.isArray(merged.preferences) ? merged.preferences : [])
+            : [];
         const newArr = [...new Set([...existingArr, ...value])];
-        merged.preference = newArr;
-        merged.preferences = newArr;
+        (merged as Record<string, unknown>)[key] = newArr;
+        if (key === "preference" || key === "preferences") {
+          merged.preference = newArr;
+          merged.preferences = newArr;
+        }
       } else if (key === "budgetFlexible") {
         // budgetFlexible: only set true, never overwrite with false
         if (value === true) merged.budgetFlexible = true;
@@ -773,14 +786,21 @@ async function generatePlanFromSlots(
     const slotSummary: string[] = [];
     if (slots.destination || slots.destinationCity) slotSummary.push(`目的地：${slots.destination || slots.destinationCity}`);
     if (slots.origin) slotSummary.push(`出发地：${slots.origin}`);
+    if (Array.isArray(slots.routeStops) && slots.routeStops.length > 0) slotSummary.push(`路线顺序：${slots.routeStops.join(" → ")}`);
+    if (slots.returnPoint) slotSummary.push(`回程终点：${slots.returnPoint}`);
     if (slots.time) slotSummary.push(`时间：${slots.time}`);
     if (slots.date && !slots.time) slotSummary.push(`日期：${slots.date}`);
     if (slots.timeWindow) slotSummary.push(`时段：${slots.timeWindow}`);
     if (slots.partySize) slotSummary.push(`人数：${slots.partySize}人`);
     if (slots.companions) slotSummary.push(`同行人：${slots.companions}`);
     if (slots.budget) slotSummary.push(`预算：${slots.budget}元`);
+    if (slots.transportMode) slotSummary.push(`交通偏好：${slots.transportMode}`);
     const prefs = slots.preferences || slots.preference;
     if (prefs) slotSummary.push(`偏好：${Array.isArray(prefs) ? prefs.join("、") : prefs}`);
+    if (Array.isArray(slots.foodPreferences) && slots.foodPreferences.length > 0) slotSummary.push(`饮食偏好：${slots.foodPreferences.join("、")}`);
+    if (slots.bookingIntent) slotSummary.push("预约需求：需要检查预约/排队/订座");
+    if (slots.purchaseIntent) slotSummary.push("购票需求：需要检查门票/预约入口");
+    if (slots.orderingIntent) slotSummary.push("下单需求：需要生成下单草稿，用户最终确认支付");
 
     const enrichedPrompt = slotSummary.length > 0
       ? `${input.message}\n\n[规划信息] ${slotSummary.join("；")}`

@@ -1,7 +1,6 @@
-import { useState, useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { ToastType } from "../components/GlassToast";
 
-/* ── Types ── */
 export type ActionStatus = "idle" | "loading" | "success" | "error";
 
 export interface RunPlanActionOptions {
@@ -20,7 +19,12 @@ export interface PlanActionState {
 
 type ShowToast = (text: string, type?: ToastType, duration?: number) => void;
 
-/* ── usePlanAction: per-button state management ── */
+function errorToastText(errorText: string | undefined, err: unknown): string {
+  if (errorText) return errorText;
+  const message = err instanceof Error ? err.message : String(err);
+  return `操作失败：${message}`;
+}
+
 export function usePlanAction(showToast: ShowToast): {
   getAction: (opts: RunPlanActionOptions) => PlanActionState;
   isAnyLoading: boolean;
@@ -35,7 +39,6 @@ export function usePlanAction(showToast: ShowToast): {
       const status = states[actionKey] ?? "idle";
 
       const execute = () => {
-        // Prevent double-click while loading
         if (loadingRef.current.has(actionKey)) return;
 
         loadingRef.current.add(actionKey);
@@ -49,7 +52,6 @@ export function usePlanAction(showToast: ShowToast): {
           loadingRef.current.delete(actionKey);
           setStates((prev) => ({ ...prev, [actionKey]: "success" }));
           showToast(successText, "success");
-          // Reset to idle after a short delay so the button can be re-used
           setTimeout(() => {
             setStates((prev) => ({ ...prev, [actionKey]: "idle" }));
           }, 2000);
@@ -60,7 +62,7 @@ export function usePlanAction(showToast: ShowToast): {
           const message = err instanceof Error ? err.message : String(err);
           setStates((prev) => ({ ...prev, [actionKey]: "error" }));
           setErrors((prev) => ({ ...prev, [actionKey]: message }));
-          showToast(errorText ?? `操作失败：${message}`, "error");
+          showToast(errorToastText(errorText, err), "error");
           setTimeout(() => {
             setStates((prev) => ({ ...prev, [actionKey]: "idle" }));
           }, 2000);
@@ -92,7 +94,6 @@ export function usePlanAction(showToast: ShowToast): {
   return { getAction, isAnyLoading };
 }
 
-/* ── Standalone helper (non-hook, for one-shot calls) ── */
 export async function runPlanAction(
   opts: RunPlanActionOptions & { showToast: ShowToast },
 ): Promise<boolean> {
@@ -105,8 +106,7 @@ export async function runPlanAction(
     toast(successText, "success");
     return true;
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    toast(errorText ?? `操作失败：${message}`, "error");
+    toast(errorToastText(errorText, err), "error");
     return false;
   }
 }

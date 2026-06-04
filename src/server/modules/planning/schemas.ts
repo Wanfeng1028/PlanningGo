@@ -34,6 +34,13 @@ export const userIntentSchema = z.object({
   budgetMax: z.number().positive().optional(),
   distanceLimitMinutes: z.number().positive().default(40),
   preferences: z.array(z.string()).default([]),
+  routeStops: z.array(z.string()).default([]),
+  returnPoint: z.string().optional(),
+  transportMode: z.enum(["driving", "taxi", "subway", "walk", "mixed", "transit", "none"]).optional(),
+  foodPreferences: z.array(z.string()).default([]),
+  bookingIntent: z.string().optional(),
+  orderingIntent: z.string().optional(),
+  purchaseIntent: z.string().optional(),
   mustAsk: z.array(z.string()).default([]),
   isPlanningRequest: z.boolean().default(true),
 });

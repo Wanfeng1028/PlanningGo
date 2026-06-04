@@ -1,26 +1,33 @@
 import type { ServiceActionDraft } from "../../server/modules/connectors/types";
-
-// ============================================================================
-// ServiceActionBtn — 单个服务入口按钮
-// ============================================================================
+import type { ToastType } from "../GlassToast";
+import styles from "../../pages/FeaturesPage.module.scss";
 
 interface ServiceActionBtnProps {
   action: ServiceActionDraft;
   onTrack: (action: ServiceActionDraft) => void;
   onShowDraft?: (action: ServiceActionDraft) => void;
+  onToast?: (text: string, type?: ToastType) => void;
 }
 
-/**
- * 行为规则：
- * - 有 redirectUrl：弹确认弹窗 → window.open
- * - 有 copyText：复制到剪贴板
- * - 都没有：toast 提示"当前平台暂未接入，已为你保留下单信息"
- */
-function ServiceActionBtn({ action, onTrack, onShowDraft }: ServiceActionBtnProps) {
+const ACTION_LABEL: Record<string, string> = {
+  restaurant_reservation: "预约",
+  group_buy: "团购",
+  food_delivery: "下单草稿",
+  coffee_order: "点单草稿",
+  movie_ticket: "购票",
+  navigation: "导航",
+  calendar_event: "日历",
+  copy_booking_info: "复制",
+};
+
+function getActionLabel(action: ServiceActionDraft): string {
+  return ACTION_LABEL[action.actionType] ?? "服务";
+}
+
+function ServiceActionBtn({ action, onTrack, onShowDraft, onToast }: ServiceActionBtnProps) {
   const handleClick = async () => {
     onTrack(action);
 
-    // 优先使用 onShowDraft 处理 food_delivery / coffee_order 等需要展示草稿的 action
     if (
       onShowDraft &&
       (action.actionType === "food_delivery" || action.actionType === "coffee_order")
@@ -35,54 +42,37 @@ function ServiceActionBtn({ action, onTrack, onShowDraft }: ServiceActionBtnProp
       );
       if (confirmed) {
         window.open(action.redirectUrl, "_blank", "noopener,noreferrer");
+        onToast?.("已打开第三方平台，请在对方页面确认", "info");
+      } else {
+        onToast?.("已取消跳转", "info");
       }
-    } else if (action.copyText) {
+      return;
+    }
+
+    if (action.copyText) {
       try {
         await navigator.clipboard.writeText(action.copyText);
+        onToast?.("已复制服务信息", "success");
       } catch {
-        console.error("Failed to copy to clipboard");
+        onToast?.("复制失败，请手动复制", "error");
       }
+      return;
     }
+
+    onToast?.("当前平台暂未接入，已为你保留操作信息", "info");
   };
 
   return (
     <button
-      className="service-action-btn"
+      className={styles.serviceActionBtn}
       onClick={handleClick}
       title={`${action.description}\n${action.riskNotice}`}
     >
-      <span className="service-action-icon">{getActionIcon(action)}</span>
-      <span className="service-action-label">{action.title}</span>
+      <span className={styles.serviceActionIcon}>{getActionLabel(action)}</span>
+      <span className={styles.serviceActionLabel}>{action.title}</span>
     </button>
   );
 }
-
-function getActionIcon(action: ServiceActionDraft): string {
-  switch (action.actionType) {
-    case "restaurant_reservation":
-      return "🍽️";
-    case "group_buy":
-      return "🎫";
-    case "food_delivery":
-      return "🛵";
-    case "coffee_order":
-      return "☕";
-    case "movie_ticket":
-      return "🎬";
-    case "navigation":
-      return "🧭";
-    case "calendar_event":
-      return "📅";
-    case "copy_booking_info":
-      return "📋";
-    default:
-      return "🔗";
-  }
-}
-
-// ============================================================================
-// ExternalServicePanel — 折叠面板（旧接口，兼容 PlanCardView 使用）
-// ============================================================================
 
 interface DeepLink {
   provider: string;
@@ -112,12 +102,12 @@ export function ExternalServicePanel({
     <div className="external-service-panel">
       <details className="external-service-details" open={expanded}>
         <summary className="external-service-summary" onClick={onToggle}>
-          🔗 外部服务 ({steps.length})
+          外部服务 ({steps.length})
         </summary>
         <div className="external-service-body">
           {steps.map((step) => (
             <div key={step.stepId} className="external-service-group">
-              <div className="external-service-poi">📍 {step.poiName}</div>
+              <div className="external-service-poi">{step.poiName}</div>
               <div className="external-service-links">
                 {step.links.map((link) => (
                   <a
@@ -127,7 +117,7 @@ export function ExternalServicePanel({
                     rel="noopener noreferrer"
                     className="external-service-link"
                   >
-                    {link.icon} {link.label}
+                    {link.label}
                   </a>
                 ))}
               </div>
@@ -138,10 +128,6 @@ export function ExternalServicePanel({
     </div>
   );
 }
-
-// ============================================================================
-// PlanCardServicePanel — 挂载到 PlanCardView 的 timeline step 上
-// ============================================================================
 
 interface PlanCardServicePanelProps {
   stepId: string;
@@ -157,6 +143,7 @@ interface PlanCardServicePanelProps {
     provider: string;
   }) => void;
   onShowDraft?: (action: ServiceActionDraft) => void;
+  onToast?: (text: string, type?: ToastType) => void;
 }
 
 export function PlanCardServicePanel({
@@ -166,6 +153,7 @@ export function PlanCardServicePanel({
   planId,
   onTrack,
   onShowDraft,
+  onToast,
 }: PlanCardServicePanelProps) {
   if (!serviceActions || serviceActions.length === 0) return null;
 
@@ -181,18 +169,19 @@ export function PlanCardServicePanel({
   };
 
   return (
-    <div className="plan-card-service-panel">
-      <details className="service-actions-details">
-        <summary className="service-actions-summary">
-          🔗 外部服务入口 ({serviceActions.length})
+    <div className={styles.planCardServicePanel}>
+      <details className={styles.serviceActionsDetails} open>
+        <summary className={styles.serviceActionsSummary}>
+          可执行入口 ({serviceActions.length})
         </summary>
-        <div className="service-actions-body">
+        <div className={styles.serviceActionsBody}>
           {serviceActions.map((action) => (
             <ServiceActionBtn
               key={action.id}
               action={action}
               onTrack={handleTrack}
               onShowDraft={onShowDraft}
+              onToast={onToast}
             />
           ))}
         </div>

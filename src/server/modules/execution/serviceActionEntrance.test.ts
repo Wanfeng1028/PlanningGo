@@ -322,3 +322,40 @@ describe("action status validation", () => {
     }
   });
 });
+
+describe("transaction draft wording", () => {
+  it("keeps restaurant and ordering actions in draft/redirect language", () => {
+    const step = {
+      id: "step_transaction_1",
+      startTime: "19:00",
+      endTime: "20:30",
+      type: "meal" as const,
+      title: "海底捞晚餐",
+      poiId: "poi_transaction_1",
+      poiName: "海底捞",
+      address: "杭州市西湖区",
+      durationMinutes: 90,
+      transport: "walk" as const,
+      reasoning: "晚餐",
+      bookingNeeded: true,
+      actionId: null,
+      description: "预约草稿，需前往平台确认支付",
+    };
+
+    const actions = buildServiceActionsForStep(step);
+    const combined = actions.map((action) => [
+      action.title,
+      action.description,
+      action.userConfirmText,
+      action.riskNotice,
+      action.copyText,
+      action.redirectUrl,
+      action.status,
+    ].filter(Boolean).join(" ")).join(" ");
+
+    assertNoForbiddenText(combined, "transaction action copy");
+    expect(combined).toContain("确认");
+    expect(combined).toContain("第三方平台");
+    expect(actions.some((action) => action.status === "prepared" || action.status === "redirect_required")).toBe(true);
+  });
+});

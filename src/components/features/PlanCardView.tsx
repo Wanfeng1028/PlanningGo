@@ -123,6 +123,7 @@ export function PlanCardView({
                   planId={plan.planId}
                   onTrack={onTrackAction}
                   onShowDraft={onShowDraft}
+                  onToast={onToast}
                 />
               )}
             </li>
@@ -347,4 +348,3 @@ export function PlanCardView({
     </div>
   );
 }
-

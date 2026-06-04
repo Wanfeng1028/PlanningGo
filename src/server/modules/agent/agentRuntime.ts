@@ -227,7 +227,7 @@ export async function runAgentChatStream(
         id: toolEventId,
         type: "tool",
         toolName: tc.name,
-        label: getToolDisplayName(tc.name),
+        label: getPublicToolDisplayName(tc.name),
         status: "running",
         timestamp: new Date().toISOString(),
       });
@@ -240,9 +240,9 @@ export async function runAgentChatStream(
           id: toolEventId,
           type: "tool",
           toolName: tc.name,
-          label: getToolDisplayName(tc.name),
+          label: getPublicToolDisplayName(tc.name),
           status: "done",
-          outputSummary: summarizeToolResult(tc.name, resultStr),
+          outputSummary: summarizePublicToolResult(tc.name, resultStr),
           timestamp: new Date().toISOString(),
         });
 
@@ -268,7 +268,7 @@ export async function runAgentChatStream(
           id: toolEventId,
           type: "tool",
           toolName: tc.name,
-          label: getToolDisplayName(tc.name),
+          label: getPublicToolDisplayName(tc.name),
           status: "error",
           detail: err instanceof Error ? err.message : String(err),
           timestamp: new Date().toISOString(),
@@ -385,6 +385,8 @@ export async function runAgentChatStream(
       if (destination) slotSummary.push(`目的地：${destination}`);
       if (origin) slotSummary.push(`出发地：${origin}`);
       else slotSummary.push("出发地：未提供");
+      if (Array.isArray(effectiveDraft.routeStops) && effectiveDraft.routeStops.length > 0) slotSummary.push(`路线顺序：${effectiveDraft.routeStops.join(" → ")}`);
+      if (effectiveDraft.returnPoint) slotSummary.push(`回程终点：${effectiveDraft.returnPoint}`);
       if (effectiveDraft.time) slotSummary.push(`时间：${effectiveDraft.time}`);
       if (effectiveDraft.date) slotSummary.push(`日期：${effectiveDraft.date}`);
       if (effectiveDraft.timeWindow) slotSummary.push(`时段：${effectiveDraft.timeWindow}`);
@@ -392,8 +394,13 @@ export async function runAgentChatStream(
       if (companions) slotSummary.push(`同行人：${companions}`);
       if (budget) slotSummary.push(`预算：${budget}元（用户明确提供，请严格遵守）`);
       else slotSummary.push("预算：用户未提供，请合理估算");
+      if (effectiveDraft.transportMode) slotSummary.push(`交通偏好：${effectiveDraft.transportMode}`);
       const prefs = effectiveDraft.preferences || effectiveDraft.preference;
       if (prefs) slotSummary.push(`偏好：${Array.isArray(prefs) ? prefs.join("、") : prefs}`);
+      if (Array.isArray(effectiveDraft.foodPreferences) && effectiveDraft.foodPreferences.length > 0) slotSummary.push(`饮食偏好：${effectiveDraft.foodPreferences.join("、")}`);
+      if (effectiveDraft.bookingIntent) slotSummary.push("预约需求：需要检查预约/排队/订座");
+      if (effectiveDraft.purchaseIntent) slotSummary.push("购票需求：需要检查门票/预约入口");
+      if (effectiveDraft.orderingIntent) slotSummary.push("下单需求：需要生成下单草稿，用户最终确认支付");
       if (effectiveDraft.budgetFlexible) slotSummary.push(`预算灵活`);
 
       const enrichedPrompt = slotSummary.length > 0
@@ -608,6 +615,44 @@ export async function runAgentChatStream(
   }
 
   return agentResponse;
+}
+
+function getPublicToolDisplayName(name: string): string {
+  const map: Record<string, string> = {
+    update_planning_draft: "识别需求",
+    search_places: "查询地点",
+    generate_weekend_plan: "生成方案",
+    prepare_action: "准备动作",
+  };
+  return map[name] ?? "处理规划";
+}
+
+function summarizePublicToolResult(toolName: string, resultStr: string): string {
+  try {
+    const result = JSON.parse(resultStr) as Record<string, unknown>;
+    if (typeof result.error === "string") {
+      return result.error.slice(0, 120);
+    }
+    switch (toolName) {
+      case "update_planning_draft": {
+        const known = result.knownSlots as Record<string, unknown> | undefined;
+        const count = known ? Object.keys(known).length : 0;
+        return `已识别 ${count} 项出行信息`;
+      }
+      case "search_places": {
+        const items = result.places as unknown[] | undefined;
+        return items ? `找到 ${items.length} 个候选地点` : "地点查询完成";
+      }
+      case "generate_weekend_plan":
+        return "方案结构已生成";
+      case "prepare_action":
+        return "动作入口已准备";
+      default:
+        return "处理完成";
+    }
+  } catch {
+    return "处理完成";
+  }
 }
 
 // ─── Response Classification ────────────────────────────────

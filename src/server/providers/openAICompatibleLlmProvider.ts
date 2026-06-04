@@ -28,6 +28,12 @@ export class OpenAICompatibleLlmProvider implements LlmProvider {
     const temperature = query.temperature ?? 0.7;
     const start = Date.now();
 
+    // Merge external signal (e.g. client disconnect) with internal timeout
+    const timeoutSignal = AbortSignal.timeout(this.options.timeoutMs);
+    const combinedSignal = query.signal
+      ? AbortSignal.any([timeoutSignal, query.signal])
+      : timeoutSignal;
+
     const res = await fetch(
       this.options.baseUrl.replace(/\/+$/, '') + '/chat/completions',
       {
@@ -42,7 +48,7 @@ export class OpenAICompatibleLlmProvider implements LlmProvider {
           temperature,
           max_tokens: maxTokens,
         }),
-        signal: AbortSignal.timeout(this.options.timeoutMs),
+        signal: combinedSignal,
       },
     );
 

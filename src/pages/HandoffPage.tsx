@@ -1,103 +1,100 @@
-import { useEffect, useState, useCallback } from "react";
-import { getHandoffCode, claimHandoffCode } from "../lib/api";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import {
+  claimHandoffCode,
+  getHandoffDetail,
+  type HandoffDetail,
+  type PlanningOption,
+  type PlanningTimelineStep,
+} from "../lib/api";
 
 interface HandoffPageProps {
   code: string;
 }
 
-/**
- * HandoffPage — 手机扫码后打开的页面
- * 展示规划摘要，提供登录入口或只读浏览
- */
-export function HandoffPage({ code }: HandoffPageProps) {
-  const [status, setStatus] = useState<"loading" | "ready" | "claimed" | "expired" | "error">("loading");
-  const [data, setData] = useState<{
-    conversationId: string;
-    planId: string | null;
-    title?: string;
-    summary?: string;
-  } | null>(null);
-  const [errorMsg, setErrorMsg] = useState("");
+type HandoffStatus = "loading" | "claimed" | "expired" | "error";
 
-  // Step 1: Query the handoff code
-  useEffect(() => {
-    if (!code) {
-      setStatus("error");
-      setErrorMsg("无效的接续码");
-      return;
-    }
+type MobileAction = {
+  id: string;
+  label: string;
+  description?: string;
+  url?: string;
+  copyText?: string;
+};
 
-    getHandoffCode(code)
-      .then((result) => {
-        if (!result) {
-          setStatus("expired");
-          setErrorMsg("接续码不存在或已过期");
-          return;
-        }
-        setData({
-          conversationId: result.conversationId,
-          planId: result.planId,
-        });
-        setStatus("ready");
-      })
-      .catch(() => {
-        setStatus("error");
-        setErrorMsg("无法连接到服务器");
-      });
-  }, [code]);
+const pageStyle = {
+  minHeight: "100dvh",
+  padding: "20px 14px 32px",
+  background: "linear-gradient(180deg, #fbfaf7 0%, #f3efe7 100%)",
+  fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  color: "#1a1a2e",
+} satisfies React.CSSProperties;
 
-  // Step 2: Claim the code (one-time use)
-  const handleClaim = useCallback(async () => {
-    if (!code || !data) return;
+const cardStyle = {
+  borderRadius: 18,
+  background: "rgba(255,255,255,0.9)",
+  border: "1px solid rgba(26,26,46,0.08)",
+  boxShadow: "0 10px 32px rgba(26,26,46,0.07)",
+} satisfies React.CSSProperties;
 
-    // Generate a simple device ID
-    const deviceId = `mobile_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+function actionFromRaw(raw: unknown, index: number): MobileAction | null {
+  if (!raw || typeof raw !== "object") return null;
+  const action = raw as Record<string, unknown>;
+  const payload = typeof action.payload === "object" && action.payload !== null
+    ? action.payload as Record<string, unknown>
+    : {};
+  const label = typeof action.label === "string"
+    ? action.label
+    : typeof action.title === "string"
+      ? action.title
+      : typeof payload.label === "string"
+        ? payload.label
+        : "";
+  if (!label) return null;
 
-    try {
-      const claimResult = await claimHandoffCode(code, deviceId);
-      if (claimResult.success) {
-        setStatus("claimed");
-        // Optionally load conversation summary here
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("expired")) {
-        setStatus("expired");
-        setErrorMsg("接续码已过期");
-      } else if (msg.includes("already claimed")) {
-        setStatus("claimed");
-      } else {
-        setStatus("error");
-        setErrorMsg("认领失败，请重试");
-      }
-    }
-  }, [code, data]);
+  return {
+    id: typeof action.key === "string" ? action.key : typeof action.id === "string" ? action.id : `action-${index}`,
+    label,
+    description: typeof action.description === "string" ? action.description : undefined,
+    url: typeof action.redirectUrl === "string"
+      ? action.redirectUrl
+      : typeof action.url === "string"
+        ? action.url
+        : typeof payload.url === "string"
+          ? payload.url
+          : undefined,
+    copyText: typeof action.copyText === "string"
+      ? action.copyText
+      : typeof payload.copyText === "string"
+        ? payload.copyText
+        : undefined,
+  };
+}
 
-  // Auto-claim on mount when ready
-  useEffect(() => {
-    if (status === "ready" && data) {
-      handleClaim();
-    }
-  }, [status, data, handleClaim]);
+function stepActions(step: PlanningTimelineStep): MobileAction[] {
+  return (step.serviceActions ?? [])
+    .map((action, index) => actionFromRaw(action, index))
+    .filter((action): action is MobileAction => Boolean(action));
+}
 
+function optionMeta(option?: PlanningOption | null) {
+  if (!option) return "";
+  const parts = [];
+  if (option.totalDurationMinutes) {
+    const h = Math.floor(option.totalDurationMinutes / 60);
+    const m = option.totalDurationMinutes % 60;
+    parts.push(`${h ? `${h}小时` : ""}${m ? `${m}分钟` : ""}`);
+  }
+  if (option.totalCostMin || option.totalCostMax) {
+    parts.push(`¥${option.totalCostMin ?? 0}-${option.totalCostMax ?? option.totalCostMin ?? 0}`);
+  }
+  if (option.walkingKm) parts.push(`步行 ${option.walkingKm}km`);
+  return parts.filter(Boolean).join(" · ");
+}
+
+function BrandHeader() {
   return (
-    <div style={{
-      minHeight: "100dvh",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: "24px 16px",
-      background: "linear-gradient(180deg, #faf8f4 0%, #f3efe7 100%)",
-      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-    }}>
-      {/* Header */}
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        marginBottom: 24,
-      }}>
+    <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{
           width: 36,
           height: 36,
@@ -108,206 +105,269 @@ export function HandoffPage({ code }: HandoffPageProps) {
           justifyContent: "center",
           fontSize: 16,
           fontWeight: 900,
-          color: "#1a1a2e",
         }}>
           P
         </div>
-        <span style={{
-          fontSize: 16,
-          fontWeight: 700,
-          color: "#1a1a2e",
-        }}>
-          周末去哪儿
-        </span>
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 800 }}>周末去哪儿</div>
+          <div style={{ fontSize: 11, color: "rgba(26,26,46,0.48)" }}>手机接续</div>
+        </div>
       </div>
+      <a href="/" style={{ color: "#6b7280", fontSize: 13, textDecoration: "none" }}>首页</a>
+    </header>
+  );
+}
 
-      {/* Loading state */}
-      {status === "loading" && (
-        <div style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 16,
-        }}>
+function ActionButton({ action, onDone }: { action: MobileAction; onDone: (text: string) => void }) {
+  const handleClick = async () => {
+    if (action.copyText) {
+      try {
+        await navigator.clipboard.writeText(action.copyText);
+        onDone("已复制，可到对应应用中粘贴确认");
+      } catch {
+        onDone("复制失败，请长按文字手动复制");
+      }
+      return;
+    }
+    if (action.url) {
+      window.open(action.url, "_blank", "noopener,noreferrer");
+      onDone("已打开第三方页面，请在对方页面确认");
+      return;
+    }
+    onDone("这个动作已准备好，最终确认仍由你完成");
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      style={{
+        border: "1px solid rgba(255,204,51,0.42)",
+        background: "#fffaf0",
+        color: "#1a1a2e",
+        borderRadius: 999,
+        padding: "9px 12px",
+        fontSize: 12,
+        fontWeight: 700,
+        lineHeight: 1,
+      }}
+    >
+      {action.copyText ? "复制 " : action.url ? "打开 " : "查看 "}{action.label}
+    </button>
+  );
+}
+
+function TimelineStep({ step, onToast }: { step: PlanningTimelineStep; onToast: (text: string) => void }) {
+  const actions = stepActions(step);
+  return (
+    <li style={{ display: "grid", gridTemplateColumns: "72px 1fr", gap: 10, padding: "14px 0", borderBottom: "1px solid rgba(26,26,46,0.06)" }}>
+      <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}>
+        <strong style={{ display: "block", color: "#1a1a2e" }}>{step.startTime}</strong>
+        <span>{step.endTime}</span>
+      </div>
+      <div>
+        <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>{step.title}</div>
+        {step.poiName && <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>{step.poiName}</div>}
+        {step.description && <p style={{ fontSize: 12, color: "#4b5563", lineHeight: 1.55, margin: "0 0 8px" }}>{step.description}</p>}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {step.transport && step.transport !== "none" && <span style={pillStyle}>交通 {step.transport}</span>}
+          {step.estimatedCost && <span style={pillStyle}>{step.estimatedCost}</span>}
+          {step.bookingNeeded && <span style={warningPillStyle}>需确认</span>}
+        </div>
+        {actions.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+            {actions.map((action) => <ActionButton key={action.id} action={action} onDone={onToast} />)}
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
+
+const pillStyle = {
+  borderRadius: 999,
+  background: "rgba(26,26,46,0.04)",
+  color: "#6b7280",
+  fontSize: 11,
+  padding: "4px 8px",
+} satisfies React.CSSProperties;
+
+const warningPillStyle = {
+  ...pillStyle,
+  background: "rgba(239,68,68,0.08)",
+  color: "#dc2626",
+} satisfies React.CSSProperties;
+
+export function HandoffPage({ code }: HandoffPageProps) {
+  const [status, setStatus] = useState<HandoffStatus>("loading");
+  const [detail, setDetail] = useState<HandoffDetail | null>(null);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [toast, setToast] = useState("");
+
+  const selectedOption = useMemo(() => {
+    const plan = detail?.plan;
+    return plan?.selectedOption ?? plan?.options?.[0] ?? null;
+  }, [detail]);
+
+  const topActions = useMemo(() => {
+    const plan = detail?.plan;
+    return (plan?.planningActions ?? [])
+      .map((action, index) => actionFromRaw(action, index))
+      .filter((action): action is MobileAction => action !== null)
+      .filter((action) => action.id !== "mobile_handoff");
+  }, [detail]);
+
+  const showToast = useCallback((text: string) => {
+    setToast(text);
+    window.setTimeout(() => setToast(""), 2400);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (!code) {
+        setStatus("error");
+        setErrorMsg("无效的接续码");
+        return;
+      }
+
+      const loaded = await getHandoffDetail(code);
+      if (cancelled) return;
+      if (!loaded) {
+        setStatus("expired");
+        setErrorMsg("接续码不存在或已过期，请在电脑上重新生成");
+        return;
+      }
+
+      setDetail(loaded);
+      const deviceId = `mobile_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      try {
+        await claimHandoffCode(code, deviceId);
+      } catch {
+        // 详情已拿到时，认领失败通常是重复扫码；仍允许只读查看当前方案。
+      }
+      if (!cancelled) setStatus("claimed");
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, [code]);
+
+  if (status === "loading") {
+    return (
+      <main style={{ ...pageStyle, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ textAlign: "center" }}>
           <div style={{
-            width: 48,
-            height: 48,
+            width: 46,
+            height: 46,
             border: "3px solid rgba(26,26,46,0.1)",
             borderTopColor: "#ffcc33",
             borderRadius: "50%",
             animation: "handoffSpin 0.8s linear infinite",
+            margin: "0 auto 14px",
           }} />
-          <p style={{ color: "#6b7280", fontSize: 14 }}>正在加载规划…</p>
+          <p style={{ color: "#6b7280", fontSize: 14 }}>正在接续规划…</p>
           <style>{`@keyframes handoffSpin { to { transform: rotate(360deg); } }`}</style>
         </div>
-      )}
+      </main>
+    );
+  }
 
-      {/* Ready / Claimed state */}
-      {(status === "ready" || status === "claimed") && data && (
-        <div style={{
-          maxWidth: 400,
-          width: "100%",
-          textAlign: "center",
-        }}>
-          <div style={{
-            padding: "24px 20px",
-            borderRadius: 20,
-            background: "rgba(255,255,255,0.85)",
-            border: "1px solid rgba(255,204,51,0.2)",
-            boxShadow: "0 8px 32px rgba(26,26,46,0.06)",
-            backdropFilter: "blur(16px)",
-          }}>
-            <div style={{
-              fontSize: 32,
-              marginBottom: 12,
-            }}>
-              {status === "claimed" ? "\u2705" : "\ud83d\udcf1"}
-            </div>
+  if (status === "expired" || status === "error") {
+    return (
+      <main style={pageStyle}>
+        <BrandHeader />
+        <section style={{ ...cardStyle, padding: 22, textAlign: "center", marginTop: 80 }}>
+          <div style={{ fontSize: 30, marginBottom: 10 }}>{status === "expired" ? "⏰" : "⚠️"}</div>
+          <h1 style={{ fontSize: 19, margin: "0 0 8px" }}>{status === "expired" ? "接续码不可用" : "加载失败"}</h1>
+          <p style={{ fontSize: 14, color: "#6b7280", lineHeight: 1.6, margin: "0 0 18px" }}>{errorMsg || "无法加载规划方案，请稍后重试。"}</p>
+          <a href="/" style={{ display: "inline-block", padding: "11px 22px", borderRadius: 999, background: "#ffcc33", color: "#1a1a2e", fontWeight: 800, textDecoration: "none", fontSize: 14 }}>返回首页</a>
+        </section>
+      </main>
+    );
+  }
 
-            <h2 style={{
-              fontSize: 18,
+  return (
+    <main style={pageStyle}>
+      <BrandHeader />
+
+      <section style={{ ...cardStyle, padding: 18, marginBottom: 14 }}>
+        <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 8 }}>已接续 · {detail?.conversation.city ?? "当前城市"}</div>
+        <h1 style={{ fontSize: 21, lineHeight: 1.25, margin: "0 0 8px" }}>
+          {selectedOption?.title ?? detail?.conversation.title ?? "你的规划方案"}
+        </h1>
+        {(selectedOption?.summary || detail?.plan?.summary) && (
+          <p style={{ fontSize: 13, color: "#4b5563", lineHeight: 1.65, margin: "0 0 12px" }}>
+            {selectedOption?.summary || detail?.plan?.summary}
+          </p>
+        )}
+        {optionMeta(selectedOption) && (
+          <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>{optionMeta(selectedOption)}</div>
+        )}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {topActions.map((action) => <ActionButton key={action.id} action={action} onDone={showToast} />)}
+          <a
+            href={`/features?continue=${detail?.conversation.id ?? ""}`}
+            style={{
+              border: "1px solid rgba(26,26,46,0.09)",
+              background: "#fff",
+              color: "#1a1a2e",
+              borderRadius: 999,
+              padding: "9px 12px",
+              fontSize: 12,
               fontWeight: 700,
-              color: "#1a1a2e",
-              margin: "0 0 8px",
-            }}>
-              {status === "claimed" ? "已接续成功" : "规划方案接续"}
-            </h2>
-
-            <p style={{
-              fontSize: 14,
-              color: "#6b7280",
-              lineHeight: 1.6,
-              margin: "0 0 20px",
-            }}>
-              {status === "claimed"
-                ? "你可以在手机上继续查看这个规划方案。建议登录账号以保存方案并同步历史。"
-                : "正在接续桌面端的规划方案…"
-              }
-            </p>
-
-            <div style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
-            }}>
-              <a
-                href={`/features?continue=${data.conversationId}`}
-                style={{
-                  display: "block",
-                  padding: "12px 24px",
-                  borderRadius: 999,
-                  background: "linear-gradient(135deg, #ffcc33, #e6b800)",
-                  color: "#1a1a2e",
-                  fontSize: 14,
-                  fontWeight: 700,
-                  textDecoration: "none",
-                  textAlign: "center",
-                }}
-              >
-                打开规划助手
-              </a>
-              <a
-                href="/"
-                style={{
-                  display: "block",
-                  padding: "12px 24px",
-                  borderRadius: 999,
-                  border: "1px solid rgba(26,26,46,0.1)",
-                  background: "rgba(255,255,255,0.7)",
-                  color: "#6b7280",
-                  fontSize: 14,
-                  fontWeight: 500,
-                  textDecoration: "none",
-                  textAlign: "center",
-                }}
-              >
-                返回首页
-              </a>
-            </div>
-          </div>
-
-          <p style={{
-            fontSize: 11,
-            color: "rgba(26,26,46,0.35)",
-            marginTop: 16,
-          }}>
-            接续码 {code} · 一次性使用 · 10 分钟有效
-          </p>
-        </div>
-      )}
-
-      {/* Expired state */}
-      {status === "expired" && (
-        <div style={{
-          maxWidth: 400,
-          width: "100%",
-          textAlign: "center",
-          padding: "24px 20px",
-          borderRadius: 20,
-          background: "rgba(254,242,242,0.85)",
-          border: "1px solid rgba(239,68,68,0.15)",
-        }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>{"\u23f0"}</div>
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: "#dc2626", margin: "0 0 8px" }}>
-            二维码已过期
-          </h2>
-          <p style={{ fontSize: 14, color: "#6b7280", lineHeight: 1.6, margin: "0 0 20px" }}>
-            {errorMsg || "此接续码已过期，请在桌面端重新生成二维码。"}
-          </p>
-          <a
-            href="/"
-            style={{
-              display: "inline-block",
-              padding: "12px 24px",
-              borderRadius: 999,
-              background: "rgba(26,26,46,0.05)",
-              color: "#1a1a2e",
-              fontSize: 14,
-              fontWeight: 600,
               textDecoration: "none",
             }}
           >
-            返回首页
+            打开完整助手
           </a>
         </div>
-      )}
+      </section>
 
-      {/* Error state */}
-      {status === "error" && (
+      {selectedOption?.risks?.length ? (
+        <section style={{ ...cardStyle, padding: 14, marginBottom: 14, background: "rgba(255,250,240,0.95)" }}>
+          <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>需要留意</div>
+          <ul style={{ paddingLeft: 18, margin: 0, color: "#7c2d12", fontSize: 12, lineHeight: 1.6 }}>
+            {selectedOption.risks.slice(0, 3).map((risk) => <li key={risk}>{risk}</li>)}
+          </ul>
+        </section>
+      ) : null}
+
+      <section style={{ ...cardStyle, padding: "2px 16px 4px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0 2px" }}>
+          <h2 style={{ fontSize: 16, margin: 0 }}>今天的行程</h2>
+          <span style={{ fontSize: 11, color: "rgba(26,26,46,0.45)" }}>接续码 {code}</span>
+        </div>
+        {selectedOption?.timeline?.length ? (
+          <ol style={{ listStyle: "none", padding: 0, margin: 0 }}>
+            {selectedOption.timeline.map((step) => <TimelineStep key={step.id} step={step} onToast={showToast} />)}
+          </ol>
+        ) : (
+          <p style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.6 }}>这个接续码还没有可展示的详细行程。</p>
+        )}
+      </section>
+
+      <p style={{ fontSize: 11, color: "rgba(26,26,46,0.42)", lineHeight: 1.6, textAlign: "center", margin: "16px 4px 0" }}>
+        这里不会替你付款或最终下单；所有第三方页面都需要你自己确认。
+      </p>
+
+      {toast && (
         <div style={{
-          maxWidth: 400,
-          width: "100%",
+          position: "fixed",
+          left: 16,
+          right: 16,
+          bottom: 18,
+          borderRadius: 14,
+          background: "rgba(26,26,46,0.92)",
+          color: "#fff",
+          fontSize: 13,
           textAlign: "center",
-          padding: "24px 20px",
-          borderRadius: 20,
-          background: "rgba(254,242,242,0.85)",
-          border: "1px solid rgba(239,68,68,0.15)",
+          padding: "12px 14px",
+          boxShadow: "0 12px 28px rgba(26,26,46,0.18)",
         }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>{"\u26a0\ufe0f"}</div>
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: "#dc2626", margin: "0 0 8px" }}>
-            加载失败
-          </h2>
-          <p style={{ fontSize: 14, color: "#6b7280", lineHeight: 1.6, margin: "0 0 20px" }}>
-            {errorMsg || "无法加载规划方案，请稍后重试。"}
-          </p>
-          <a
-            href="/"
-            style={{
-              display: "inline-block",
-              padding: "12px 24px",
-              borderRadius: 999,
-              background: "rgba(26,26,46,0.05)",
-              color: "#1a1a2e",
-              fontSize: 14,
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
-          >
-            返回首页
-          </a>
+          {toast}
         </div>
       )}
-    </div>
+    </main>
   );
 }
 

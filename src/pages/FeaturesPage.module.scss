@@ -1678,6 +1678,70 @@ $green: #22c55e;
   cursor: default;
 }
 
+.planCardServicePanel {
+  display: block;
+  margin-top: 8px;
+  margin-bottom: 4px;
+  width: 100%;
+}
+
+.serviceActionsDetails {
+  width: 100%;
+}
+
+.serviceActionsSummary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba($text, 0.68);
+  cursor: pointer;
+  user-select: none;
+}
+
+.serviceActionsBody {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  max-width: 100%;
+}
+
+.serviceActionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  max-width: 100%;
+  padding: 5px 9px;
+  border-radius: 8px;
+  border: 1px solid rgba($brand, 0.18);
+  background: rgba(255, 255, 255, 0.76);
+  color: rgba($text, 0.78);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.25;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+
+  &:hover {
+    background: rgba($brand, 0.1);
+    border-color: rgba($brand, 0.34);
+    transform: translateY(-1px);
+  }
+}
+
+.serviceActionIcon {
+  flex: 0 0 auto;
+  font-size: 13px;
+}
+
+.serviceActionLabel {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .actionChipDisabled {
   opacity: 0.5;
   cursor: not-allowed !important;
@@ -2797,4 +2861,3 @@ $green: #22c55e;
     text-decoration: underline;
   }
 }
-

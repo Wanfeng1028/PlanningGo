@@ -21,7 +21,7 @@ interface AmapProviderOptions {
 export class AmapMapProvider implements MapProvider {
   constructor(private readonly options: AmapProviderOptions) {}
 
-  async searchPois(query: PoiQuery): Promise<PoiResult[]> {
+  async searchPois(query: PoiQuery, signal?: AbortSignal): Promise<PoiResult[]> {
     const url = new URL("/v5/place/text", this.options.baseUrl);
     url.searchParams.set("key", this.options.apiKey);
     url.searchParams.set("keywords", query.keywords);
@@ -35,8 +35,12 @@ export class AmapMapProvider implements MapProvider {
       url.searchParams.set("types", query.types);
     }
 
+    // Merge external signal with internal timeout
+    const timeoutSignal = AbortSignal.timeout(this.options.timeoutMs);
+    const combinedSignal = signal ? AbortSignal.any([timeoutSignal, signal]) : timeoutSignal;
+
     const res = await fetch(url, {
-      signal: AbortSignal.timeout(this.options.timeoutMs),
+      signal: combinedSignal,
     });
 
     if (!res.ok) {

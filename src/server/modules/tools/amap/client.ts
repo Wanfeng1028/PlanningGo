@@ -47,7 +47,7 @@ export class AmapClient {
   /**
    * Generic GET request to AMap API
    */
-  async get<T>(path: string, params: Record<string, string | number | undefined>): Promise<T> {
+  async get<T>(path: string, params: Record<string, string | number | undefined>, signal?: AbortSignal): Promise<T> {
     if (!this.isConfigured()) {
       throw new AmapError("AMAP_NOT_CONFIGURED", "AMAP_WEB_SERVICE_KEY is not configured");
     }
@@ -64,10 +64,13 @@ export class AmapClient {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
 
+    // Merge internal timeout signal with external signal (e.g. client disconnect)
+    const combinedSignal = signal ? AbortSignal.any([controller.signal, signal]) : controller.signal;
+
     try {
       const res = await fetch(url, {
         method: "GET",
-        signal: controller.signal,
+        signal: combinedSignal,
       });
 
       clearTimeout(timeoutId);
@@ -163,11 +166,11 @@ export class AmapClient {
   /**
    * Walking route planning
    */
-  async routeWalking(params: { origin: string; destination: string }): Promise<AmapRouteResponse> {
+  async routeWalking(params: { origin: string; destination: string }, signal?: AbortSignal): Promise<AmapRouteResponse> {
     return this.get<AmapRouteResponse>("/v4/direction/walking", {
       origin: params.origin,
       destination: params.destination,
-    });
+    }, signal);
   }
 
   /**
@@ -177,12 +180,12 @@ export class AmapClient {
     origin: string;
     destination: string;
     strategy?: number;
-  }): Promise<AmapRouteResponse> {
+  }, signal?: AbortSignal): Promise<AmapRouteResponse> {
     return this.get<AmapRouteResponse>("/v4/direction/driving", {
       origin: params.origin,
       destination: params.destination,
       strategy: params.strategy,
-    });
+    }, signal);
   }
 
   /**
@@ -192,12 +195,12 @@ export class AmapClient {
     origin: string;
     destination: string;
     city?: string;
-  }): Promise<AmapRouteResponse> {
+  }, signal?: AbortSignal): Promise<AmapRouteResponse> {
     return this.get<AmapRouteResponse>("/v4/direction/transit/integrated", {
       origin: params.origin,
       destination: params.destination,
       city: params.city,
-    });
+    }, signal);
   }
 
   /**

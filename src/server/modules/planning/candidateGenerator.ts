@@ -88,12 +88,12 @@ function buildDynamicKeywords(intent: { raw: string; preferences: string[] }): {
  * 优先通过 providers.map.searchPois 获取真实高德数据；
  * 生产环境无 provider 则抛错；开发环境 fallback 到 mock。
  */
-export async function generateCandidates(context: PlanningContext): Promise<CandidatePool> {
+export async function generateCandidates(context: PlanningContext, signal?: AbortSignal): Promise<CandidatePool> {
   const isProd = env.NODE_ENV === "production";
   const mapProvider = context.providers?.map;
 
   if (mapProvider) {
-    return generateFromProvider(context, mapProvider);
+    return generateFromProvider(context, mapProvider, signal);
   }
 
   if (isProd) {
@@ -106,6 +106,7 @@ export async function generateCandidates(context: PlanningContext): Promise<Cand
 async function generateFromProvider(
   context: PlanningContext,
   mapProvider: NonNullable<PlanningProviders["map"]>,
+  signal?: AbortSignal,
 ): Promise<CandidatePool> {
   const city = context.intent.city || "杭州";
   const dynamicKw = buildDynamicKeywords(context.intent);
@@ -116,11 +117,11 @@ async function generateFromProvider(
   const activityKw = [POI_CATEGORIES.activities.keywords, ...dynamicKw.activityKeywords].join(" ");
 
   const [activityPois, restaurantPois, eventPois, cafePois, cinemaPois] = await Promise.all([
-    searchPoisSafe(mapProvider, city, activityKw, POI_CATEGORIES.activities.types),
-    searchPoisSafe(mapProvider, city, restaurantKw, POI_CATEGORIES.restaurants.types),
-    searchPoisSafe(mapProvider, city, POI_CATEGORIES.events.keywords, POI_CATEGORIES.events.types),
-    searchPoisSafe(mapProvider, city, cafeKw, POI_CATEGORIES.cafes.types),
-    searchPoisSafe(mapProvider, city, POI_CATEGORIES.cinemas.keywords, POI_CATEGORIES.cinemas.types),
+    searchPoisSafe(mapProvider, city, activityKw, POI_CATEGORIES.activities.types, signal),
+    searchPoisSafe(mapProvider, city, restaurantKw, POI_CATEGORIES.restaurants.types, signal),
+    searchPoisSafe(mapProvider, city, POI_CATEGORIES.events.keywords, POI_CATEGORIES.events.types, signal),
+    searchPoisSafe(mapProvider, city, cafeKw, POI_CATEGORIES.cafes.types, signal),
+    searchPoisSafe(mapProvider, city, POI_CATEGORIES.cinemas.keywords, POI_CATEGORIES.cinemas.types, signal),
   ]);
 
   const filterByCity = (pois: PoiResult[]) => pois.filter((poi) => isSameCity(poi, city));
@@ -147,6 +148,7 @@ async function searchPoisSafe(
   city: string,
   keywords: string,
   types: string,
+  signal?: AbortSignal,
 ): Promise<PoiResult[]> {
   // V4: 先查缓存
   const cacheKey = `${city}:${keywords}:${types}`;
@@ -154,7 +156,7 @@ async function searchPoisSafe(
   if (cached) return cached;
 
   try {
-    const result = await mapProvider.searchPois({ city, keywords, types, pageSize: 10 });
+    const result = await mapProvider.searchPois({ city, keywords, types, pageSize: 10 }, signal);
     setCachedPois(cacheKey, result);
     return result;
   } catch (error) {

@@ -275,9 +275,10 @@ export async function registerAgentRoutes(app: FastifyInstance) {
       ],
     },
     async (request, reply) => {
-      let clientDisconnected = false;
+      // Create AbortController — abort when client disconnects
+      const abortController = new AbortController();
       request.raw.on("close", () => {
-        clientDisconnected = true;
+        abortController.abort();
       });
 
       try {
@@ -313,14 +314,14 @@ export async function registerAgentRoutes(app: FastifyInstance) {
         // ── 2. 保存用户消息 ──
         await saveMessage(db, conversationId, "user", parsed.prompt, undefined, app.log);
 
-        // ── 3. 运行规划管道（带心跳 + 真流式进度回调） ──
+        // ── 3. 运行规划管道（带心跳 + 真流式进度回调 + AbortSignal） ──
         const heartbeat = setInterval(() => {
-          if (!clientDisconnected) reply.raw.write(":heartbeat\n\n");
+          if (!abortController.signal.aborted) reply.raw.write(":heartbeat\n\n");
         }, 15_000);
 
         // V4: 真流式 SSE — 每个阶段立即推送状态事件
         const sendSse = (event: string, data: unknown) => {
-          if (!clientDisconnected) {
+          if (!abortController.signal.aborted) {
             reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
           }
         };
@@ -342,13 +343,14 @@ export async function registerAgentRoutes(app: FastifyInstance) {
             providers: app.providers ?? undefined,
             userId,
             progress: progressCallbacks,
+            signal: abortController.signal,
           });
         } finally {
           clearInterval(heartbeat);
         }
 
         // 客户端已断连则跳过写入
-        if (clientDisconnected) {
+        if (abortController.signal.aborted) {
           app.log.warn({ conversationId }, "Client disconnected during planning pipeline, skipping response write");
           return;
         }
@@ -360,11 +362,11 @@ export async function registerAgentRoutes(app: FastifyInstance) {
 
         // Stream the summary (V4: 快速流式输出，不再逐字)
         const summary = result.summary || "为你找到以下方案：";
-        if (!clientDisconnected) {
+        if (!abortController.signal.aborted) {
           reply.raw.write(`data: ${JSON.stringify({ content: summary })}\n\n`);
         }
 
-        if (!clientDisconnected) {
+        if (!abortController.signal.aborted) {
           // Send final structured result for progressive UI hydration
           sendSse("final", { ...result, conversationId });
           reply.raw.write(`data: [FINAL_RESULT]${JSON.stringify({ ...result, conversationId })}\n\n`);
@@ -396,12 +398,12 @@ export async function registerAgentRoutes(app: FastifyInstance) {
           }
         }
 
-        if (!clientDisconnected) {
+        if (!abortController.signal.aborted) {
           reply.raw.end();
         }
       } catch (error) {
         app.log.error({ err: error }, "SSE planning stream error");
-        if (!clientDisconnected) {
+        if (!abortController.signal.aborted) {
           try {
             if (error instanceof ZodError) {
               reply.raw.write(`data: ${JSON.stringify({ error: "INVALID_REQUEST", issues: error.issues })}\n\n`);

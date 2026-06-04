@@ -26,6 +26,8 @@ const mockIntent: UserIntent = {
   budgetMax: 500,
   distanceLimitMinutes: 40,
   preferences: [],
+  routeStops: [],
+  foodPreferences: [],
   mustAsk: [],
   isPlanningRequest: true,
 };
