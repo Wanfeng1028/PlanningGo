@@ -1851,6 +1851,12 @@ $green: #22c55e;
   color: $text-secondary;
 }
 
+.planMetaTagConstraint {
+  background: linear-gradient(135deg, rgba(#8b5cf6, 0.12) 0%, rgba(#8b5cf6, 0.06) 100%);
+  color: #7c3aed;
+  border: 1px solid rgba(#8b5cf6, 0.2);
+}
+
 .planCardActions {
   display: flex;
   flex-wrap: wrap;

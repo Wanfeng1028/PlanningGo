@@ -133,6 +133,19 @@ export function PlanCardView({
 
       {/* Meta tags */}
       <div className={styles.planCardMeta}>
+        {/* Constraint tags */}
+        {plan.constraints && plan.constraints.length > 0 && (
+          <>
+            {plan.constraints.map((c, i) => (
+              <span
+                key={i}
+                className={`${styles.planMetaTag} ${styles.planMetaTagConstraint}`}
+              >
+                {c}
+              </span>
+            ))}
+          </>
+        )}
         {duration && (
           <span className={`${styles.planMetaTag} ${styles.planMetaTagRoute}`}>
             ⏱ {duration}

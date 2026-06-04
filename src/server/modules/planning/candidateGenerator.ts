@@ -4,6 +4,47 @@ import type { PlanningContext } from "./contextBuilder";
 import type { PoiResult } from "../../providers/types";
 import { env } from "../../config/env";
 
+// ── Mock booking failure helpers ──
+
+/** Check if a specific booking failure type is enabled */
+function isMockBookingFailure(type: string): boolean {
+  return env.MOCK_BOOKING_FAILURES.includes(type);
+}
+
+/** Determine if a POI should have bookingAvailable=false based on MOCK_BOOKING_FAILURES */
+function resolveBookingAvailable(category: CandidatePoi["category"], poiName?: string): {
+  bookingAvailable: boolean;
+  queueRisk: CandidatePoi["queueRisk"];
+  riskFlags: string[];
+} {
+  if (!isMockBookingFailure("no_seat") && !isMockBookingFailure("no_ticket")) {
+    return { bookingAvailable: true, queueRisk: "unknown", riskFlags: [] };
+  }
+
+  const isRestaurant = category === "restaurant";
+  const isActivity = category === "activity";
+
+  // no_seat: restaurants and activities have no seats
+  if (isMockBookingFailure("no_seat") && (isRestaurant || isActivity)) {
+    return {
+      bookingAvailable: false,
+      queueRisk: "high",
+      riskFlags: [`${poiName || "该场所"}当前时段已无可用座位`, "建议调整时间或选择其他门店"],
+    };
+  }
+
+  // no_ticket: scenic spots and activities have no tickets
+  if (isMockBookingFailure("no_ticket") && (category === "scenic" || isActivity)) {
+    return {
+      bookingAvailable: false,
+      queueRisk: "high",
+      riskFlags: [`${poiName || "该场所"}当日门票已售罄`, "建议改期或选择其他日期"],
+    };
+  }
+
+  return { bookingAvailable: true, queueRisk: "unknown", riskFlags: [] };
+}
+
 // V4: 简单内存缓存 — 同一 session 内避免重复高德调用
 const _poiCache = new Map<string, { data: PoiResult[]; expiresAt: number }>();
 const POI_CACHE_TTL_MS = 5 * 60 * 1000; // 5 分钟
@@ -170,6 +211,7 @@ async function searchPoisSafe(
 
 function mapAmapPoiToCandidate(poi: PoiResult, defaultCategory: CandidatePoi["category"]): CandidatePoi {
   const category = inferCategory(poi.type, defaultCategory);
+  const booking = resolveBookingAvailable(category, poi.name);
 
   return {
     id: poi.id,
@@ -189,9 +231,9 @@ function mapAmapPoiToCandidate(poi: PoiResult, defaultCategory: CandidatePoi["ca
     todayOpenStatus: "unknown",
     distanceMinutes: poi.distance ? Math.round(poi.distance / 800) : undefined,
     bookingRequired: category === "restaurant",
-    bookingAvailable: true,
-    queueRisk: "unknown",
-    riskFlags: [],
+    bookingAvailable: booking.bookingAvailable,
+    queueRisk: booking.queueRisk,
+    riskFlags: booking.riskFlags,
     city: poi.city,
     adcode: poi.adcode,
     /* V4: deep POI fields */
@@ -393,6 +435,7 @@ async function generateMockFallback(context: PlanningContext): Promise<Candidate
   const base = pois.map<CandidatePoi>((poi) => {
     const category = mapCategory(poi.type);
     const distanceMinutes = Number.parseInt(poi.distance.replace(/\D/g, ""), 10) || 40;
+    const booking = resolveBookingAvailable(category, poi.name);
 
     return {
       id: poi.id,
@@ -410,9 +453,9 @@ async function generateMockFallback(context: PlanningContext): Promise<Candidate
       todayOpenStatus: "open" as const,
       distanceMinutes,
       bookingRequired: poi.type === "餐厅" || poi.type === "雨天兜底",
-      bookingAvailable: true,
-      queueRisk: poi.name.includes("海底捞") ? "medium" as const : "low" as const,
-      riskFlags: poi.name.includes("海底捞") ? ["晚餐高峰可能等位"] : [],
+      bookingAvailable: booking.bookingAvailable,
+      queueRisk: booking.queueRisk,
+      riskFlags: booking.riskFlags.length > 0 ? booking.riskFlags : poi.name.includes("海底捞") ? ["晚餐高峰可能等位"] : [],
     };
   });
 

@@ -158,6 +158,17 @@ const envSchema = z.object({
     .default("false")
     .transform((v) => v === "true"),
 
+  // ── 演示模式 ──
+  DEMO_MODE: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true"),
+  MOCK_BOOKING_FAILURES: z
+    .string()
+    .default("")
+    .transform((v) => v.split(",").map((s) => s.trim()).filter(Boolean)),
+  MOCK_LATENCY_MS: z.coerce.number().int().min(0).default(0),
+
   // ── 生产环境安全开关 ──
   ENABLE_DEMO_AUTH: z
     .string()

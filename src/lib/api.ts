@@ -328,6 +328,7 @@ export interface PlanningOption {
   risks: string[];
   timeline: PlanningTimelineStep[];
   backupPlan?: string;
+  constraints?: string[];
 }
 
 export interface PlanningExecutableAction {
