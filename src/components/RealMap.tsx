@@ -70,8 +70,8 @@ export function RealMap({
           "",
           center as [number, number],
           3000, // 3km 半径
-          (status, result) => {
-            if (status === "complete" && result.poiList) {
+          (_status: string, result: any) => {
+            if (_status === "complete" && result.poiList) {
               const pois = result.poiList.pois
                 .slice(0, 15)
                 .map((poi: any) => ({
