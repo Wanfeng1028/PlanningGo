@@ -68,6 +68,13 @@ export async function buildApp() {
       return sendError(reply, error.statusCode, error.code, error.message);
     }
 
+    if (error && typeof error === "object" && "statusCode" in error && "error" in error) {
+      const raw = error as { statusCode?: number; error?: { code?: string; message?: string } };
+      if (raw.statusCode && raw.error?.code && raw.error?.message) {
+        return sendError(reply, raw.statusCode, raw.error.code, raw.error.message);
+      }
+    }
+
     // Fastify 自身的 400 系列
     if (error instanceof Error && "statusCode" in error && typeof (error as Record<string, unknown>).statusCode === "number" && ((error as Record<string, unknown>).statusCode as number) < 500) {
       const statusCode = (error as Record<string, unknown>).statusCode as number;

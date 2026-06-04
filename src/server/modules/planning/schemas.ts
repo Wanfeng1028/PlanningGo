@@ -175,6 +175,12 @@ export const activityPlanSchema = z.object({
   assumptions: z.array(z.string()).default([]),
   highlights: z.array(z.string()).default([]),
   risks: z.array(z.string()).default([]),
+  constraints: z.array(z.string()).default([]).optional(),
+  recovery: z.object({
+    applied: z.boolean(),
+    reasons: z.array(z.string()).default([]),
+    actions: z.array(z.string()).default([]),
+  }).optional(),
   timeline: z.array(timelineStepSchema).min(2),
   backupPlan: z.string().optional(),
 });

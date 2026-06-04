@@ -345,6 +345,11 @@ export interface PlanningOption {
   timeline: PlanningTimelineStep[];
   backupPlan?: string;
   constraints?: string[];
+  recovery?: {
+    applied: boolean;
+    reasons: string[];
+    actions: string[];
+  };
 }
 
 export interface PlanningExecutableAction {
@@ -888,6 +893,41 @@ export interface ReverseGeocodeResult {
 
 export async function reverseGeocode(lat: number, lng: number): Promise<ReverseGeocodeResult> {
   return apiJson<ReverseGeocodeResult>(`/api/location/reverse-geocode?lat=${lat}&lng=${lng}`);
+}
+
+export interface NearbyPoi {
+  id: string;
+  name: string;
+  address: string;
+  type: string;
+  location: { lng: number; lat: number };
+  rating?: number;
+  cost?: number;
+  distance?: number;
+  source: "amap" | "mock";
+}
+
+export interface NearbyPoiResult {
+  pois: NearbyPoi[];
+  count: number;
+  source: "amap" | "mock";
+  fallbackUsed: boolean;
+  hint?: string;
+}
+
+export async function getNearbyPois(input: {
+  lat: number;
+  lng: number;
+  city: string;
+  radius?: number;
+}): Promise<NearbyPoiResult> {
+  const params = new URLSearchParams({
+    lat: String(input.lat),
+    lng: String(input.lng),
+    city: input.city,
+    radius: String(input.radius ?? 3000),
+  });
+  return apiJson<NearbyPoiResult>(`/api/location/nearby?${params.toString()}`);
 }
 
 // ═══════════════════════════════════════════════════

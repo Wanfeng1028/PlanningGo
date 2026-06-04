@@ -2125,6 +2125,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
               ← 返回
             </button>
             <RealMap
+              key="realmap"
               center={location?.latitude && location?.longitude ? [location.longitude, location.latitude] : undefined}
               city={city}
             />

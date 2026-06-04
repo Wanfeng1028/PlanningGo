@@ -197,7 +197,9 @@ async function searchPoisSafe(
   if (cached) return cached;
 
   try {
-    const result = await mapProvider.searchPois({ city, keywords, types, pageSize: 10 }, signal);
+    const timeoutSignal = AbortSignal.timeout(3000);
+    const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+    const result = await mapProvider.searchPois({ city, keywords, types, pageSize: 10 }, combinedSignal);
     setCachedPois(cacheKey, result);
     return result;
   } catch (error) {

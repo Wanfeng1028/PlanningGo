@@ -9,12 +9,18 @@ import rateLimit from "@fastify/rate-limit";
 
 async function rateLimitPlugin(app: FastifyInstance) {
   await app.register(rateLimit, {
-    max: 100,
+    max: 300,
     timeWindow: "1 minute",
+    skipOnError: true,
+    allowList: (request) =>
+      request.url === "/api/health" ||
+      request.url === "/api/ready" ||
+      request.url.startsWith("/api/location/nearby"),
     keyGenerator: (request) => {
       return request.userId ?? request.ip;
     },
     errorResponseBuilder: (_request, context) => ({
+      statusCode: 429,
       ok: false,
       error: {
         code: "RATE_LIMIT_EXCEEDED",

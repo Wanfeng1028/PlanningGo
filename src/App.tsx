@@ -85,6 +85,7 @@ export function App() {
       setAuthRedirectTo(null);
       setModal("login");
     } else {
+      if (key === "features") setViewMode("chat");
       setActive(key);
     }
   };
@@ -336,7 +337,19 @@ export function App() {
         </footer>
       )}
 
-      {!isFeatureWorkspace && <BottomTabs active={active} onNavigate={handleAuthRequiredNavigate} user={user} onOpenModal={openModal} onMapTabClick={() => setViewMode("map")} />}
+      {!isFeatureWorkspace && (
+        <BottomTabs
+          active={active}
+          onNavigate={handleAuthRequiredNavigate}
+          user={user}
+          onOpenModal={openModal}
+          featureViewMode={viewMode}
+          onMapTabClick={() => {
+            setActive("features");
+            setViewMode("map");
+          }}
+        />
+      )}
 
       {isAuthModal(modal) ? (
         <AuthModal

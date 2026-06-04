@@ -30,6 +30,28 @@ import { VOTE_RULE } from "../common/rateLimiter.js";
 
 const uid = requireUserId;
 
+function buildCollaborationSummary(members: Array<{ name: string; vote: "yes" | "no" | "pending"; comment?: string }>) {
+  const agreed = members.filter((member) => member.vote === "yes").length;
+  const rejected = members.filter((member) => member.vote === "no");
+  const pending = members.filter((member) => member.vote === "pending").length;
+  return {
+    agreed,
+    pending,
+    conflicts: rejected.length,
+    majorFeedback: rejected
+      .map((member) => member.comment || `${member.name}想调整`)
+      .slice(0, 3),
+    nextAction: rejected.length > 0 ? "基于反馈调整方案" : pending > 0 ? "等待同行人确认" : "全员已确认，可继续执行",
+  };
+}
+
+function withShareSummary<T extends { members: Array<{ name: string; vote: "yes" | "no" | "pending"; comment?: string }> }>(room: T) {
+  return {
+    ...room,
+    collaboration: buildCollaborationSummary(room.members),
+  };
+}
+
 export async function registerShareRoutes(app: FastifyInstance) {
   // ── 获取分享房间列表（公开） ──
   app.get("/api/share/rooms", { preHandler: [app.optionalAuthGuard] }, async () => {
@@ -37,7 +59,7 @@ export async function registerShareRoutes(app: FastifyInstance) {
     // 公开展示时 sanitize HTML
     return {
       items: rooms.map((room) => ({
-        ...room,
+        ...withShareSummary(room),
         title: sanitizeHtmlForRender(String(room.title)),
       })),
     };
@@ -76,7 +98,7 @@ export async function registerShareRoutes(app: FastifyInstance) {
       planId: planId ?? "",
     });
 
-    return sendOk(reply, room);
+    return sendOk(reply, withShareSummary(room));
   });
 
   // ── 投票 ──
@@ -110,7 +132,7 @@ export async function registerShareRoutes(app: FastifyInstance) {
     if (!next) throw new NotFoundError("SHARE_ROOM_NOT_FOUND");
 
     return sendOk(reply, {
-      ...next,
+      ...withShareSummary(next),
       title: sanitizeHtmlForRender(String(next.title)),
     });
   });

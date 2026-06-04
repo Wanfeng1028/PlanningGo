@@ -10,9 +10,10 @@ interface BottomTabsProps {
   user: SessionUser | null;
   onOpenModal: (key: ModalKey) => void;
   onMapTabClick?: () => void;
+  featureViewMode?: "chat" | "map";
 }
 
-export function BottomTabs({ active, onNavigate, user, onOpenModal, onMapTabClick }: BottomTabsProps) {
+export function BottomTabs({ active, onNavigate, user, onOpenModal, onMapTabClick, featureViewMode = "chat" }: BottomTabsProps) {
   const handleTabClick = (index: number) => {
     const nav = tabToNav[index];
     // 地图 tab（index 2）点击时触发地图视图
@@ -33,7 +34,10 @@ export function BottomTabs({ active, onNavigate, user, onOpenModal, onMapTabClic
       {mobileTabs.map((tab, index) => {
         const Icon = tab.icon;
         const nav = tabToNav[index];
-        const isActive = active === nav || (index === 2 && active === "features") || (index === 3 && active === "features");
+        const isActive =
+          (index === 1 && active === "features" && featureViewMode === "chat") ||
+          (index === 2 && active === "features" && featureViewMode === "map") ||
+          (index !== 1 && index !== 2 && active === nav);
         return (
           <button
             className={`${styles.tab} ${isActive ? styles.active : ""}`}

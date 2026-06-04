@@ -7,6 +7,7 @@ import { generateCandidates } from "../planning/candidateGenerator";
 import { rankCandidates } from "../planning/ranking";
 import { generateMockPlans, generateLlmPlans } from "./planner";
 import { validatePlans } from "../planning/validator";
+import { repairPlans } from "../planning/repairer";
 import { createActionsForPlans } from "../execution/actionService";
 import { buildServiceActionsForPlan } from "../execution/serviceActionBuilder.js";
 import { scoreAndFilterCandidates } from "../planning/poiScorer";
@@ -40,7 +41,7 @@ export async function runPlanningPipeline(
   const planId = createId("plan");
   const mode = env.PLANNING_MODE;
   const progress = input.progress;
-  const signal = input.signal;
+  const signal = input.signal ? AbortSignal.any([input.signal, AbortSignal.timeout(30_000)]) : AbortSignal.timeout(30_000);
 
   // 1. 抽取意图
   progress?.onStatus("正在理解你的需求...");
@@ -130,8 +131,12 @@ export async function runPlanningPipeline(
   progress?.onStatus("正在计算路线和交通时间...");
   const routedOptions = await calculateRouteTimes(enrichedOptions, effectiveCandidates, input.providers?.map ? getAmapClientIfAvailable(input.providers.map) : undefined, signal);
 
-  // 7.5. 为每个方案生成 serviceActions（外部服务入口）
-  const serviceEnhancedOptions = routedOptions.map((option) => {
+  // 7.5. 程序化修复硬约束：时间窗、完整链路、无座/无票、预算等
+  progress?.onStatus("正在校验并修复约束...");
+  const repairedOptions = repairPlans({ intent, candidates: effectiveCandidates, options: routedOptions });
+
+  // 7.6. 为每个方案生成 serviceActions（外部服务入口）
+  const serviceEnhancedOptions = repairedOptions.map((option) => {
     const result = buildServiceActionsForPlan(option);
     // 将 serviceActions 挂载到每个 timeline step 上
     return {
@@ -140,7 +145,7 @@ export async function runPlanningPipeline(
     };
   });
 
-  // 8. 校验方案
+  // 8. 校验修复后的方案
   const validation = validatePlans({ intent, candidates: effectiveCandidates, options: serviceEnhancedOptions });
 
   // 9. 为最优方案生成推荐（静态推理 + 真实 POI 增强）

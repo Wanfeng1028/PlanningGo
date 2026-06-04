@@ -16,6 +16,8 @@
   min-height: 300px;
   width: 100%;
   position: relative;
+  touch-action: pan-x pan-y;
+  will-change: transform;
 
   & > div {
     width: 100%;
@@ -142,8 +144,7 @@
   left: 0;
   right: 0;
   max-height: 45%;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.96);
   border-top: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: 20px 20px 0 0;
   display: flex;
@@ -151,17 +152,47 @@
   overflow: hidden;
   z-index: 20;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
-  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.poiPanelDragging {
+  transform: translateY(calc(100% - 48px));
+  opacity: 0.88;
+  pointer-events: none;
+}
+
+.poiPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .poiPanelTitle {
-  padding: 16px 20px 12px;
   font-size: 15px;
   font-weight: 600;
   color: #1a1a2e;
   margin: 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
   flex-shrink: 0;
+}
+
+.poiRefreshBtn {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 5px 9px;
+}
+
+.poiStatus {
+  margin: 0;
+  padding: 8px 20px 0;
+  color: #6b7280;
+  font-size: 12px;
 }
 
 .poiList {
@@ -245,7 +276,6 @@
   }
 
   .poiPanelTitle {
-    padding: 14px 16px 10px;
     font-size: 14px;
   }
 

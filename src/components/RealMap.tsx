@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import AMapLoader from "@amap/amap-jsapi-loader";
+import { getNearbyPois, type NearbyPoi } from "../lib/api";
 import styles from "./RealMap.module.scss";
 
 export interface RealMapProps {
@@ -8,8 +9,19 @@ export interface RealMapProps {
   onMarkerClick?: (marker: any) => void;
 }
 
+type MapPoi = {
+  id: string;
+  name: string;
+  address?: string;
+  location: [number, number];
+  type: string;
+  distance?: number;
+  source: "amap" | "mock";
+};
+
 /** SDK 加载超时（毫秒） */
 const SDK_LOAD_TIMEOUT = 15_000;
+const DEFAULT_CENTER: [number, number] = [121.4379, 31.0339];
 
 /* ═══════════════════════════════════════════
    SDK 加载函数
@@ -51,7 +63,7 @@ function loadSdk(): Promise<any> {
  * NotFoundError。
  */
 export function RealMap({
-  center = [121.4379, 31.0339],
+  center = DEFAULT_CENTER,
   city = "上海",
   onMarkerClick,
 }: RealMapProps) {
@@ -64,13 +76,14 @@ export function RealMap({
   const centerRef = useRef(center);
   const cityRef = useRef(city);
   const onMarkerClickRef = useRef(onMarkerClick);
+  const poiMarkersRef = useRef<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [poiList, setPoiList] =
-    useState<Array<{ name: string; location: [number, number]; type: string }>>(
-      [],
-    );
-  const [viewMode, setViewMode] = useState<"2D" | "3D">("2D");
+  const [poiList, setPoiList] = useState<MapPoi[]>([]);
+  const [poiLoading, setPoiLoading] = useState(false);
+  const [poiFallback, setPoiFallback] = useState(false);
+  const [poiMessage, setPoiMessage] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [mapStyle, setMapStyle] = useState<"standard" | "satellite">("standard");
 
   // 将 ref 更新移到 useEffect 中，避免在渲染期间修改 ref
@@ -79,6 +92,70 @@ export function RealMap({
     cityRef.current = city;
     onMarkerClickRef.current = onMarkerClick;
   }, [center, city, onMarkerClick]);
+
+  const renderPoiMarkers = useCallback((pois: MapPoi[]) => {
+    const map = mapInstanceRef.current;
+    const AMap = (window as any).AMap;
+    if (!map || !AMap) return;
+
+    if (poiMarkersRef.current.length > 0) {
+      try {
+        map.remove(poiMarkersRef.current);
+      } catch {
+        // ignore stale marker cleanup
+      }
+      poiMarkersRef.current = [];
+    }
+
+    const markers = pois.slice(0, 12).map((poi) => {
+      const marker = new AMap.Marker({
+        position: poi.location,
+        title: poi.name,
+        anchor: "bottom-center",
+      });
+      marker.on("click", () => {
+        onMarkerClickRef.current?.(marker);
+      });
+      return marker;
+    });
+    if (markers.length > 0) map.add(markers);
+    poiMarkersRef.current = markers;
+  }, []);
+
+  const loadNearbyPois = useCallback(async (targetCenter = centerRef.current, targetCity = cityRef.current) => {
+    setPoiLoading(true);
+    setPoiMessage(null);
+    try {
+      const result = await getNearbyPois({
+        lng: targetCenter[0],
+        lat: targetCenter[1],
+        city: targetCity || "上海",
+        radius: 3000,
+      });
+      const pois = result.pois
+        .filter((poi: NearbyPoi) => Number.isFinite(poi.location.lng) && Number.isFinite(poi.location.lat))
+        .slice(0, 12)
+        .map((poi) => ({
+          id: poi.id,
+          name: poi.name,
+          address: poi.address,
+          location: [poi.location.lng, poi.location.lat] as [number, number],
+          type: poi.type || "周边地点",
+          distance: poi.distance,
+          source: poi.source,
+        }));
+      setPoiList(pois);
+      setPoiFallback(result.fallbackUsed);
+      setPoiMessage(result.hint ?? null);
+      renderPoiMarkers(pois);
+    } catch {
+      setPoiList([]);
+      setPoiFallback(false);
+      setPoiMessage("周边加载失败，请稍后重试。");
+    } finally {
+      setPoiLoading(false);
+    }
+  }, [renderPoiMarkers]);
 
   // 只在 mount 时加载地图（空依赖数组），通过 ref 获取最新 center/city
   useEffect(() => {
@@ -140,17 +217,19 @@ export function RealMap({
         const map = new AMap.Map(mapContainer, {
           zoom: 15,
           center: currentCenter,
-          mapStyle: mapStyle === "satellite" ? "amap://styles/satellite" : "amap://styles/light",
-          viewMode: viewMode === "3D" ? "3D" : "2D",
-          pitch: viewMode === "3D" ? 50 : 0,
+          mapStyle: mapStyle === "satellite" ? "amap://styles/satellite" : "amap://styles/normal",
+          viewMode: "2D",
+          pitch: 0,
           resizeEnable: true,
           dragEnable: true,
           zoomEnable: true,
-          rotateEnable: true,
-          pitchEnable: true,
+          rotateEnable: false,
+          pitchEnable: false,
         });
 
         mapInstanceRef.current = map;
+        map.on("dragstart", () => setIsDragging(true));
+        map.on("dragend", () => setIsDragging(false));
 
         // 用户位置标记
         const userMarker = new AMap.Marker({
@@ -164,47 +243,8 @@ export function RealMap({
         });
         map.add(userMarker);
 
-        // 搜索周边 POI
-        const placeSearch = new AMap.PlaceSearch({
-          city: currentCity,
-          pageSize: 20,
-          pageIndex: 1,
-        });
-
-        placeSearch.searchNearBy(
-          "",
-          currentCenter as [number, number],
-          3000,
-          (_status: string, result: any) => {
-            if (_status === "complete" && result.poiList) {
-              const pois = result.poiList.pois
-                .slice(0, 15)
-                .map((poi: any) => ({
-                  name: poi.name,
-                  location: [
-                    poi.location.lng,
-                    poi.location.lat,
-                  ] as [number, number],
-                  type: poi.type || "其他",
-                }));
-              setPoiList(pois);
-
-              pois.forEach((poi: any) => {
-                const marker = new AMap.Marker({
-                  position: poi.location,
-                  title: poi.name,
-                  anchor: "bottom-center",
-                });
-                marker.on("click", () => {
-                  onMarkerClickRef.current?.(marker);
-                });
-                map.add(marker);
-              });
-            }
-          },
-        );
-
         if (!destroyed) setLoading(false);
+        if (!destroyed) void loadNearbyPois(currentCenter, currentCity);
       } catch (err) {
         if (destroyed) return;
         const msg = err instanceof Error ? err.message : String(err);
@@ -238,6 +278,7 @@ export function RealMap({
         }
         mapInstanceRef.current = null;
       }
+      poiMarkersRef.current = [];
 
       // 手动移除 React 树之外的容器，React 不需要知道
       if (mapContainerElRef.current?.parentNode) {
@@ -267,25 +308,31 @@ export function RealMap({
     if (currentCenter && map.setCenter) {
       try {
         map.setCenter(currentCenter);
+        void loadNearbyPois(currentCenter, cityRef.current);
       } catch {
         // ignore
       }
     }
-  }, [center, city]);
+  }, [center, city, loadNearbyPois]);
 
-  // 当 viewMode 或 mapStyle 变化时，更新地图配置
+  // 当 mapStyle 变化时，更新地图样式
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map) return;
+    if (!map) {
+      console.log("[RealMap] 地图实例不存在");
+      return;
+    }
+
+    console.log("[RealMap] 更新地图样式:", { mapStyle });
 
     try {
-      map.setViewMode(viewMode === "3D" ? "3D" : "2D");
-      map.setPitch(viewMode === "3D" ? 50 : 0);
-      map.setMapStyle(mapStyle === "satellite" ? "amap://styles/satellite" : "amap://styles/light");
-    } catch {
-      // ignore
+      const style = mapStyle === "satellite" ? "amap://styles/satellite" : "amap://styles/normal";
+      map.setMapStyle(style);
+      console.log("[RealMap] 地图样式更新完成");
+    } catch (error) {
+      console.error("[RealMap] 更新地图样式失败:", error);
     }
-  }, [viewMode, mapStyle]);
+  }, [mapStyle]);
 
   // 处理 POI 点击
   const handlePoiClick = useCallback(
@@ -337,18 +384,11 @@ export function RealMap({
 
       <div className={styles.mapControls}>
         <button
-          className={`${styles.mapControlBtn} ${viewMode === "2D" ? styles.active : ""}`}
-          onClick={() => setViewMode("2D")}
+          className={`${styles.mapControlBtn} ${styles.active}`}
           type="button"
+          disabled
         >
           2D
-        </button>
-        <button
-          className={`${styles.mapControlBtn} ${viewMode === "3D" ? styles.active : ""}`}
-          onClick={() => setViewMode("3D")}
-          type="button"
-        >
-          3D
         </button>
         <button
           className={`${styles.mapControlBtn} ${mapStyle === "standard" ? styles.active : ""}`}
@@ -366,8 +406,18 @@ export function RealMap({
         </button>
       </div>
 
-      <div className={styles.poiPanel}>
-        <h3 className={styles.poiPanelTitle}>周边 {poiList.length} 个地点</h3>
+      <div className={`${styles.poiPanel} ${isDragging ? styles.poiPanelDragging : ""}`}>
+        <div className={styles.poiPanelHeader}>
+          <h3 className={styles.poiPanelTitle}>
+            周边 {poiLoading ? "加载中" : `${poiList.length} 个地点`}
+          </h3>
+          <button className={styles.poiRefreshBtn} type="button" onClick={() => loadNearbyPois()}>
+            重试
+          </button>
+        </div>
+        {(poiFallback || poiMessage) && (
+          <p className={styles.poiStatus}>{poiMessage ?? "已切换为演示推荐地点"}</p>
+        )}
         <div className={styles.poiList}>
           {poiList.map((poi, index) => (
             <button
@@ -379,12 +429,14 @@ export function RealMap({
               <span className={styles.poiIcon}>📍</span>
               <div className={styles.poiInfo}>
                 <span className={styles.poiName}>{poi.name}</span>
-                <span className={styles.poiType}>{poi.type}</span>
+                <span className={styles.poiType}>
+                  {poi.distance ? `${poi.distance}m · ` : ""}{poi.type}{poi.source === "mock" ? " · 推荐" : ""}
+                </span>
               </div>
             </button>
           ))}
-          {poiList.length === 0 && !loading && (
-            <p className={styles.poiEmpty}>暂无周边数据</p>
+          {poiList.length === 0 && !loading && !poiLoading && (
+            <p className={styles.poiEmpty}>周边暂时没有返回数据，点重试或换个区域看看。</p>
           )}
         </div>
       </div>

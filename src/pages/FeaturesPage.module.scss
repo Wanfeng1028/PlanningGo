@@ -1921,6 +1921,26 @@ $green: #22c55e;
   box-sizing: border-box;
 }
 
+.planRecoveryBox {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(34, 197, 94, 0.22);
+  border-radius: 8px;
+  background: rgba(240, 253, 244, 0.88);
+  color: #166534;
+}
+
+.planRecoveryTitle {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.planRecoveryText {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .planMetaTag {
   padding: 4px 12px;
   border-radius: 999px;

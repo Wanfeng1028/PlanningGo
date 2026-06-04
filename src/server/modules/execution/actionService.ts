@@ -109,6 +109,7 @@ function createBookingAction(
       poiName: step.poiName,
       startTime: step.startTime,
       partySize: intent.partySize,
+      recovery: buildRecovery(step, isMeal ? "no_seat" : "no_ticket"),
     },
   };
 }
@@ -265,7 +266,31 @@ function createRestaurantReservationDraft(
       recommendedItems: step.recommendedItems ?? [],
       bookingAdvice: step.bookingAdvice,
       queueRisk: step.queueRisk,
+      recovery: buildRecovery(step, "no_seat"),
     },
+  };
+}
+
+function buildRecovery(step: ActivityPlan["timeline"][number], type: "no_seat" | "no_ticket" | "conflict") {
+  const highRisk = step.queueRisk === "high" || /无座|无票|售罄|冲突|排队/.test(
+    [step.bookingHint, step.bookingAdvice, ...(step.suggestions ?? []), ...(step.fallbackPois ?? [])].filter(Boolean).join(" "),
+  );
+  if (!highRisk && type !== "conflict") return undefined;
+
+  const reason = type === "no_seat"
+    ? `${step.poiName ?? step.title} 可能无座或排队较久`
+    : type === "no_ticket"
+      ? `${step.poiName ?? step.title} 可能无票或库存不足`
+      : `${step.title} 存在时间冲突`;
+  return {
+    type,
+    reason,
+    alternatives: step.fallbackPois ?? [],
+    actions: type === "no_seat"
+      ? ["改选备选餐厅", "调整到错峰时间", "打开第三方平台确认"]
+      : type === "no_ticket"
+        ? ["切换室内备选", "改到其他时段", "打开第三方平台确认"]
+        : ["插入缓冲", "压缩低优先级活动", "重新生成方案"],
   };
 }
 

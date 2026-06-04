@@ -179,6 +179,15 @@ export function PlanCardView({
         ))}
       </div>
 
+      {plan.recovery?.applied && (
+        <div className={styles.planRecoveryBox}>
+          <div className={styles.planRecoveryTitle}>异常已处理</div>
+          <div className={styles.planRecoveryText}>
+            {plan.recovery.actions.slice(0, 3).join(" · ")}
+          </div>
+        </div>
+      )}
+
       {/* Backup plan hint */}
       {plan.backupPlan && (
         <div className={styles.planCardBackup}>
