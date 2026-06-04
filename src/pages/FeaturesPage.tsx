@@ -2117,6 +2117,15 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
               输入一句话，Agent 帮你规划完整周末
             </p>
 
+            <button
+              type="button"
+              className={styles.viewMapBtn}
+              onClick={() => setViewMode("map")}
+              aria-label="查看地图"
+            >
+              🗺️ 查看地图
+            </button>
+
             <Composer
               textareaRef={textareaRef}
               value={inputValue}
