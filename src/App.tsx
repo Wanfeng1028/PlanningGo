@@ -39,6 +39,8 @@ export function App() {
   const [handoffCode] = useState(() => getHandoffCodeFromUrl());
 
   const [active, setActive] = useState<NavKey>("home");
+  // 移动端地图视图模式
+  const [viewMode, setViewMode] = useState<"chat" | "map">("chat");
   const [modal, setModal] = useState<ModalKey | null>(null);
   const [user, setUser] = useState<SessionUser | null>(() => {
     try {
@@ -218,6 +220,8 @@ export function App() {
             onRequestLocation={handleRequestLocation}
             onNavigate={setActive}
             location={locationState}
+            viewMode={viewMode}
+            onSetViewMode={setViewMode}
           />
         );
 
@@ -319,7 +323,7 @@ export function App() {
         </footer>
       )}
 
-      {!isFeatureWorkspace && <BottomTabs active={active} onNavigate={handleAuthRequiredNavigate} user={user} onOpenModal={openModal} />}
+      {!isFeatureWorkspace && <BottomTabs active={active} onNavigate={handleAuthRequiredNavigate} user={user} onOpenModal={openModal} onMapTabClick={() => setViewMode("map")} />}
 
       {isAuthModal(modal) ? (
         <AuthModal

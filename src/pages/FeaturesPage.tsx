@@ -5,6 +5,7 @@ import {
   checkHealth,
   addMemory,
   selectPlan,
+  createConversation,
   listConversations,
   getConversation,
   trackEvent as apiTrackEvent,
@@ -59,6 +60,8 @@ interface FeaturesPageProps {
     onConfirmCity: (city: string) => void;
     onDismissConfirm: () => void;
   };
+  viewMode?: "chat" | "map";
+  onSetViewMode?: (mode: "chat" | "map") => void;
 }
 
 type ChatPhase =
@@ -170,10 +173,12 @@ const HERO_PHRASES = [
 
 const STREAM_FLUSH_INTERVAL_MS = 40;
 
-export default function FeaturesPage({ user, onOpenModal, onNavigate, location }: FeaturesPageProps) {
+export default function FeaturesPage({ user, onOpenModal, onNavigate, location, viewMode: externalViewMode, onSetViewMode }: FeaturesPageProps) {
   const [mode, setMode] = useState<"idle" | "chat">("idle");
-  // 移动端视图模式：'chat' | 'map'
-  const [viewMode, setViewMode] = useState<"chat" | "map">("chat");
+  // 移动端视图模式：'chat' | 'map'（优先使用外部传入的状态）
+  const [internalViewMode, setInternalViewMode] = useState<"chat" | "map">("chat");
+  const viewMode = externalViewMode ?? internalViewMode;
+  const setViewMode = onSetViewMode ?? setInternalViewMode;
   const [inputValue, setInputValue] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [, setPhase] = useState<ChatPhase>("idle");
@@ -342,9 +347,115 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     }
     // Load conversations: backend DB for logged-in users, localStorage for guests
     if (user?.id) {
+      // Check for guest data migration before clearing
+      const savedSessions = localStorage.getItem("pg_chat_sessions");
+      let guestSessionsToMigrate: ChatSession[] | null = null;
+      if (savedSessions) {
+        try {
+          guestSessionsToMigrate = JSON.parse(savedSessions) as ChatSession[];
+        } catch { /* ignore corrupt data */ }
+      }
+
       // Clear guest data when user is logged in
       localStorage.removeItem("pg_chat_sessions");
-      console.info("[FeaturesPage] loading DB conversations for user", { userId: user.id, pgActiveConvId: localStorage.getItem("pg_active_conversation_id") });
+      localStorage.removeItem("pg_active_conversation_id");
+      console.info("[FeaturesPage] loading DB conversations for user", { userId: user.id, hasGuestData: Boolean(guestSessionsToMigrate) });
+
+      // Migrate guest localStorage sessions to DB if any exist
+      if (guestSessionsToMigrate && guestSessionsToMigrate.length > 0) {
+        console.info(`[FeaturesPage] migrating ${guestSessionsToMigrate.length} guest sessions to DB for userId=${user.id}`);
+
+        // Use IIFE to allow await in useEffect
+        (async () => {
+          let migratedCount = 0;
+          let activeConvId: string | null = null;
+
+          for (const guestSession of guestSessionsToMigrate!) {
+            try {
+              // Create conversation in DB
+              const createdConv = await createConversation({
+                title: guestSession.title,
+                city: guestSession.city,
+                modelMode: modelMode,
+              });
+
+              // Load messages for this session from DB (backend already saved them during chat)
+              const detail = await getConversation(createdConv.id);
+              if (detail && detail.messages.length > 0) {
+                const loadedMessages = safeMapDbMessages(detail.messages);
+                messagesBySessionRef.current.set(createdConv.id, loadedMessages);
+              } else {
+                messagesBySessionRef.current.set(createdConv.id, guestSession.messages ?? []);
+              }
+
+              migratedCount++;
+
+              // Track the most recently updated session as the active one
+              if (!activeConvId || new Date(guestSession.updatedAt) > new Date(messagesBySessionRef.current.get(activeConvId)?.[0]?.createdAt || "")) {
+                activeConvId = createdConv.id;
+              }
+            } catch (err) {
+              console.error(`[FeaturesPage] failed to migrate session ${guestSession.id}:`, err);
+            }
+          }
+
+          console.info(`[FeaturesPage] migrated ${migratedCount}/${guestSessionsToMigrate!.length} guest sessions to DB`);
+
+          // Load full conversation list from DB after migration
+          const convs = await listConversations({ limit: 50 });
+          const sessions: ChatSession[] = convs.map((cv) => ({
+            id: cv.id,
+            title: cv.title,
+            messages: messagesBySessionRef.current.get(cv.id) ?? [],
+            city: cv.city,
+            createdAt: cv.createdAt,
+            updatedAt: cv.updatedAt,
+          }));
+          setChatSessions(sessions);
+
+          // Restore active conversation
+          if (activeConvId && convs.some((cv) => cv.id === activeConvId)) {
+            setConversationId(activeConvId);
+            conversationIdRef.current = activeConvId;
+            setCurrentSessionId(activeConvId);
+            currentSessionIdRef.current = activeConvId;
+
+            // Auto-load messages for the active conversation
+            getConversation(activeConvId).then((detail) => {
+              if (detail && detail.messages.length > 0) {
+                const loadedMessages = safeMapDbMessages(detail.messages);
+                setSessionMessages(activeConvId, loadedMessages);
+                setMode('chat');
+                setPhase('result');
+                const selMsg = detail.messages.find((m) => {
+                  const p2 = m.payloadJson as Record<string, unknown> | undefined;
+                  return p2?.type === 'plan_selected';
+                });
+                const selPayload = selMsg?.payloadJson as Record<string, unknown> | undefined;
+                if (selPayload?.selectedOptionId) {
+                  setSelectedPlanId(selPayload.selectedOptionId as string);
+                }
+                const lastWithEvents = [...loadedMessages].reverse().find(
+                  (m) => m.role === "assistant" && m.traceEvents && m.traceEvents.length > 0
+                );
+                if (lastWithEvents?.traceEvents) {
+                  setAgentEvents(lastWithEvents.traceEvents);
+                }
+                setShouldAutoScroll(true);
+                requestAnimationFrame(() => {
+                  requestAnimationFrame(() => {
+                    const el = messagesContainerRef.current;
+                    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
+                  });
+                });
+              }
+            }).catch(() => {});
+          }
+        })();
+        return; // Migration done, skip normal DB load path
+      }
+
+      // Normal DB load path (no guest data to migrate)
       listConversations({ limit: 50 })
         .then((convs) => {
           console.info("[FeaturesPage] load DB conversations", { userId: user?.id, count: convs.length, titles: convs.map((c) => c.title), ids: convs.map((c) => c.id) });
@@ -1980,7 +2091,22 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
           </div>
         )}
 
-        {mode === "idle" ? (
+        {/* 地图视图（移动端） */}
+        {viewMode === "map" ? (
+          <div className={styles.featureMapView}>
+            <button
+              className={styles.mapBackBtn}
+              onClick={() => setViewMode("chat")}
+              aria-label="返回聊天"
+            >
+              ← 返回
+            </button>
+            <RealMap
+              center={location?.latitude && location?.longitude ? [location.longitude, location.latitude] : undefined}
+              city={city}
+            />
+          </div>
+        ) : mode === "idle" ? (
           /* ── Idle: centered title + composer ── */
           <div className={styles.featureHome}>
             <h1 className={styles.featureHomeTitle}>
@@ -2032,6 +2158,18 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
         ) : (
           /* ── Chat: messages + docked composer ── */
           <div className={styles.featureChat}>
+            {/* 移动端：地图切换按钮 */}
+            <div className={styles.viewToggleBar}>
+              <button
+                type="button"
+                className={styles.viewToggleBtn}
+                onClick={() => setViewMode("map")}
+                aria-label="查看地图"
+              >
+                🗺️ 查看地图
+              </button>
+            </div>
+
             <div
               className={styles.featureMessages}
               ref={messagesContainerRef}
@@ -2054,12 +2192,12 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
 
             {/* Agent execution process panel */}
             {agentEvents.length > 0 && (
-              <div className={styles.agentEventsPanel}>
+              <div className={`${styles.agentEventsPanel} ${agentEventsCollapsed ? styles.agentEventsCollapsed : ""}`}>
                 <div
                   className={styles.agentEventsHeader}
                   onClick={() => setAgentEventsCollapsed((v) => !v)}
                 >
-                  <span>执行过程</span>
+                  <span className={styles.agentEventsTitle}>执行过程</span>
                   <span className={styles.agentEventsToggle}>
                     {agentEventsCollapsed ? "▸ 点击展开" : "▾ 点击收起"}
                   </span>

@@ -465,6 +465,44 @@ $green: #22c55e;
   box-sizing: border-box;
 }
 
+/* ── 地图视图 ── */
+.featureMapView {
+  position: relative;
+  z-index: 5;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mapBackBtn {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 50;
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  color: #1a1a2e;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 1);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
 /* ── ambient decorations (absolute, no layout) ── */
 .featureAmbient {
   position: absolute;
@@ -833,6 +871,36 @@ $green: #22c55e;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* ── view toggle bar (mobile chat → map switch) ── */
+.viewToggleBar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 16px 4px;
+  flex-shrink: 0;
+}
+
+.viewToggleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  color: $text;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s;
+
+  &:active {
+    transform: scale(0.96);
+    background: rgba(240, 240, 245, 0.95);
+  }
 }
 
 /* ── message area (scrollable) ── */
@@ -2643,6 +2711,7 @@ $green: #22c55e;
     max-width: 320px;
     max-height: 200px;
     font-size: 12px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     
     .agentEventsHeader {
       padding: 8px 12px;
@@ -2651,6 +2720,33 @@ $green: #22c55e;
       
       &:active {
         background: rgba(0, 0, 0, 0.04);
+      }
+    }
+
+    /* 移动端折叠态：收缩为小胶囊，减少遮挡 */
+    &.agentEventsCollapsed {
+      width: auto;
+      max-width: none;
+      background: rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(0, 0, 0, 0.04);
+      padding: 4px 10px;
+      border-radius: 20px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+
+      .agentEventsHeader {
+        padding: 2px 4px;
+        font-size: 11px;
+        color: $text-secondary;
+      }
+
+      /* 折叠时隐藏标题，只显示展开箭头 */
+      .agentEventsTitle {
+        display: none;
+      }
+
+      .agentEventsToggle {
+        font-size: 11px;
       }
     }
   }
@@ -2676,6 +2772,10 @@ $green: #22c55e;
 .agentEventsToggle {
   font-size: 11px;
   color: $text-secondary;
+}
+
+.agentEventsTitle {
+  /* base: no special styles, inherits from header */
 }
 
 .agentEventsList {

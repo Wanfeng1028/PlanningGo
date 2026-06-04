@@ -9,11 +9,17 @@ interface BottomTabsProps {
   onNavigate: (key: NavKey) => void;
   user: SessionUser | null;
   onOpenModal: (key: ModalKey) => void;
+  onMapTabClick?: () => void;
 }
 
-export function BottomTabs({ active, onNavigate, user, onOpenModal }: BottomTabsProps) {
+export function BottomTabs({ active, onNavigate, user, onOpenModal, onMapTabClick }: BottomTabsProps) {
   const handleTabClick = (index: number) => {
     const nav = tabToNav[index];
+    // 地图 tab（index 2）点击时触发地图视图
+    if (index === 2) {
+      onMapTabClick?.();
+      return;
+    }
     // 未登录时，除首页外的 tab 需要登录
     if (!user && nav !== "home") {
       onOpenModal("login");
