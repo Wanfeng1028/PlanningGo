@@ -31,7 +31,7 @@ export function RealMap({
       try {
         setLoading(true);
         const AMap = await AMapLoader.load({
-          key: process.env.VITE_AMAP_KEY || "你的高德地图Web端Key", // 从环境变量读取
+          key: import.meta.env.VITE_AMAP_KEY || "你的高德地图Web端Key", // 从环境变量读取
           version: "2.0",
           plugins: ["AMap.Marker", "AMap.InfoWindow", "AMap.AutoComplete", "AMap.PlaceSearch"],
         });

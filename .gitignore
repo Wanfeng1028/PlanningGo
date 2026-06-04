@@ -15,6 +15,4 @@ nul
 
 /src/generated/prisma
 .qwen/
-build3.log
-build.log
-build2.log
+logs/
