@@ -35,6 +35,20 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
   fastify.post("/api/handoff/mobile", { preHandler: [fastify.authGuard] }, async (request, reply) => {
     const body = createHandoffSchema.parse(request.body);
     const userId = uid(request);
+    const guestId = (request.body as Record<string, unknown>)?.guestId as string | undefined;
+
+    // 校验 conversation 归属（防止 BOLA）
+    const db = fastify.db;
+    if (db) {
+      try {
+        await assertHandoffConversationOwnership(db, body.conversationId, userId, guestId ?? null);
+      } catch (err) {
+        if (err instanceof Error && err.message === "HANDOFF_CONVERSATION_NOT_FOUND") {
+          return sendError(reply, 404, "CONVERSATION_NOT_FOUND", "会话不存在");
+        }
+        return sendError(reply, 403, "FORBIDDEN", "无权操作此会话");
+      }
+    }
 
     try {
       const result = await createMobileHandoff({
