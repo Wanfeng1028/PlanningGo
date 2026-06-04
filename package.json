@@ -43,6 +43,7 @@
     "dev:reset-xiaoming": "node scripts/dev-reset-xiaoming.mjs"
   },
   "dependencies": {
+    "@amap/amap-jsapi-loader": "^1.0.1",
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^11.2.0",
     "@fastify/helmet": "^13.0.2",

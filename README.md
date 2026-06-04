@@ -640,6 +640,85 @@ PlanningGo 的"可执行服务入口"采用 **AI 代选 + 下单草稿 + 第三�
 - **饿了么**：`https://waimai.meituan.com/order/{poiName}`
 - **高德地图**：`https://www.amap.com/search?query={poiName}`
 
+## 演示模式
+
+PlanningGo 支持演示模式，方便在比赛、演示或测试场景中快速展示核心功能。
+
+### 启用演示模式
+
+```bash
+# 修改 .env 或启动时设置
+export DEMO_MODE=true
+export PLANNING_MODE=mock
+```
+
+### 演示场景按钮
+
+启用演示模式后，首页会显示 3 个预设演示场景卡片：
+
+| 场景 | 说明 | 示例 Prompt |
+| --- | --- | --- |
+| 👨‍👩‍👧 家庭周末半日游 | 亲子友好，轻松半日游 | "这周六带老婆和6岁儿子在杭州周边玩半天..." |
+| 💑 情侣约会 | 浪漫约会，电影+咖啡+晚餐 | "这周日和女朋友在杭州约会一天，想要浪漫一点..." |
+| 🎉 朋友聚会 | 4人聚会，娱乐+火锅 | "这周六和三个朋友在杭州聚会，想要有趣的活动..." |
+
+点击场景卡片会自动创建会话并填入对应 prompt。
+
+### 工具链路可视化
+
+聊天过程中，右上角会显示"工具链路"面板，实时展示 Agent 的执行步骤：
+- 意图解析（人群、时间、城市、预算）
+- POI 搜索（高德地图 API）
+- 候选方案生成
+- 评分排序
+- 时间线规划
+
+### 预约失败模拟
+
+通过 `MOCK_BOOKING_FAILURES` 环境变量模拟 3 种预约失败场景：
+
+```bash
+# 模拟餐厅/活动无座位
+export MOCK_BOOKING_FAILURES=no_seat
+
+# 模拟景点门票售罄
+export MOCK_BOOKING_FAILURES=no_ticket
+
+# 模拟时间冲突
+export MOCK_BOOKING_FAILURES=time_conflict
+
+# 组合模拟
+export MOCK_BOOKING_FAILURES=no_seat,no_ticket
+```
+
+失败时：
+- 方案卡片显示风险标签（红色）
+- 工具链路面板显示降级决策
+- Agent 推荐备选方案
+
+### 延迟模拟
+
+```bash
+# 所有 POI 搜索和 booking 操作延迟 2 秒
+export MOCK_LATENCY_MS=2000
+```
+
+### 完整演示启动命令
+
+```bash
+# 终端 1：启动后端
+DEMO_MODE=true PLANNING_MODE=mock MOCK_BOOKING_FAILURES=no_seat npm run dev:api
+
+# 终端 2：启动前端
+npm run dev
+
+# 浏览器访问 http://localhost:5173
+```
+
+详细演示脚本请参考 [DEMO_SCRIPT.md](./DEMO_SCRIPT.md)。
+
+---
+
 ## 项目标签
 
 `本地生活` `周末规划` `AI Agent` `行程安排` `多人协作` `路线规划` `预约执行` `家庭出行` `朋友聚会` `雨天备选`
