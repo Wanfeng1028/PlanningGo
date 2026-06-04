@@ -117,6 +117,12 @@ function mapAmapPoiToCandidate(poi: PoiResult, defaultCategory: CandidatePoi["ca
     riskFlags: [],
     city: poi.city,
     adcode: poi.adcode,
+    /* V4: deep POI fields */
+    tel: poi.phone || undefined,
+    distanceMeters: poi.distance || undefined,
+    deepLink: poi.deepLink || undefined,
+    recommendedItems: undefined,
+    reservationHints: undefined,
   };
 }
 
@@ -145,6 +151,85 @@ function isIndoor(category: CandidatePoi["category"], poiType: string): boolean 
 }
 
 // ── Mock Fallback（仅开发环境） ──
+
+/** V4: 开发环境 mock 咖啡店数据 — 确保 cafes 池不为空 */
+const MOCK_CAFES: CandidatePoi[] = [
+  {
+    id: "mock_cafe_manner",
+    source: "mock",
+    name: "Manner 咖啡 浙大紫金港店",
+    category: "other",
+    address: "杭州市余杭区浙大紫金港校区附近",
+    rating: 4.5,
+    avgPrice: 18,
+    tags: ["咖啡", "外带", "性价比"],
+    indoor: true,
+    kidFriendly: false,
+    dietFriendly: false,
+    openingHours: "07:30–20:00",
+    todayOpenStatus: "open",
+    distanceMinutes: 6,
+    bookingRequired: false,
+    bookingAvailable: false,
+    queueRisk: "low",
+    riskFlags: [],
+    tel: "0571-8888-0001",
+    distanceMeters: 480,
+    deepLink: "https://waimai.meituan.com/shop/manner-zju",
+    recommendedItems: ["冰拿铁", "澳白", "美式"],
+    reservationHints: "无需预约，可外带或堂食",
+  },
+  {
+    id: "mock_cafe Luckin",
+    source: "mock",
+    name: "瑞幸咖啡 紫金港店",
+    category: "other",
+    address: "杭州市余杭区西溪银泰城附近",
+    rating: 4.3,
+    avgPrice: 15,
+    tags: ["咖啡", "小程序自提", "性价比"],
+    indoor: true,
+    kidFriendly: false,
+    dietFriendly: false,
+    openingHours: "07:00–21:00",
+    todayOpenStatus: "open",
+    distanceMinutes: 8,
+    bookingRequired: false,
+    bookingAvailable: false,
+    queueRisk: "low",
+    riskFlags: [],
+    tel: "0571-8888-0002",
+    distanceMeters: 650,
+    deepLink: "https://www.luckincoffee.com/store/zijingang",
+    recommendedItems: ["生椰拿铁", "丝绒拿铁", "橙C美式"],
+    reservationHints: "小程序下单自提，无需排队",
+  },
+  {
+    id: "mock_cafe_starbucks",
+    source: "mock",
+    name: "星巴克 西溪银泰店",
+    category: "other",
+    address: "杭州市余杭区西溪银泰城 1 楼",
+    rating: 4.4,
+    avgPrice: 35,
+    tags: ["咖啡", "堂食", "氛围"],
+    indoor: true,
+    kidFriendly: true,
+    dietFriendly: false,
+    openingHours: "08:00–22:00",
+    todayOpenStatus: "open",
+    distanceMinutes: 10,
+    bookingRequired: false,
+    bookingAvailable: false,
+    queueRisk: "medium",
+    riskFlags: ["周末下午可能排队"],
+    tel: "0571-8888-0003",
+    distanceMeters: 800,
+    deepLink: "https://www.starbucks.com.cn/store/xixi",
+    recommendedItems: ["馥芮白", "拿铁", "星冰乐"],
+    reservationHints: "可通过星巴克 APP 提前点单",
+  },
+];
 
 async function generateMockFallback(context: PlanningContext): Promise<CandidatePool> {
   const { pois } = await import("../../data/mockData");
@@ -180,7 +265,8 @@ async function generateMockFallback(context: PlanningContext): Promise<Candidate
     restaurants: base.filter((item) => item.category === "restaurant"),
     movies: [],
     events: base.filter((item) => item.name.includes("展")),
-    cafes: [],
+    /* V4: mock fallback 不再返回空 cafes */
+    cafes: MOCK_CAFES,
     cinemas: [],
   };
 }

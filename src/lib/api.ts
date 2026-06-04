@@ -307,6 +307,26 @@ export interface PlanningTimelineStep {
   estimatedCost?: string;
   bookingHint?: string;
   suggestions?: string[];
+  /* V3: service actions — step-level external service entrances */
+  serviceActions?: Array<{
+    id: string;
+    provider: string;
+    actionType: string;
+    title: string;
+    description: string;
+    poiName?: string;
+    poiAddress?: string;
+    lat?: number;
+    lng?: number;
+    recommendedItems?: Array<{ name: string; quantity: number; estimatedPrice?: number; note?: string }>;
+    estimatedTotalPrice?: number;
+    priceNote?: string;
+    userConfirmText: string;
+    riskNotice: string;
+    redirectUrl?: string;
+    copyText?: string;
+    status: string;
+  }>;
 }
 
 export interface PlanningOption {

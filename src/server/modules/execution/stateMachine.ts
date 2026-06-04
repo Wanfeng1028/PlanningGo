@@ -38,6 +38,7 @@ const stateTransitions: Record<ActionStatus, ActionStatus[]> = {
   waiting_user_confirm: [
     "redirect_required",
     "waiting_external_confirm",
+    "executing",
     "cancelled",
     "expired",
   ],

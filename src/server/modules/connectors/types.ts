@@ -150,3 +150,58 @@ export interface ConnectorRegistry {
   register(connector: ServiceConnector): void;
   getAll(): ServiceConnector[];
 }
+
+// ============================================================================
+// ServiceActionDraft — 可执行服务入口数据结构
+// V3: 所有外部服务入口统一使用此结构，前端直接渲染
+// ============================================================================
+
+export type ServiceActionProvider =
+  | "meituan"
+  | "dianping"
+  | "eleme"
+  | "taobao_flash"
+  | "amap"
+  | "calendar"
+  | "mock";
+
+export type ServiceActionType =
+  | "restaurant_reservation"
+  | "group_buy"
+  | "food_delivery"
+  | "coffee_order"
+  | "movie_ticket"
+  | "navigation"
+  | "calendar_event"
+  | "copy_booking_info";
+
+export type ServiceActionStatus =
+  | "prepared"
+  | "redirect_required"
+  | "redirected_to_payment"
+  | "waiting_external_confirm";
+
+export interface ServiceActionDraft {
+  id: string;
+  provider: ServiceActionProvider;
+  actionType: ServiceActionType;
+  title: string;
+  description: string;
+  poiName?: string;
+  poiAddress?: string;
+  lat?: number;
+  lng?: number;
+  recommendedItems?: Array<{
+    name: string;
+    quantity: number;
+    estimatedPrice?: number;
+    note?: string;
+  }>;
+  estimatedTotalPrice?: number;
+  priceNote?: string;
+  userConfirmText: string;
+  riskNotice: string;
+  redirectUrl?: string;
+  copyText?: string;
+  status: ServiceActionStatus;
+}

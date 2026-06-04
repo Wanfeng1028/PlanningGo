@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { MapProvider, LlmProvider, BookingProvider } from "../../providers/types.js";
+import type { ServiceActionDraft } from "../connectors/types.js";
 
 // ============================================================================
 // PlanningProviders - 规划链路依赖注入
@@ -67,6 +68,12 @@ export const candidatePoiSchema = z.object({
   riskFlags: z.array(z.string()).default([]),
   city: z.string().optional(),
   adcode: z.string().optional(),
+  /* V4: deep POI fields */
+  tel: z.string().optional(),
+  distanceMeters: z.number().optional(),
+  deepLink: z.string().optional(),
+  recommendedItems: z.array(z.string()).optional(),
+  reservationHints: z.string().optional(),
 });
 
 export type CandidatePoi = z.infer<typeof candidatePoiSchema>;
@@ -93,6 +100,17 @@ export const timelineStepSchema = z.object({
   estimatedCost: z.string().optional(),
   bookingHint: z.string().optional(),
   suggestions: z.array(z.string()).optional(),
+  /* V4: deep step detail — 具体店铺/商品/执行动作 */
+  address: z.string().optional(),
+  lat: z.number().optional(),
+  lng: z.number().optional(),
+  whyRecommended: z.string().optional(),
+  recommendedItems: z.array(z.string()).optional(),
+  bookingAdvice: z.string().optional(),
+  queueRisk: z.enum(["low", "medium", "high", "unknown"]).optional(),
+  businessHours: z.string().optional(),
+  actionHints: z.array(z.string()).optional(),
+  fallbackPois: z.array(z.string()).optional(),
 });
 
 export type TimelineStep = z.infer<typeof timelineStepSchema>;
@@ -110,8 +128,11 @@ export const executionActionSchema = z.object({
     "restaurant_reservation", "ticket_lock", "calendar_event", "share_message",
     "navigation", "memory_save", "book_hotel", "book_restaurant", "book_transport",
     "buy_ticket", "reserve_activity", "add_to_calendar", "set_reminder",
+    /* V4: execution action types */
+    "coffee_order_draft", "restaurant_reservation_draft", "open_taxi_deeplink",
+    "open_meituan_search", "open_dianping_search", "call_restaurant",
   ]),
-  provider: z.enum(["meituan", "amap", "calendar", "mock"]).default("mock"),
+  provider: z.enum(["meituan", "amap", "calendar", "mock", "dianping", "meituan_order"]).default("mock"),
   status: z.enum([
     "proposed", "quoted", "prepared", "waiting_user_confirm",
     "redirect_required", "waiting_external_confirm", "executing",

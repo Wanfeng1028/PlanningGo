@@ -186,6 +186,8 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
   const [conversationId, setConversationId] = useState<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
   const messagesBySessionRef = useRef<Map<string, ChatMessage[]>>(new Map());
+  // Draft input text keyed by session ID (persisted to localStorage)
+  const draftBySessionRef = useRef<Map<string, string>>(new Map());
   // Backend conversations populated from DB for logged-in users
   const [busyActionId, setBusyActionId] = useState<string | null>(null);
   const [phraseIndex, setPhraseIndex] = useState(0);
@@ -242,6 +244,19 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
       }
     };
   }, [phraseIndex, typedText, isDeleting]);
+
+  /* ── Persist draft input to localStorage keyed by session ── */
+  useEffect(() => {
+    if (!currentSessionId) return;
+    const key = `pg_input_draft_${currentSessionId}`;
+    const timer = setTimeout(() => {
+      if (inputValue) {
+        draftBySessionRef.current.set(currentSessionId, inputValue);
+        try { localStorage.setItem(key, inputValue); } catch { /* ignore */ }
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [inputValue, currentSessionId]);
 
   /* ── Message helpers (declared before useEffects that reference them) ── */
   const updateSessionMessages = useCallback((
@@ -532,6 +547,12 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
   const doSubmit = useCallback(
     async (prompt: string) => {
       if (!prompt || isBusy) return;
+
+      // Clear draft for current session on send
+      if (currentSessionIdRef.current) {
+        try { localStorage.removeItem(`pg_input_draft_${currentSessionIdRef.current}`); } catch { /* ignore */ }
+        draftBySessionRef.current.delete(currentSessionIdRef.current);
+      }
 
       // Validate input length
       const validation = validateInputLength(prompt);
@@ -1028,6 +1049,11 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
   }, [messages, doSubmit]);
 
   const handleNewChat = useCallback(() => {
+    // Clear draft for current session
+    if (currentSessionIdRef.current) {
+      try { localStorage.removeItem(`pg_input_draft_${currentSessionIdRef.current}`); } catch { /* ignore */ }
+      draftBySessionRef.current.delete(currentSessionIdRef.current);
+    }
     setMode("idle");
     setMessages([]);
     setPhase("idle");
@@ -1050,12 +1076,29 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
       conversationId: conversationIdRef.current,
     });
 
+    // Save current draft before switching
+    if (currentSessionIdRef.current && inputValue.trim()) {
+      const currentKey = `pg_input_draft_${currentSessionIdRef.current}`;
+      draftBySessionRef.current.set(currentSessionIdRef.current, inputValue);
+      try { localStorage.setItem(currentKey, inputValue); } catch { /* ignore */ }
+    }
+
     // Set active session state immediately
     setCurrentSessionId(sessionId);
     currentSessionIdRef.current = sessionId;
     setConversationId(sessionId);
     conversationIdRef.current = sessionId;
     localStorage.setItem("pg_active_conversation_id", sessionId);
+
+    // Restore draft for the target session
+    let restoredDraft = "";
+    try {
+      const savedDraft = localStorage.getItem(`pg_input_draft_${sessionId}`);
+      if (savedDraft) {
+        restoredDraft = savedDraft;
+        draftBySessionRef.current.set(sessionId, savedDraft);
+      }
+    } catch { /* ignore */ }
 
     if (user?.id) {
       // Logged-in user: always load from DB
@@ -1094,7 +1137,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
           }
 
           setSidebarOpen(false);
-          setInputValue("");
+          setInputValue(restoredDraft);
 
           // Auto-scroll to bottom after messages load
           forceScrollToBottom("auto");
@@ -1117,7 +1160,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     setPhase(lastAssistant?.status === "success" ? "result" : "idle");
     setSelectedPlanId(null);
     setSidebarOpen(false);
-    setInputValue("");
+    setInputValue(restoredDraft);
     forceScrollToBottom("auto");
   }, [user?.id, chatSessions, setSessionMessages, showToast, forceScrollToBottom]);
 

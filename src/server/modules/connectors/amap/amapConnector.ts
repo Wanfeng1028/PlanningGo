@@ -2,11 +2,12 @@
  * Amap Connector — 高德地图服务连接器
  * V3: 提供 POI 搜索、路线规划、导航能力
  *
- * 依赖: AMAP_KEY 环境变量
+ * 依赖: AMAP_WEB_SERVICE_KEY 环境变量
  * API 文档: https://lbs.amap.com/api/webservice/guide/search/searchbykeywords
  */
 
 import https from "node:https";
+import { env } from "../../../config/env.js";
 import type {
   ConnectorCapability,
   ConnectorProvider,
@@ -27,7 +28,7 @@ const CAPABILITIES: ConnectorCapability[] = [
   "payment_redirect",
 ];
 
-const AMAP_KEY = process.env.AMAP_KEY;
+const AMAP_KEY = env.AMAP_WEB_SERVICE_KEY;
 
 // ============================================================================
 // HTTP 请求工具
@@ -96,19 +97,23 @@ async function searchPoi(
 
   if (json.status !== "1" || !json.places) return [];
 
-  return json.places.map((p) => ({
-    provider: PROVIDER,
-    externalId: (p.id as string) || undefined,
-    name: (p.name as string) || input.keyword,
-    address: (p.address as string) || undefined,
-    lat: parseFloat((p.location as string)?.split(",")[0] || "0"),
-    lng: parseFloat((p.location as string)?.split(",")[1] || "0"),
-    category: (p.category as string) || undefined,
-    rating: p.rating ? parseFloat(p.rating as string) : undefined,
-    avgPrice: p.price ? parseFloat(p.price as string) : undefined,
-    sourceUrl: undefined,
-    raw: p,
-  }));
+  return json.places.map((p) => {
+    const location = (p.location as string) || "0,0";
+    const [lngStr, latStr] = location.split(",");
+    return {
+      provider: PROVIDER,
+      externalId: (p.id as string) || undefined,
+      name: (p.name as string) || input.keyword,
+      address: (p.address as string) || undefined,
+      lat: parseFloat(latStr || "0"),
+      lng: parseFloat(lngStr || "0"),
+      category: (p.category as string) || undefined,
+      rating: p.rating ? parseFloat(p.rating as string) : undefined,
+      avgPrice: p.price ? parseFloat(p.price as string) : undefined,
+      sourceUrl: undefined,
+      raw: p,
+    };
+  });
 }
 
 // ============================================================================

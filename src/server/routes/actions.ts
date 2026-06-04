@@ -24,6 +24,7 @@ import { optionalUserId } from "../common/uid.js";
 import { getConnectorRegistry } from "../modules/connectors/registry.js";
 import type { ConnectorSearchResult } from "../modules/connectors/types.js";
 import { isTerminalState, isValidTransition, type ActionStatus } from "../modules/execution/stateMachine.js";
+import { getActionExecutor } from "../modules/execution/actionExecutor.js";
 
 /**
  * 安全查找 action：同时校验 id 和 userId ownership
@@ -157,7 +158,23 @@ export async function registerActionRoutes(app: FastifyInstance) {
     const actionStatus = action.status as ActionStatus;
     assertConfirmable(actionStatus);
 
-    // V3: 所有交易动作不直接 succeeded，走 Connector prepare → redirect
+    // V3: 非交易类动作（calendar/navigation/share）直接执行，不走 connector.prepare
+    const NON_TRADING_TYPES = new Set(["calendar_event", "add_to_calendar", "navigation", "share_message"]);
+    const isNonTrading = NON_TRADING_TYPES.has(action.type);
+
+    if (isNonTrading) {
+      // 委托 ActionExecutor 处理状态转换和具体执行
+      const executor = getActionExecutor();
+      const result = await executor.confirmAction(params.id);
+
+      return sendOk(reply, {
+        actionId: result.actionId,
+        status: result.status,
+        result: result.result,
+      });
+    }
+
+    // V3: 交易动作走 Connector prepare → redirect
     const registry = getConnectorRegistry();
     const actionType = action.type;
     const connectorProvider = (action.provider || "mock") as any;

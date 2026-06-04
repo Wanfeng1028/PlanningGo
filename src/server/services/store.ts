@@ -277,13 +277,7 @@ function assertActionNotExpired(action: ExecutionAction): void {
   }
 }
 
-const PAYMENT_TYPES = new Set(["restaurant_reservation", "ticket_lock"]);
-
-function assertActionTypeAllowed(action: ExecutionAction): void {
-  if (PAYMENT_TYPES.has(action.type)) {
-    throw new Error("PAYMENT_DISABLED: payment actions are not allowed in this version");
-  }
-}
+// assertActionTypeAllowed + PAYMENT_TYPES removed: were only called by removed confirmAction
 
 export function quoteAction(id: string, userId: string): ExecutionAction | null {
   const action = actionStore.get(id);
@@ -295,24 +289,9 @@ export function quoteAction(id: string, userId: string): ExecutionAction | null 
   return next;
 }
 
-export function confirmAction(id: string, userId: string): ExecutionAction | null {
-  const action = actionStore.get(id);
-  if (!action) return null;
-  assertActionOwnership(action, userId);
-  assertActionNotExpired(action);
-  assertActionTypeAllowed(action);
-  if (!action.confirmationRequired) {
-    const next: ExecutionAction = { ...action, status: "succeeded" as ExecutionAction["status"] };
-    actionStore.set(id, next);
-    return next;
-  }
-  const next: ExecutionAction = { ...action, status: "executing" };
-  actionStore.set(id, next);
-  // 模拟执行完成
-  const final: ExecutionAction = { ...next, status: "succeeded" as ExecutionAction["status"] };
-  actionStore.set(id, final);
-  return final;
-}
+// ── Legacy in-memory store (deprecated — not used in production) ──
+// confirmAction has been removed: replaced by ActionExecutor.confirmAction()
+// which uses Prisma DB + V3 state machine + Connector Registry.
 
 export function cancelAction(id: string, userId: string): ExecutionAction | null {
   const action = actionStore.get(id);
