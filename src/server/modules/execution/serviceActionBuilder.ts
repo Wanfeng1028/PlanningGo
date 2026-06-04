@@ -150,7 +150,7 @@ function buildActionsForStep(step: TimelineStep): ServiceActionDraft[] {
   let rules: StepActionRule[] = [];
 
   // 根据 step type 选择规则
-  if (stepType === "meal" || stepType === "activity") {
+  if (stepType === "meal") {
     // meal / restaurant / lunch / dinner 类型
     rules = MEAL_RULES;
   } else if (stepType === "rest") {
@@ -159,8 +159,8 @@ function buildActionsForStep(step: TimelineStep): ServiceActionDraft[] {
   } else if (stepType === "movie") {
     // movie / cinema 类型
     rules = MOVIE_RULES;
-  } else if (stepType === "event") {
-    // activity / scenic 类型
+  } else if (stepType === "activity" || stepType === "event") {
+    // activity / event 类型
     rules = ACTIVITY_RULES;
   } else {
     // 所有有 poiName 的步骤：通用规则
@@ -227,9 +227,9 @@ function buildActionsForStep(step: TimelineStep): ServiceActionDraft[] {
     if (rule.hasCopyText) {
       // 生成复制文案
       const lines = [poiName];
+      if (step.address) lines.push(`地址：${step.address}`);
       if (step.type === "meal") lines.push(`类型：${step.title}`);
       if (step.startTime) lines.push(`时间：${step.startTime}–${step.endTime}`);
-      if (step.address) lines.push(`地址：${step.address}`);
       copyText = lines.join("\n");
     }
 

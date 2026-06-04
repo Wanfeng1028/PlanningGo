@@ -313,10 +313,27 @@ export async function registerAgentRoutes(app: FastifyInstance) {
         // ── 2. 保存用户消息 ──
         await saveMessage(db, conversationId, "user", parsed.prompt, undefined, app.log);
 
-        // ── 3. 运行规划管道（带心跳） ──
+        // ── 3. 运行规划管道（带心跳 + 真流式进度回调） ──
         const heartbeat = setInterval(() => {
           if (!clientDisconnected) reply.raw.write(":heartbeat\n\n");
         }, 15_000);
+
+        // V4: 真流式 SSE — 每个阶段立即推送状态事件
+        const sendSse = (event: string, data: unknown) => {
+          if (!clientDisconnected) {
+            reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+          }
+        };
+
+        const progressCallbacks = {
+          onStatus: (status: string) => sendSse("status", { message: status }),
+          onCandidates: (data: { activities: number; restaurants: number; cafes: number; events: number }) => sendSse("candidates", data),
+          onPartialPlan: (data: { title: string; stepsCount: number }) => sendSse("partial_plan", data),
+          onActions: (data: { count: number }) => sendSse("actions", data),
+        };
+
+        // 立即发送第一个状态 — 确保首屏 1 秒内有响应
+        sendSse("status", { message: "正在理解你的需求..." });
 
         let result: Awaited<ReturnType<typeof runPlanningPipeline>>;
         try {
@@ -324,6 +341,7 @@ export async function registerAgentRoutes(app: FastifyInstance) {
             ...parsed,
             providers: app.providers ?? undefined,
             userId,
+            progress: progressCallbacks,
           });
         } finally {
           clearInterval(heartbeat);
@@ -340,19 +358,17 @@ export async function registerAgentRoutes(app: FastifyInstance) {
           saveActions(result.executableActions);
         }
 
-        // Stream the summary
+        // Stream the summary (V4: 快速流式输出，不再逐字)
         const summary = result.summary || "为你找到以下方案：";
-        for (let i = 0; i < summary.length; i++) {
-          if (clientDisconnected) break;
-          reply.raw.write(`data: ${JSON.stringify({ content: summary[i] })}\n\n`);
-          await new Promise((resolve) => setTimeout(resolve, 10));
+        if (!clientDisconnected) {
+          reply.raw.write(`data: ${JSON.stringify({ content: summary })}\n\n`);
         }
 
         if (!clientDisconnected) {
           // Send final structured result for progressive UI hydration
-          const finalResult = { ...result, conversationId };
-          reply.raw.write(`data: [FINAL_RESULT]${JSON.stringify(finalResult)}\n\n`);
-          reply.raw.write(`data: ${JSON.stringify({ done: true, result: finalResult })}\n\n`);
+          sendSse("final", { ...result, conversationId });
+          reply.raw.write(`data: [FINAL_RESULT]${JSON.stringify({ ...result, conversationId })}\n\n`);
+          reply.raw.write(`data: ${JSON.stringify({ done: true, result: { ...result, conversationId } })}\n\n`);
           reply.raw.write("data: [DONE]\n\n");
         }
 

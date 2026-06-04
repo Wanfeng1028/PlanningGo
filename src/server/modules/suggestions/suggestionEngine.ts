@@ -140,6 +140,9 @@ function inferSuggestions(
   return results.slice(0, 4); // Max 4 suggestions per step
 }
 
+// V4: 使用递增计数器代替 Date.now()，避免同毫秒内生成重复 ID
+let _suggestionCounter = 0;
+
 function makeSuggestion(
   category: string,
   description: string,
@@ -148,7 +151,7 @@ function makeSuggestion(
   poiName: string,
 ): SuggestionItem {
   return {
-    id: `sug-${category}-${Date.now().toString(36)}`,
+    id: `sug-${category}-${(++_suggestionCounter).toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     category,
     label,
     description,

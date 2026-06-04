@@ -12,6 +12,7 @@ import {
   trackAction,
   type PlanningOption,
   type PlanningExecutableAction,
+  type ServiceActionPrepareInput,
   selectAgentPlan,
   savePlanToDb,
 } from "../lib/api";
@@ -34,6 +35,7 @@ import { PlanCardView } from "../components/features/PlanCardView";
 import { usePlanActions } from "../components/features/usePlanActions";
 import { ErrorCardView } from "../components/features/ErrorCardView";
 import { MobileHandoffQRCode } from "../components/features/MobileHandoffQRCode";
+import { OrderDraftModal } from "../components/features/OrderDraftModal";
 import styles from "./FeaturesPage.module.scss";
 
 /* ═══════════════════════════════════════════════
@@ -210,6 +212,19 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
   const [showHandoffQR, setShowHandoffQR] = useState(false);
   const [handoffPlanId, setHandoffPlanId] = useState<string | undefined>(undefined);
   const [reservationPlan, setReservationPlan] = useState<PlanningOption | null>(null);
+  const [draftAction, setDraftAction] = useState<{
+    id: string;
+    provider: string;
+    actionType: string;
+    title: string;
+    description: string;
+    poiName?: string;
+    recommendedItems?: Array<{ name: string; quantity: number; estimatedPrice?: number }>;
+    estimatedTotalPrice?: number;
+    priceNote?: string;
+    riskNotice: string;
+    copyText?: string;
+  } | null>(null);
 
   const { toast: glassToast, show: showToast, dismiss: dismissToast } = useGlassToast();
 
@@ -1532,6 +1547,47 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
     setReservationPlan(plan);
   }, [showToast]);
 
+  /* ── Service action handlers ── */
+  const handleTrackAction = useCallback(async (payload: {
+    conversationId?: string;
+    planId?: string;
+    stepId: string;
+    actionType: string;
+    label: string;
+    provider: string;
+  }) => {
+    try {
+      await trackAction({
+        conversationId: payload.conversationId ?? conversationIdRef.current ?? undefined,
+        planId: payload.planId,
+        actionType: payload.actionType,
+        label: payload.label,
+      });
+    } catch {
+      // tracking failure is non-fatal
+    }
+  }, []);
+
+  const handleShowDraft = useCallback((action: {
+    id: string;
+    provider: string;
+    actionType: string;
+    title: string;
+    description: string;
+    poiName?: string;
+    recommendedItems?: Array<{ name: string; quantity: number; estimatedPrice?: number }>;
+    estimatedTotalPrice?: number;
+    priceNote?: string;
+    riskNotice: string;
+    copyText?: string;
+  }) => {
+    setDraftAction(action);
+  }, []);
+
+  const handleCloseDraft = useCallback(() => {
+    setDraftAction(null);
+  }, []);
+
   /* ── usePlanActions hook — provides handleOpenNavigation (Phase 1) ── */
   const { handleOpenNavigation } = usePlanActions({
     showToast,
@@ -1805,6 +1861,9 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
                           busyActionId={busyActionId}
                           unifiedActions={msg.planningActions}
                           onUnifiedAction={handleUnifiedAction}
+                          onTrackAction={handleTrackAction}
+                          onShowDraft={handleShowDraft}
+                          conversationId={conversationId ?? undefined}
                         />
                       );
                     })}
@@ -2116,6 +2175,46 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location }
       )}
 
       <GlassToast toast={glassToast} onDismiss={dismissToast} />
+
+      {/* 下单草稿弹窗 */}
+      {draftAction && (
+        <OrderDraftModal
+          open={!!draftAction}
+          onClose={handleCloseDraft}
+          action={draftAction}
+          onCopy={async () => {
+            if (draftAction.copyText) {
+              try {
+                await navigator.clipboard.writeText(draftAction.copyText);
+                showToast("已复制到剪贴板", "success");
+              } catch {
+                showToast("复制失败，请手动复制", "error");
+              }
+            }
+          }}
+          onRedirect={async () => {
+            try {
+              const { prepareServiceAction } = await import("../lib/api.js");
+              const result = await prepareServiceAction({
+                conversationId: conversationIdRef.current ?? undefined,
+                planId: draftAction.id,
+                actionType: draftAction.actionType as ServiceActionPrepareInput["actionType"],
+                provider: draftAction.provider as ServiceActionPrepareInput["provider"],
+                poiName: draftAction.poiName,
+                recommendedItems: draftAction.recommendedItems,
+              });
+              if (result.redirectUrl) {
+                window.open(result.redirectUrl, "_blank");
+                showToast("正在跳转到第三方平台...", "info");
+              } else {
+                showToast("暂无跳转链接", "info");
+              }
+            } catch {
+              showToast("打开失败，请重试", "error");
+            }
+          }}
+        />
+      )}
     </section>
   );
 }

@@ -112,6 +112,7 @@ export type PlanningAction =
       label: string;
       url: string;
       target?: "_blank";
+      provider?: string;
     }
   | {
       type: "map_search";

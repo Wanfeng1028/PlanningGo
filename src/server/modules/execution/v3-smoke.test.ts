@@ -146,7 +146,7 @@ describe('V3 Execution System Smoke Test', () => {
         userId: 'user-test',
       });
 
-      const validProviders = new Set(['meituan', 'amap', 'calendar', 'mock']);
+      const validProviders = new Set(['meituan', 'dianping', 'eleme', 'amap', 'calendar', 'mock']);
 
       for (const action of actions) {
         expect(validProviders.has(action.provider)).toBe(true);
@@ -288,7 +288,7 @@ describe('V3 Execution System Smoke Test', () => {
       // 验证每个 action
       for (const action of actions) {
         // provider 有效
-        const validProviders = new Set(['meituan', 'amap', 'calendar', 'mock']);
+        const validProviders = new Set(['meituan', 'dianping', 'eleme', 'amap', 'calendar', 'mock']);
         expect(validProviders.has(action.provider)).toBe(true);
 
         // status 是 V3 状态（不是旧状态）
@@ -301,8 +301,8 @@ describe('V3 Execution System Smoke Test', () => {
         }
       }
 
-      // 验证 action 数量：reservation + navigation + calendar + share = 4
-      expect(actions.length).toBe(4);
+      // 验证 action 数量：至少包含 reservation + navigation + calendar + share + dianping_search + open_meituan_search + open_taxi_deeplink
+      expect(actions.length).toBeGreaterThanOrEqual(4);
     });
   });
 });

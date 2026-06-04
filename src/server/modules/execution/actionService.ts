@@ -6,6 +6,7 @@ import type { PlanningAction } from "../../../shared/agentResponse.js";
  * 为方案生成可执行动作（预约、锁座、日历、分享等）。
  * 所有不可逆动作默认 waiting_confirm，需用户确认后执行。
  * 包含 action guard：缺失必要字段时跳过对应 action，不生成无效动作。
+ * V4: 新增咖啡下单草稿、餐厅预约草稿、打车深链、美团/大众点评搜索、电话预约等动作。
  */
 export function createActionsForPlans(input: {
   planId: string;
@@ -22,6 +23,32 @@ export function createActionsForPlans(input: {
       // Guard: 缺少 poiName 时不生成 "预约 null"
       if (step.bookingNeeded && step.poiName && step.poiName !== "null") {
         actions.push(createBookingAction(input.planId, option.id, step, input.intent, userId));
+      }
+
+      // V4: 咖啡下单草稿 — buffer/rest 步骤且有咖啡店 POI
+      if ((step.type === "buffer" || step.type === "rest") && step.poiName && step.poiName !== "null") {
+        actions.push(createCoffeeOrderDraft(input.planId, option.id, step, userId));
+      }
+
+      // V4: 餐厅预约草稿 — meal 步骤且有具体餐厅
+      if (step.type === "meal" && step.poiName && step.poiName !== "null") {
+        actions.push(createRestaurantReservationDraft(input.planId, option.id, step, input.intent, userId));
+
+        // V4: 美团搜索 — 所有 meal 步骤
+        actions.push(createMeituanSearchAction(input.planId, option.id, step, userId));
+
+        // V4: 大众点评搜索 — 所有 meal 步骤
+        actions.push(createDianpingSearchAction(input.planId, option.id, step, userId));
+
+        // V4: 电话预约 — 如果有电话号码
+        if ((step as Record<string, unknown>).tel) {
+          actions.push(createCallRestaurantAction(input.planId, option.id, step, userId));
+        }
+      }
+
+      // V4: 打车深链 — travel/return 步骤
+      if ((step.type === "travel" || step.type === "return") && step.poiName && step.poiName !== "null") {
+        actions.push(createTaxiDeeplinkAction(input.planId, option.id, step, userId));
       }
     }
 
@@ -40,7 +67,14 @@ export function createActionsForPlans(input: {
     actions.push(createShareAction(input.planId, option.id, option, input.intent, userId));
   }
 
-  return actions;
+  // 去重：同类型 + 同 POI 的 action 只保留一个
+  const seen = new Set<string>();
+  return actions.filter((a) => {
+    const key = `${a.type}:${(a.payload as Record<string, unknown>)?.poiName ?? ""}:${a.optionId}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function createBookingAction(
@@ -164,6 +198,194 @@ function buildShareText(option: ActivityPlan): string {
   return [`我让周末去哪儿排了一个方案：${option.title}`, ...lines, "你看可以吗？"].join("\n");
 }
 
+// ─── V4: New Action Creators ─────────────────────────────
+
+/** 咖啡下单草稿 — "已帮你准备好，点击去第三方确认下单" */
+function createCoffeeOrderDraft(
+  planId: string,
+  optionId: string,
+  step: ActivityPlan["timeline"][number],
+  userId: string,
+): ExecutionAction {
+  const poiLabel = step.poiName ?? "咖啡店";
+  const items = step.recommendedItems?.length ? step.recommendedItems.join("、") : "看看菜单选一杯";
+
+  return {
+    id: createId("act_coffee"),
+    planId,
+    optionId,
+    userId,
+    type: "coffee_order_draft",
+    provider: "meituan_order",
+    status: "waiting_user_confirm",
+    title: `去${poiLabel}点杯咖啡`,
+    description: `推荐：${items}${step.estimatedCost ? `，${step.estimatedCost}` : ""}。点击打开下单页面确认。`,
+    confirmationRequired: true,
+    idempotencyKey: createIdempotencyKey([planId, optionId, step.poiId, "coffee_order_draft"]),
+    priceEstimate: step.estimatedCost,
+    payload: {
+      poiId: step.poiId,
+      poiName: step.poiName,
+      startTime: step.startTime,
+      recommendedItems: step.recommendedItems ?? [],
+      deepLink: (step as Record<string, unknown>).deepLink ?? undefined,
+    },
+  };
+}
+
+/** 餐厅预约草稿 — 包含推荐菜品、预约方式 */
+function createRestaurantReservationDraft(
+  planId: string,
+  optionId: string,
+  step: ActivityPlan["timeline"][number],
+  intent: UserIntent,
+  userId: string,
+): ExecutionAction {
+  const poiLabel = step.poiName ?? "餐厅";
+  const items = step.recommendedItems?.length ? `推荐菜品：${step.recommendedItems.join("、")}` : "";
+
+  return {
+    id: createId("act_reserve_draft"),
+    planId,
+    optionId,
+    userId,
+    type: "restaurant_reservation_draft",
+    provider: "meituan",
+    status: "waiting_user_confirm",
+    title: `预约${poiLabel} ${intent.partySize}人餐位`,
+    description: `${step.startTime} ${intent.partySize}人用餐。${items}${step.bookingAdvice ? ` ${step.bookingAdvice}` : ""}`,
+    confirmationRequired: true,
+    idempotencyKey: createIdempotencyKey([planId, optionId, step.poiId, "restaurant_reservation_draft"]),
+    priceEstimate: step.estimatedCost,
+    payload: {
+      poiId: step.poiId,
+      poiName: step.poiName,
+      startTime: step.startTime,
+      partySize: intent.partySize,
+      recommendedItems: step.recommendedItems ?? [],
+      bookingAdvice: step.bookingAdvice,
+      queueRisk: step.queueRisk,
+    },
+  };
+}
+
+/** 打车深链 — 打开高德/滴滴打车 */
+function createTaxiDeeplinkAction(
+  planId: string,
+  optionId: string,
+  step: ActivityPlan["timeline"][number],
+  userId: string,
+): ExecutionAction {
+  const destLabel = step.poiName ?? "目的地";
+
+  return {
+    id: createId("act_taxi"),
+    planId,
+    optionId,
+    userId,
+    type: "open_taxi_deeplink",
+    provider: "amap",
+    status: "proposed",
+    title: `打车去${destLabel}`,
+    description: `打开高德打车，一键叫车前往${destLabel}。${step.estimatedCost ? `预估${step.estimatedCost}` : ""}`,
+    confirmationRequired: false,
+    idempotencyKey: createIdempotencyKey([planId, optionId, step.poiId, "taxi_deeplink"]),
+    priceEstimate: step.estimatedCost,
+    payload: {
+      poiName: step.poiName,
+      lat: step.lat,
+      lng: step.lng,
+      address: step.address,
+      transport: step.transport,
+    },
+  };
+}
+
+/** 美团搜索 — 打开美团查看店铺详情 */
+function createMeituanSearchAction(
+  planId: string,
+  optionId: string,
+  step: ActivityPlan["timeline"][number],
+  userId: string,
+): ExecutionAction {
+  const poiLabel = step.poiName ?? "餐厅";
+
+  return {
+    id: createId("act_meituan"),
+    planId,
+    optionId,
+    userId,
+    type: "open_meituan_search",
+    provider: "meituan",
+    status: "proposed",
+    title: `美团查看${poiLabel}`,
+    description: `打开美团搜索${poiLabel}，查看菜单、评价和优惠。`,
+    confirmationRequired: false,
+    idempotencyKey: createIdempotencyKey([planId, optionId, step.poiId, "meituan_search"]),
+    payload: {
+      poiName: step.poiName,
+      keyword: poiLabel,
+    },
+  };
+}
+
+/** 大众点评搜索 — 打开大众点评查看店铺 */
+function createDianpingSearchAction(
+  planId: string,
+  optionId: string,
+  step: ActivityPlan["timeline"][number],
+  userId: string,
+): ExecutionAction {
+  const poiLabel = step.poiName ?? "餐厅";
+
+  return {
+    id: createId("act_dianping"),
+    planId,
+    optionId,
+    userId,
+    type: "open_dianping_search",
+    provider: "dianping",
+    status: "proposed",
+    title: `大众点评查看${poiLabel}`,
+    description: `打开大众点评搜索${poiLabel}，查看详细评价和推荐菜品。`,
+    confirmationRequired: false,
+    idempotencyKey: createIdempotencyKey([planId, optionId, step.poiId, "dianping_search"]),
+    payload: {
+      poiName: step.poiName,
+      keyword: poiLabel,
+    },
+  };
+}
+
+/** 电话预约餐厅 — 直接拨打餐厅电话 */
+function createCallRestaurantAction(
+  planId: string,
+  optionId: string,
+  step: ActivityPlan["timeline"][number],
+  userId: string,
+): ExecutionAction {
+  const poiLabel = step.poiName ?? "餐厅";
+  const tel = (step as Record<string, unknown>).tel as string | undefined;
+
+  return {
+    id: createId("act_call"),
+    planId,
+    optionId,
+    userId,
+    type: "call_restaurant",
+    provider: "mock",
+    status: "proposed",
+    title: tel ? `拨打${poiLabel}电话` : `查看${poiLabel}电话`,
+    description: tel ? `点击拨打${tel}预约餐位。` : `查看${poiLabel}联系方式并电话预约。`,
+    confirmationRequired: false,
+    idempotencyKey: createIdempotencyKey([planId, optionId, step.poiId, "call_restaurant"]),
+    payload: {
+      poiName: step.poiName,
+      tel: tel ?? "",
+    },
+  };
+}
+
 // ─── Unified PlanningAction[] Generator ─────────────────────
 
 /**
@@ -237,6 +459,47 @@ export function createPlanningActions(input: {
       conversationId: input.conversationId,
       planId: input.planId,
     });
+  }
+
+  // V4: 从方案 timeline 中提取深链动作
+  for (const step of firstOption.timeline) {
+    if (!step.poiName || step.poiName === "null") continue;
+
+    // 咖啡店步骤 — 添加下单深链
+    if ((step.type === "buffer" || step.type === "rest") && step.recommendedItems?.length) {
+      actions.push({
+        type: "open_url",
+        label: `去${step.poiName}点杯${step.recommendedItems[0] ?? "咖啡"}`,
+        provider: "meituan_order",
+        url: `https://waimai.meituan.com/search?q=${encodeURIComponent(step.poiName)}`,
+      });
+    }
+
+    // 餐厅步骤 — 添加美团/大众点评深链
+    if (step.type === "meal") {
+      actions.push({
+        type: "open_url",
+        label: `美团查看${step.poiName}`,
+        provider: "meituan",
+        url: `https://www.meituan.com/search?q=${encodeURIComponent(step.poiName)}`,
+      });
+      actions.push({
+        type: "open_url",
+        label: `大众点评查看${step.poiName}`,
+        provider: "dianping",
+        url: `https://www.dianping.com/search?keyword=${encodeURIComponent(step.poiName)}`,
+      });
+    }
+
+    // 出行步骤 — 添加打车深链
+    if ((step.type === "travel" || step.type === "return") && step.transport === "taxi") {
+      actions.push({
+        type: "open_url",
+        label: `打车去${step.poiName}`,
+        provider: "amap",
+        url: `https://uri.amap.com/navigation?to=${encodeURIComponent(step.poiName)}&mode=car&coordinate=gaode`,
+      });
+    }
   }
 
   return actions;

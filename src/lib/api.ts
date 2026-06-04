@@ -20,6 +20,7 @@ import type {
   DeveloperSecurity,
   DeveloperSandboxResult,
 } from "../types";
+import type { ServiceActionDraft } from "../server/modules/connectors/types";
 import { retryWithBackoff, refreshToken } from "./retry";
 import { API_BASE } from "./config";
 
@@ -308,25 +309,7 @@ export interface PlanningTimelineStep {
   bookingHint?: string;
   suggestions?: string[];
   /* V3: service actions — step-level external service entrances */
-  serviceActions?: Array<{
-    id: string;
-    provider: string;
-    actionType: string;
-    title: string;
-    description: string;
-    poiName?: string;
-    poiAddress?: string;
-    lat?: number;
-    lng?: number;
-    recommendedItems?: Array<{ name: string; quantity: number; estimatedPrice?: number; note?: string }>;
-    estimatedTotalPrice?: number;
-    priceNote?: string;
-    userConfirmText: string;
-    riskNotice: string;
-    redirectUrl?: string;
-    copyText?: string;
-    status: string;
-  }>;
+  serviceActions?: ServiceActionDraft[];
 }
 
 export interface PlanningOption {
@@ -352,6 +335,7 @@ export interface PlanningExecutableAction {
   planId: string;
   optionId: string;
   type: string;
+  provider?: string;
   status: string;
   title: string;
   description: string;
@@ -460,6 +444,40 @@ export async function confirmAction(actionId: string): Promise<ActionItem> {
 
 export async function cancelAction(actionId: string): Promise<ActionItem> {
   return apiJson<ActionItem>(`/api/actions/${actionId}/cancel`, { method: "POST" });
+}
+
+// ── Service Actions (V3) ──
+
+export interface ServiceActionPrepareInput {
+  conversationId?: string;
+  planId?: string;
+  optionId?: string;
+  stepId?: string;
+  provider: "meituan" | "dianping" | "eleme" | "taobao_flash" | "amap" | "calendar" | "mock";
+  actionType: "food_delivery" | "restaurant_reservation" | "group_buy" | "navigation" | "coffee_order" | "movie_ticket" | "calendar_event" | "copy_booking_info";
+  poiName?: string;
+  poiAddress?: string;
+  lat?: number;
+  lng?: number;
+  userNote?: string;
+  recommendedItems?: Array<{ name: string; quantity: number; estimatedPrice?: number }>;
+}
+
+export interface ServiceActionPrepareResult {
+  actionId: string;
+  status: "prepared" | "redirect_required";
+  title: string;
+  description: string;
+  redirectUrl?: string;
+  copyText?: string;
+  riskNotice: string;
+}
+
+export async function prepareServiceAction(input: ServiceActionPrepareInput): Promise<ServiceActionPrepareResult> {
+  return apiJson<ServiceActionPrepareResult>("/api/service-actions/prepare", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 // ── Calendar ──

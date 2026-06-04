@@ -2,8 +2,18 @@ import type { PlanningOption, PlanningExecutableAction, PlanningAction } from ".
 import type { ToastType } from "../GlassToast";
 import { formatMatchScore } from "./formatMatchScore";
 import styles from "../../pages/FeaturesPage.module.scss";
+import { PlanCardServicePanel } from "./ExternalServicePanel";
 
 type OnToast = (text: string, type?: ToastType) => void;
+type OnTrackAction = (payload: {
+  conversationId?: string;
+  planId?: string;
+  stepId: string;
+  actionType: string;
+  label: string;
+  provider: string;
+}) => void;
+type OnShowDraft = (action: { id: string; provider: string; actionType: string; title: string; description: string; poiName?: string; recommendedItems?: Array<{ name: string; quantity: number; estimatedPrice?: number }>; estimatedTotalPrice?: number; priceNote?: string; riskNotice: string; copyText?: string }) => void;
 
 /* ── Plan Card — structured view ── */
 export function PlanCardView({
@@ -21,6 +31,9 @@ export function PlanCardView({
   busyActionId,
   unifiedActions,
   onUnifiedAction,
+  onTrackAction,
+  onShowDraft,
+  conversationId,
 }: {
   plan: PlanningOption;
   selected: boolean;
@@ -36,6 +49,9 @@ export function PlanCardView({
   busyActionId?: string | null;
   unifiedActions?: PlanningAction[];
   onUnifiedAction?: (action: PlanningAction) => void;
+  onTrackAction?: OnTrackAction;
+  onShowDraft?: OnShowDraft;
+  conversationId?: string;
 }) {
   /** Fallback toast when parent doesn't provide a callback */
   const fallback = (text: string) => {
@@ -98,6 +114,17 @@ export function PlanCardView({
               {step.suggestions?.map((s, i) => (
                 <span key={i} className={styles.suggestionChip}>💡 {s}</span>
               ))}
+              {/* V3: service actions — external service entrances */}
+              {step.serviceActions && step.serviceActions.length > 0 && (
+                <PlanCardServicePanel
+                  stepId={step.id}
+                  serviceActions={step.serviceActions}
+                  conversationId={conversationId}
+                  planId={plan.planId}
+                  onTrack={onTrackAction}
+                  onShowDraft={onShowDraft}
+                />
+              )}
             </li>
           ))}
         </ul>

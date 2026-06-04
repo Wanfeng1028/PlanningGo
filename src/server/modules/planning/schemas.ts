@@ -1,6 +1,5 @@
 import { z } from "zod";
 import type { MapProvider, LlmProvider, BookingProvider } from "../../providers/types.js";
-import type { ServiceActionDraft } from "../connectors/types.js";
 
 // ============================================================================
 // PlanningProviders - 规划链路依赖注入
@@ -111,6 +110,8 @@ export const timelineStepSchema = z.object({
   businessHours: z.string().optional(),
   actionHints: z.array(z.string()).optional(),
   fallbackPois: z.array(z.string()).optional(),
+  /* V3: service actions — external service entrances */
+  serviceActions: z.array(z.any()).optional(),
 });
 
 export type TimelineStep = z.infer<typeof timelineStepSchema>;
