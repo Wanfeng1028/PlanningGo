@@ -333,8 +333,8 @@ export async function registerAgentRoutes(app: FastifyInstance) {
           onActions: (data: { count: number }) => sendSse("actions", data),
         };
 
-        // 立即发送第一个状态 — 确保首屏 1 秒内有响应
-        sendSse("status", { message: "正在理解你的需求..." });
+        // Note: orchestrator sends the first "正在理解你的需求..." status at start of runPlanningPipeline
+        // No need to send a duplicate here
 
         let result: Awaited<ReturnType<typeof runPlanningPipeline>>;
         try {
