@@ -154,7 +154,6 @@ export function OpenStreetMap({
           center: currentCenter,
           zoom: 15,
           zoomControl: false,
-          dragEnable: true,
           touchZoom: true,
           scrollWheelZoom: true,
         });
