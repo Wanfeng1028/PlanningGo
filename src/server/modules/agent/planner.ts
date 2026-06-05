@@ -60,7 +60,7 @@ const llmOutputSchema = z.object({
  * Auto-derived JSON Schema from Zod — used in the LLM prompt as a structured example.
  * Single source of truth: adding a field here automatically updates the prompt.
  */
-const llmPlanJsonSchema = JSON.stringify(zodToJsonSchema(llmOutputSchema), null, 2);
+const llmPlanJsonSchema = JSON.stringify(zodToJsonSchema(llmOutputSchema as import("zod").ZodType), null, 2);
 
 export interface PlannerInput {
   traceId: string;
@@ -890,7 +890,7 @@ ${candidateList || "（无候选地点，请根据城市和需求推荐具体店
 重要：每个 meal/buffer/rest 步骤必须指定具体店铺名，不能写"在附近用餐""找家咖啡店"这类泛化描述。
 
 请输出 JSON，格式：
-${PLAN_JSON_SCHEMA_DESC}`;
+${llmPlanJsonSchema}`;
 }
 
 function parseAndValidateLlmOutput(content: string, planId: string): ActivityPlan[] {
