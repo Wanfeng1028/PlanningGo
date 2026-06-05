@@ -33,12 +33,21 @@ async function assertExecutionAccess(
 ): Promise<boolean> {
   const step = await db.executionStep.findUnique({
     where: { id: executionKey },
-    select: { conversationId: true },
+    select: { planId: true },
   });
   if (!step) throw new NotFoundError("EXECUTION_STEP_NOT_FOUND");
 
+  // ExecutionStep → Plan → Conversation
+  if (!step.planId) throw new NotFoundError("EXECUTION_STEP_PLAN_NOT_FOUND");
+
+  const plan = await db.plan.findUnique({
+    where: { id: step.planId },
+    select: { conversationId: true },
+  });
+  if (!plan || !plan.conversationId) throw new NotFoundError("CONVERSATION_NOT_FOUND");
+
   const conv = await db.conversation.findUnique({
-    where: { id: step.conversationId },
+    where: { id: plan.conversationId },
     select: { userId: true, guestId: true },
   });
   if (!conv) throw new NotFoundError("CONVERSATION_NOT_FOUND");

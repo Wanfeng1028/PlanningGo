@@ -33,19 +33,19 @@ async function assertConversationAccess(
 ): Promise<boolean> {
   // 孤儿会话 (userId=null, guestId=null) — 拒绝所有访问
   if (!conv.userId && !conv.guestId) {
-    reply.send(sendError(reply, 403, "FORBIDDEN", "此会话为历史匿名数据，认领后才能访问"));
+    sendError(reply, 403, "FORBIDDEN", "此会话为历史匿名数据，认领后才能访问");
     return false;
   }
 
   // 登录用户：必须匹配 conv.userId
   if (userId && conv.userId !== userId) {
-    reply.send(sendError(reply, 403, "FORBIDDEN", `无权${action}`));
+    sendError(reply, 403, "FORBIDDEN", `无权${action}`);
     return false;
   }
 
   // 未登录用户：必须匹配 conv.guestId（来自 Cookie/Session，非 URL 参数）
   if (!userId && (!conv.guestId || conv.guestId !== guestIdFromRequest)) {
-    reply.send(sendError(reply, 403, "FORBIDDEN", `无权${action}`));
+    sendError(reply, 403, "FORBIDDEN", `无权${action}`);
     return false;
   }
 
@@ -330,10 +330,10 @@ export async function registerConversationRoutes(app: FastifyInstance) {
           if (incrementalMemMsgs.length > 0) {
             // 合并 DB 和 mem 消息，按 createdAt 排序，按 id 去重
             const msgMap = new Map<string | undefined, unknown>();
-            for (const m of dbMsgs) msgMap.set(m.id, m);
-            for (const m of incrementalMemMsgs) msgMap.set(m.id, m);
+            for (const m of dbMsgs) msgMap.set(m.id, m as unknown as Record<string, unknown>);
+            for (const m of incrementalMemMsgs) msgMap.set(m.id, m as unknown as Record<string, unknown>);
             const merged = Array.from(msgMap.values()).sort(
-              (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+              (a, b) => new Date((a as Record<string, unknown>).createdAt as string).getTime() - new Date((b as Record<string, unknown>).createdAt as string).getTime(),
             );
             return sendOk(reply, merged);
           }
