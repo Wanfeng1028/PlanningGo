@@ -53,6 +53,7 @@ const llmPlanItemSchema = z.object({
 });
 
 const llmOutputSchema = z.object({
+  // LLM 可能因 token/上下文限制只输出 1-2 套；运行时会补齐到 3 套以满足产品链路要求
   plans: z.array(llmPlanItemSchema).min(1).max(3),
 });
 
@@ -72,7 +73,7 @@ export interface PlannerInput {
   signal?: AbortSignal;
 }
 
-const SYSTEM_PROMPT = `你是"周末去哪儿"的行程规划 AI。用户会告诉你出行需求，你需要生成 2-3 套差异化的可执行行程方案。
+const SYSTEM_PROMPT = `你是"周末去哪儿"的行程规划 AI。用户会告诉你出行需求，你需要生成 3 套差异化的可执行行程方案。
 
 严格要求：
 1. 只输出 JSON，不要输出任何其他文字
@@ -820,7 +821,8 @@ export async function generateLlmPlans(input: PlannerInput): Promise<ActivityPla
       };
 
       const result = await llmProvider.chat(query);
-      return parseAndValidateLlmOutput(result.content, input.planId);
+      const parsed = parseAndValidateLlmOutput(result.content, input.planId);
+      return ensureThreePlans(parsed, input);
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
       if (attempt < maxRetries) {
@@ -951,6 +953,35 @@ function parseAndValidateLlmOutput(content: string, planId: string): ActivityPla
     })),
     backupPlan: plan.backupPlan,
   }));
+}
+
+function ensureThreePlans(plans: ActivityPlan[], input: PlannerInput): ActivityPlan[] {
+  const uniqueByTitle = new Set(plans.map((p) => p.title));
+  const result: ActivityPlan[] = [...plans];
+
+  if (result.length >= 3) return result.slice(0, 3);
+
+  const fallbacks = [
+    () => buildPrimaryPlan(input),
+    () => buildSocialFoodiePlan(input),
+    () => buildIndoorBackupPlan(input),
+  ];
+
+  for (const make of fallbacks) {
+    if (result.length >= 3) break;
+    const plan = make();
+    if (uniqueByTitle.has(plan.title)) continue;
+    uniqueByTitle.add(plan.title);
+    result.push(plan);
+  }
+
+  // 极端情况下仍不足 3（标题冲突等），重复使用首方案但保证 id 唯一
+  while (result.length < 3 && result[0]) {
+    const base = result[0];
+    result.push({ ...base, id: createId("fallback") });
+  }
+
+  return result.slice(0, 3);
 }
 
 // --- Mock 方案构建（仅开发环境 fallback）---
