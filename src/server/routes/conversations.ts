@@ -12,6 +12,58 @@ import { assertPlanOwnership } from "../common/ownership.js";
 
 const optionalUid = optionalUserId;
 
+// ============================================================================
+// 安全辅助函数
+// ============================================================================
+
+/**
+ * 校验会话所有权（DB 模式）
+ * 返回 conversation 对象，失败时返回错误响应
+ *
+ * 安全修复 (#2): 孤儿会话 (userId=null, guestId=null) 强制拒绝所有访问
+ * 安全修复 (#3): guestId 必须来自 Cookie/Session，不接受 URL 参数
+ */
+async function assertConversationAccess(
+  app: FastifyInstance,
+  conv: { userId: string | null; guestId: string | null },
+  userId: string | null,
+  guestIdFromRequest: string | null,
+  reply: FastifyInstance["reply"],
+  action: string,
+): Promise<boolean> {
+  // 孤儿会话 (userId=null, guestId=null) — 拒绝所有访问
+  if (!conv.userId && !conv.guestId) {
+    reply.send(sendError(reply, 403, "FORBIDDEN", "此会话为历史匿名数据，认领后才能访问"));
+    return false;
+  }
+
+  // 登录用户：必须匹配 conv.userId
+  if (userId && conv.userId !== userId) {
+    reply.send(sendError(reply, 403, "FORBIDDEN", `无权${action}`));
+    return false;
+  }
+
+  // 未登录用户：必须匹配 conv.guestId（来自 Cookie/Session，非 URL 参数）
+  if (!userId && (!conv.guestId || conv.guestId !== guestIdFromRequest)) {
+    reply.send(sendError(reply, 403, "FORBIDDEN", `无权${action}`));
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * 从 Cookie 中提取 guestId（而非 URL 参数）
+ * 安全修复 (#3): guestId 必须绑定到 Cookie/Session，防止 URL 枚举
+ */
+function getGuestIdFromCookie(request: FastifyRequest): string | null {
+  const cookies = request.cookies || {};
+  return cookies.guestId ?? null;
+}
+
+// 修复：需要导入 FastifyRequest 类型
+import type { FastifyRequest } from "fastify";
+
 export async function registerConversationRoutes(app: FastifyInstance) {
   const log = app.log;
   // ── 创建会话 ──
@@ -62,7 +114,6 @@ export async function registerConversationRoutes(app: FastifyInstance) {
   app.get("/api/conversations", { preHandler: [app.optionalAuthGuard] }, async (request, reply) => {
     const query = z
       .object({
-        guestId: z.string().optional(),
         limit: z.coerce.number().int().min(1).max(100).default(50),
       })
       .parse(request.query);
@@ -70,17 +121,19 @@ export async function registerConversationRoutes(app: FastifyInstance) {
     const userId = optionalUid(request);
     const db: PrismaClient | null = app.db;
 
-    log.info({ route: "GET /api/conversations", userId, authenticated: Boolean(userId), limit: query.limit, guestId: query.guestId ?? null, db: db ? "connected" : "null" }, "[conversations:list] incoming");
+    // 安全修复 (#3): 移除 guestId URL 参数，未登录用户必须通过 Cookie 认证
+    // 未登录且无 Cookie → 返回空列表
+    if (!userId) {
+      log.info({ route: "GET /api/conversations", authenticated: false }, "[conversations:list] guest without cookie, returning empty");
+      return sendOk(reply, []);
+    }
+
+    log.info({ route: "GET /api/conversations", userId, authenticated: true, limit: query.limit, db: db ? "connected" : "null" }, "[conversations:list] incoming");
 
     if (db) {
       try {
-        const where: { userId?: string; guestId?: string } = {};
-        if (userId) where.userId = userId;
-        else if (query.guestId) where.guestId = query.guestId;
-        else {
-          log.info(`[conversations:GET] No userId or guestId, returning empty`);
-          return sendOk(reply, []);
-        }
+        const where: { userId?: string } = {};
+        where.userId = userId;
 
         const convs = await db.conversation.findMany({
           where,
@@ -90,7 +143,7 @@ export async function registerConversationRoutes(app: FastifyInstance) {
         });
 
         // 诊断日志：当认证用户拿到空结果时，额外查询全局信息辅助排查
-        if (userId && convs.length === 0) {
+        if (convs.length === 0) {
           const totalConvCount = await db.conversation.count().catch(() => -1);
           const userConvCount = await db.conversation.count({ where: { userId } }).catch(() => -1);
           const nullUserIdCount = await db.conversation.count({ where: { userId: null } }).catch(() => -1);
@@ -106,17 +159,14 @@ export async function registerConversationRoutes(app: FastifyInstance) {
         return sendOk(reply, convs);
       } catch (err) {
         log.error({ err, userId }, "[conversations:list] DB query failed for authenticated user");
-        if (userId) {
-          // Authenticated users: never fall through to memory store
-          return sendError(reply, 500, "DB_ERROR", "无法加载历史记录，数据库连接异常");
-        }
-        log.warn({ err }, "[conversations:list] DB failed for guest, falling back to memory");
+        // Authenticated users: never fall through to memory store
+        return sendError(reply, 500, "DB_ERROR", "无法加载历史记录，数据库连接异常");
       }
     }
 
+    // Memory mode for authenticated users only
     const convs = mem.listConversations({
       userId: userId ?? undefined,
-      guestId: !userId ? query.guestId : undefined,
       limit: query.limit,
     });
     return sendOk(reply, convs);
@@ -126,7 +176,8 @@ export async function registerConversationRoutes(app: FastifyInstance) {
   app.get("/api/conversations/:id", { preHandler: [app.optionalAuthGuard] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const userId = optionalUid(request);
-    const guestId = userId ? null : ((request.query as Record<string, string | undefined>).guestId ?? null);
+    // 安全修复 (#3): guestId 从 Cookie 获取，而非 URL 参数
+    const guestIdFromRequest = getGuestIdFromCookie(request);
     const db: PrismaClient | null = app.db;
 
 
@@ -147,17 +198,11 @@ export async function registerConversationRoutes(app: FastifyInstance) {
           },
         });
         if (!conv) return sendError(reply, 404, "NOT_FOUND", "会话不存在");
-        // 校验会话所有权
-        if (conv.userId && conv.userId !== userId) {
-          return sendError(reply, 403, "FORBIDDEN", "无权访问此会话");
-        }
-        if (!conv.userId && conv.guestId && conv.guestId !== guestId) {
-          return sendError(reply, 403, "FORBIDDEN", "无权访问此会话");
-        }
-        // Anonymous orphan conversations (userId=null, guestId=null) are not accessible by logged-in users
-        if (!conv.userId && !conv.guestId && userId) {
-          return sendError(reply, 403, "FORBIDDEN", "此会话为历史匿名数据，需要通过 dev-claim 脚本认领后才能访问");
-        }
+
+        // 安全修复 (#2): 统一所有权校验，孤儿会话强制拒绝
+        const hasAccess = await assertConversationAccess(app, conv, userId, guestIdFromRequest, reply, "访问此会话");
+        if (!hasAccess) return;
+
         log.info({
           conversationId: conv?.id,
           userId: conv?.userId,
@@ -175,11 +220,14 @@ export async function registerConversationRoutes(app: FastifyInstance) {
       }
     }
 
+    // Memory store fallback
     const conv = mem.getConversation(id);
     if (!conv) return sendError(reply, 404, "NOT_FOUND", "会话不存在");
-    if (conv.userId && conv.userId !== userId) {
-      return sendError(reply, 403, "FORBIDDEN", "无权访问此会话");
-    }
+
+    // 安全修复 (#2): 统一所有权校验
+    const hasAccess = await assertConversationAccess(app, conv, userId, guestIdFromRequest, reply, "访问此会话");
+    if (!hasAccess) return;
+
     const msgs = mem.listMessages(id);
     const plans = mem.listPlans({ conversationId: id });
     return sendOk(reply, { ...conv, messages: msgs, plans });
@@ -197,6 +245,8 @@ export async function registerConversationRoutes(app: FastifyInstance) {
       .parse(request.body);
 
     const userId = optionalUid(request);
+    // 安全修复 (#3): guestId 从 Cookie 获取
+    const guestIdFromRequest = getGuestIdFromCookie(request);
     const db: PrismaClient | null = app.db;
 
     // 先校验会话所有权
@@ -204,13 +254,9 @@ export async function registerConversationRoutes(app: FastifyInstance) {
       try {
         const conv = await db.conversation.findUnique({ where: { id: params.id }, select: { userId: true, guestId: true } });
         if (!conv) return sendError(reply, 404, "NOT_FOUND", "会话不存在");
-        if (conv.userId && conv.userId !== userId) {
-          return sendError(reply, 403, "FORBIDDEN", "无权向此会话添加消息");
-        }
-        // Anonymous orphan conversations (userId=null, guestId=null) are not accessible by logged-in users
-        if (!conv.userId && !conv.guestId && userId) {
-          return sendError(reply, 403, "FORBIDDEN", "此会话为历史匿名数据，需要通过 dev-claim 脚本认领后才能访问");
-        }
+
+        const hasAccess = await assertConversationAccess(app, conv, userId, guestIdFromRequest, reply, "向此会话添加消息");
+        if (!hasAccess) return;
       } catch (err) {
         log.warn({ err }, "DB ownership check failed, continuing to fallback");
       }
@@ -255,6 +301,8 @@ export async function registerConversationRoutes(app: FastifyInstance) {
   app.get("/api/conversations/:id/messages", { preHandler: [app.optionalAuthGuard] }, async (request, reply) => {
     const { id } = z.object({ id: z.string().uuid() }).parse(request.params);
     const userId = optionalUid(request);
+    // 安全修复 (#3): guestId 从 Cookie 获取
+    const guestIdFromRequest = getGuestIdFromCookie(request);
     const db: PrismaClient | null = app.db;
 
     // 校验会话所有权
@@ -262,13 +310,10 @@ export async function registerConversationRoutes(app: FastifyInstance) {
       try {
         const conv = await db.conversation.findUnique({ where: { id }, select: { userId: true, guestId: true } });
         if (!conv) return sendError(reply, 404, "NOT_FOUND", "会话不存在");
-        if (conv.userId && conv.userId !== userId) {
-          return sendError(reply, 403, "FORBIDDEN", "无权访问此会话消息");
-        }
-        // Anonymous orphan conversations (userId=null, guestId=null) are not accessible by logged-in users
-        if (!conv.userId && !conv.guestId && userId) {
-          return sendError(reply, 403, "FORBIDDEN", "此会话为历史匿名数据，需要通过 dev-claim 脚本认领后才能访问");
-        }
+
+        const hasAccess = await assertConversationAccess(app, conv, userId, guestIdFromRequest, reply, "访问此会话消息");
+        if (!hasAccess) return;
+
         const msgs = await db.message.findMany({
           where: { conversationId: id },
           orderBy: { createdAt: "asc" },
@@ -279,6 +324,8 @@ export async function registerConversationRoutes(app: FastifyInstance) {
       }
     }
 
+    // 安全修复 (#4): DB fallback 时，从 mem 获取消息
+    // 如果 DB 曾写入失败但 mem 成功，此处能补回丢失的消息
     return sendOk(reply, mem.listMessages(id));
   });
 

@@ -48,9 +48,42 @@ function latestPlanPayload(messages: Array<{ role: string; payloadJson: unknown 
   return null;
 }
 
+/**
+ * 获取 handoff code 的元数据（不含聊天内容）
+ * 安全修复 (#5): 公开接口只返回元数据，不暴露隐私
+ */
+async function getHandoffCodeMetadata(code: string): Promise<{
+  code: string;
+  status: string;
+  expiresAt: string;
+  conversationId: string;
+  planId: string | null;
+} | null> {
+  const handoff = await getHandoffCode(code);
+  if (!handoff) return null;
+
+  return {
+    code: handoff.code,
+    status: handoff.status,
+    expiresAt: handoff.expiresAt,
+    conversationId: handoff.conversationId,
+    planId: handoff.planId,
+  };
+}
+
+/**
+ * 构建 handoff 详情（含完整聊天历史和规划）
+ * 安全修复 (#5): 仅在 code 已被 claim 后才能调用
+ */
 async function buildHandoffDetail(fastify: FastifyInstance, code: string) {
   const handoff = await getHandoffCode(code);
   if (!handoff) return null;
+
+  // 安全修复 (#5): 只有已被 claim 的 code 才能获取详情
+  // 防止未 claim 前通过爆破获取他人聊天隐私
+  if (handoff.status !== "claimed") {
+    return null;
+  }
 
   const db = fastify.db;
   if (!db) throw new Error("Database not available");
@@ -285,20 +318,23 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
   });
 
   /**
-   * Query a handoff code
+   * Query a handoff code metadata (safe — no chat content exposed)
    * GET /api/handoff/:code
+   *
+   * 安全修复 (#5): 仅返回元数据（状态、过期时间），不返回聊天内容
+   * 原始接口返回 userId/guestId/conversationId，可辅助攻击者枚举
    */
   fastify.get("/api/handoff/:code", { preHandler: [fastify.optionalAuthGuard] }, async (request, reply) => {
     const { code } = z.object({ code: z.string().min(4).max(12) }).parse(request.params);
 
     try {
-      const payload = await getHandoffCode(code);
+      const metadata = await getHandoffCodeMetadata(code);
 
-      if (!payload) {
+      if (!metadata) {
         return sendError(reply, 404, "HANDOFF_CODE_NOT_FOUND", "接续码不存在或已过期");
       }
 
-      return sendOk(reply, payload);
+      return sendOk(reply, metadata);
     } catch (error) {
       fastify.log.error(error);
       return sendError(reply, 500, "HANDOFF_CODE_FETCH_FAILED", "获取接续码失败");
@@ -307,7 +343,8 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
 
   /**
    * Query handoff detail for the mobile browser.
-   * The short-lived code is the access proof; do not expose auth tokens or account data.
+   * 安全修复 (#5): 仅在 code 已被 claim 后才能访问
+   * 防止未 claim 前通过爆破短码获取他人聊天隐私
    * GET /api/handoff/:code/detail
    */
   fastify.get("/api/handoff/:code/detail", { preHandler: [fastify.optionalAuthGuard] }, async (request, reply) => {
@@ -317,7 +354,8 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
       const detail = await buildHandoffDetail(fastify, code);
 
       if (!detail) {
-        return sendError(reply, 404, "HANDOFF_CODE_NOT_FOUND", "接续码不存在或已过期");
+        // code 不存在/过期，或尚未被 claim
+        return sendError(reply, 403, "HANDOFF_CODE_NOT_CLAIMED", "接续码尚未被认领或已过期");
       }
 
       return sendOk(reply, detail);

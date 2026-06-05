@@ -115,4 +115,42 @@ describe("updateConversationTitle", () => {
       },
     });
   });
+
+  // ── 安全修复 (#6): XSS 防护测试 ──
+  it("should escape HTML entities in title to prevent XSS", async () => {
+    const db = createMockDb("旧标题");
+    await updateConversationTitle(db, "conv-1", '<script>alert(1)</script>', mockLog);
+
+    // Title should be HTML-escaped in DB and memory store
+    expect(db.conversation.update).toHaveBeenCalledWith({
+      where: { id: "conv-1" },
+      data: {
+        title: "&lt;script&gt;alert(1)&lt;/script&gt;",
+        updatedAt: expect.any(Date),
+      },
+    });
+    expect(mem.updateConversationTitle).toHaveBeenCalledWith("conv-1", "&lt;script&gt;alert(1)&lt;/script&gt;");
+  });
+
+  it("should escape ampersand, quotes, and apostrophe in title", async () => {
+    const db = createMockDb("旧标题");
+    await updateConversationTitle(db, "conv-1", 'Tom & Jerry said "hi" and \'bye\'', mockLog);
+
+    expect(db.conversation.update).toHaveBeenCalledWith({
+      where: { id: "conv-1" },
+      data: {
+        title: "Tom &amp; Jerry said &quot;hi&quot; and &#39;bye&#39;",
+        updatedAt: expect.any(Date),
+      },
+    });
+  });
+
+  it("should skip DB write when escaped title matches existing", async () => {
+    const db = createMockDb("&lt;script&gt;");
+    await updateConversationTitle(db, "conv-1", "<script>", mockLog);
+
+    // After escaping "<script>" → "&lt;script&gt;", which matches existing title
+    expect(db.conversation.update).not.toHaveBeenCalled();
+    expect(mem.updateConversationTitle).not.toHaveBeenCalled();
+  });
 });
