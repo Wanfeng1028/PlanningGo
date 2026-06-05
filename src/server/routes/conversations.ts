@@ -314,11 +314,32 @@ export async function registerConversationRoutes(app: FastifyInstance) {
         const hasAccess = await assertConversationAccess(app, conv, userId, guestIdFromRequest, reply, "访问此会话消息");
         if (!hasAccess) return;
 
-        const msgs = await db.message.findMany({
+        const dbMsgs = await db.message.findMany({
           where: { conversationId: id },
           orderBy: { createdAt: "asc" },
         });
-        return sendOk(reply, msgs);
+
+        // 安全修复 (#4): DB 查询成功后，从 mem 获取增量消息并合并去重
+        // 如果 DB 曾写入失败但 mem 成功，此处能补回丢失的消息
+        const memMsgs = mem.listMessages(id);
+        if (memMsgs.length > 0) {
+          // 以 DB 最后一条消息的 createdAt 为基准，mem 中更晚的消息为增量
+          const lastDbMsgTime = dbMsgs.length > 0 ? new Date(dbMsgs[dbMsgs.length - 1].createdAt).getTime() : 0;
+          const incrementalMemMsgs = memMsgs.filter((m) => new Date(m.createdAt).getTime() > lastDbMsgTime);
+
+          if (incrementalMemMsgs.length > 0) {
+            // 合并 DB 和 mem 消息，按 createdAt 排序，按 id 去重
+            const msgMap = new Map<string | undefined, unknown>();
+            for (const m of dbMsgs) msgMap.set(m.id, m);
+            for (const m of incrementalMemMsgs) msgMap.set(m.id, m);
+            const merged = Array.from(msgMap.values()).sort(
+              (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+            );
+            return sendOk(reply, merged);
+          }
+        }
+
+        return sendOk(reply, dbMsgs);
       } catch (err) {
         log.warn({ err }, "DB list messages failed, falling back to memory");
       }

@@ -38,7 +38,6 @@ export async function registerAgentRoutes(app: FastifyInstance) {
     flash: { max: 30, windowMs: 60 * 60 * 1000 },
     pro: { max: 100, windowMs: 60 * 60 * 1000 },
   } as const;
-  const maxPlanningCounterEntries = 2000;
   const planningCounters = new Map<string, { count: number; resetAt: number }>();
   type PlanningModeBody = { modelMode?: "flash" | "pro" };
 
@@ -50,10 +49,8 @@ export async function registerAgentRoutes(app: FastifyInstance) {
     const now = Date.now();
 
     // 清理过期 key（每次请求都清理，防止 Map 无限增长）
-    if (planningCounters.size > maxPlanningCounterEntries) {
-      for (const [k, v] of planningCounters.entries()) {
-        if (v.resetAt <= now) planningCounters.delete(k);
-      }
+    for (const [k, v] of planningCounters.entries()) {
+      if (v.resetAt <= now) planningCounters.delete(k);
     }
 
     const current = planningCounters.get(key);
