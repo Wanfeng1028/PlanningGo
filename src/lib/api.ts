@@ -190,6 +190,8 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
       } else {
         // Refresh failed — clear stale token, user needs to re-login
         setAuthToken(null);
+        setRefreshToken(null);
+        throw new Error("登录已过期，请重新登录");
       }
     }
 
@@ -886,13 +888,13 @@ export interface ReverseGeocodeResult {
   district: string;
   address: string;
   formattedAddress: string;
-  source?: "amap" | "fallback";
+  source?: "amap" | "open" | "fallback";
   confidence?: "high" | "low";
   needsConfirmation?: boolean;
 }
 
 export async function reverseGeocode(lat: number, lng: number): Promise<ReverseGeocodeResult> {
-  return apiJson<ReverseGeocodeResult>(`/api/location/reverse-geocode?lat=${lat}&lng=${lng}`);
+  return apiJson<ReverseGeocodeResult>(`/api/maps/reverse-geocode?provider=open&lat=${lat}&lng=${lng}`);
 }
 
 export interface NearbyPoi {
@@ -904,15 +906,88 @@ export interface NearbyPoi {
   rating?: number;
   cost?: number;
   distance?: number;
-  source: "amap" | "mock";
+  source: "amap" | "open" | "mock";
 }
 
 export interface NearbyPoiResult {
   pois: NearbyPoi[];
   count: number;
-  source: "amap" | "mock";
+  source: "amap" | "open" | "mock";
   fallbackUsed: boolean;
   hint?: string;
+  warnings?: string[];
+}
+
+export type UnifiedMapProvider = "open" | "amap";
+
+export interface MapProviderStatus {
+  provider: UnifiedMapProvider;
+  configured: boolean;
+  displayName: string;
+  capabilities: string[];
+  warnings: string[];
+  tileUrl?: string;
+}
+
+export interface MapsStatusResult {
+  providers: Record<UnifiedMapProvider, MapProviderStatus>;
+  defaultProvider: UnifiedMapProvider;
+}
+
+export interface UnifiedRouteResult {
+  provider: UnifiedMapProvider;
+  configured: boolean;
+  fallbackUsed: boolean;
+  route: {
+    distance: number;
+    duration: number;
+    strategy: string;
+    steps: Array<{ instruction: string; road?: string; distance: number; duration: number }>;
+    polyline?: string;
+    coordinates?: Array<{ lng: number; lat: number }>;
+    navigationUrl?: string;
+    source: UnifiedMapProvider;
+  };
+  warnings?: string[];
+}
+
+export async function getMapsStatus(): Promise<MapsStatusResult> {
+  return apiJson<MapsStatusResult>("/api/maps/status");
+}
+
+export async function searchMapPois(input: {
+  provider?: UnifiedMapProvider;
+  keywords: string;
+  city?: string;
+  lat?: number;
+  lng?: number;
+  radius?: number;
+  pageSize?: number;
+}): Promise<NearbyPoiResult> {
+  const params = new URLSearchParams({
+    keywords: input.keywords,
+  });
+  if (input.provider) params.set("provider", input.provider);
+  if (input.city) params.set("city", input.city);
+  if (input.lat !== undefined) params.set("lat", String(input.lat));
+  if (input.lng !== undefined) params.set("lng", String(input.lng));
+  if (input.radius) params.set("radius", String(input.radius));
+  if (input.pageSize) params.set("pageSize", String(input.pageSize));
+  const result = await apiJson<{
+    provider: UnifiedMapProvider;
+    fallbackUsed: boolean;
+    pois: NearbyPoi[];
+    count: number;
+    warnings?: string[];
+  }>(`/api/maps/search?${params.toString()}`);
+  return {
+    pois: result.pois,
+    count: result.count,
+    source: result.provider,
+    fallbackUsed: result.fallbackUsed,
+    warnings: result.warnings,
+    hint: result.warnings?.[0],
+  };
 }
 
 export async function getNearbyPois(input: {
@@ -920,6 +995,7 @@ export async function getNearbyPois(input: {
   lng: number;
   city: string;
   radius?: number;
+  provider?: UnifiedMapProvider;
 }): Promise<NearbyPoiResult> {
   const params = new URLSearchParams({
     lat: String(input.lat),
@@ -927,7 +1003,35 @@ export async function getNearbyPois(input: {
     city: input.city,
     radius: String(input.radius ?? 3000),
   });
-  return apiJson<NearbyPoiResult>(`/api/location/nearby?${params.toString()}`);
+  if (input.provider) params.set("provider", input.provider);
+  const result = await apiJson<{
+    provider: UnifiedMapProvider;
+    fallbackUsed: boolean;
+    pois: NearbyPoi[];
+    count: number;
+    warnings?: string[];
+  }>(`/api/maps/nearby?${params.toString()}`);
+  return {
+    pois: result.pois,
+    count: result.count,
+    source: result.provider,
+    fallbackUsed: result.fallbackUsed,
+    warnings: result.warnings,
+    hint: result.warnings?.[0],
+  };
+}
+
+export async function planMapRoute(input: {
+  provider?: UnifiedMapProvider;
+  from: { name?: string; location: { lng: number; lat: number } };
+  to: { name?: string; location: { lng: number; lat: number } };
+  waypoints?: Array<{ name?: string; location: { lng: number; lat: number } }>;
+  mode?: "driving" | "walking" | "cycling";
+}): Promise<UnifiedRouteResult> {
+  return apiJson<UnifiedRouteResult>("/api/maps/route", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 // ═══════════════════════════════════════════════════

@@ -227,9 +227,9 @@ describe('createPlanningActions', () => {
     const mapAction = actions.find((a) => a.type === 'map_search')
     expect(mapAction).toBeDefined()
     if (mapAction && mapAction.type === 'map_search') {
-      expect(mapAction.provider).toBe('amap')
+      expect(mapAction.provider).toBe('open')
       expect(mapAction.query).toBe('杭州')
-      expect(mapAction.label).toContain('高德')
+      expect(mapAction.label).toContain('地图')
     }
   })
 
@@ -243,7 +243,7 @@ describe('createPlanningActions', () => {
     expect(navAction).toBeDefined()
     if (navAction && navAction.type === 'navigation') {
       expect(navAction.destination).toBe('西湖边咖啡厅')
-      expect(navAction.provider).toBe('amap')
+      expect(navAction.provider).toBe('open')
     }
   })
 

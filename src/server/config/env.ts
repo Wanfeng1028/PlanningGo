@@ -106,6 +106,15 @@ const envSchema = z.object({
   AMAP_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
   AMAP_MAX_CALLS_FLASH: z.coerce.number().int().positive().default(8),
   AMAP_MAX_CALLS_PRO: z.coerce.number().int().positive().default(16),
+  OPEN_MAP_TILE_URL: z.string().default("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"),
+  OPEN_MAP_NOMINATIM_URL: z.string().url().default("https://nominatim.openstreetmap.org"),
+  OPEN_MAP_OVERPASS_URL: z.string().url().default("https://overpass-api.de/api/interpreter"),
+  OPEN_MAP_ROUTE_URL: z.string().url().default("https://router.project-osrm.org"),
+  OPEN_MAP_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
+  OPEN_MAP_PUBLIC_DEMO_OK: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true"),
   QWEATHER_API_KEY: z.string().optional(),
 
   // ── 美团 OAuth（可选）──
@@ -280,6 +289,16 @@ export function validateProductionRuntime(input: typeof env) {
     throw new Error("第一版生产环境禁止开启 AUTO_EXECUTION_ALLOW_PAYMENT");
   }
 
+  const usesPublicOpenMapDefaults =
+    input.OPEN_MAP_NOMINATIM_URL === "https://nominatim.openstreetmap.org" ||
+    input.OPEN_MAP_OVERPASS_URL === "https://overpass-api.de/api/interpreter" ||
+    input.OPEN_MAP_ROUTE_URL === "https://router.project-osrm.org";
+  if (usesPublicOpenMapDefaults && !input.OPEN_MAP_PUBLIC_DEMO_OK) {
+    throw new Error(
+      "生产环境必须配置自建或托管的 OPEN_MAP_NOMINATIM_URL / OPEN_MAP_OVERPASS_URL / OPEN_MAP_ROUTE_URL；如仅演示请显式设置 OPEN_MAP_PUBLIC_DEMO_OK=true",
+    );
+  }
+
   // ── LLM 模式下必须有可用的 LLM Key ──
   if (input.AGENT_CHAT_MODE === "llm" && !hasAnyLlmKeyLocal(input)) {
     throw new Error("AGENT_CHAT_MODE=llm 但未配置任何 LLM API Key，请设置至少一个 Provider 的 Key");
@@ -297,4 +316,3 @@ validateProductionRuntime(env);
 export const corsOrigins = env.CORS_ORIGINS.split(",")
   .map((item) => item.trim())
   .filter(Boolean);
-

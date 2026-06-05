@@ -133,6 +133,10 @@ export async function buildApp() {
 
     // ── AMap 状态 ──
     const amapConfigured = Boolean(env.AMAP_WEB_SERVICE_KEY);
+    const openMapPublicDemo =
+      env.OPEN_MAP_NOMINATIM_URL.includes("nominatim.openstreetmap.org") ||
+      env.OPEN_MAP_OVERPASS_URL.includes("overpass-api.de") ||
+      env.OPEN_MAP_ROUTE_URL.includes("router.project-osrm.org");
 
     // ── mock 是否允许 ──
     const mockAllowed = env.NODE_ENV === "production"
@@ -148,6 +152,15 @@ export async function buildApp() {
       redis: redisStatus,
       llm: llmInfo,
       amap: { configured: amapConfigured },
+      maps: {
+        defaultProvider: amapConfigured ? "amap" : "open",
+        open: {
+          configured: true,
+          publicDemo: openMapPublicDemo,
+          productionReady: !openMapPublicDemo || env.OPEN_MAP_PUBLIC_DEMO_OK,
+        },
+        amap: { configured: amapConfigured },
+      },
       mockAllowed,
       uptime: Math.floor((Date.now() - startedAt) / 1000),
       timestamp: new Date().toISOString(),

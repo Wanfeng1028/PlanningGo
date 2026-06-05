@@ -13,13 +13,20 @@
 
 .mapContainer {
   flex: 1;
-  min-height: 300px;
+  min-height: 400px;
   width: 100%;
+  height: 100%;
   position: relative;
   touch-action: pan-x pan-y;
   will-change: transform;
 
   & > div {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Ensure Leaflet map container has proper dimensions */
+  .leaflet-container {
     width: 100%;
     height: 100%;
   }
@@ -38,6 +45,46 @@
   padding: 4px;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.mapSearch {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 176px;
+  z-index: 35;
+  display: flex;
+  gap: 6px;
+  max-width: 460px;
+  padding: 4px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(8px);
+}
+
+.mapSearch input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  padding: 0 10px;
+  font-size: 13px;
+  color: #1a1a2e;
+  outline: none;
+}
+
+.mapSearch button {
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: #ffcc33;
+  color: #1a1a2e;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .mapControlBtn {
@@ -140,7 +187,7 @@
 /* ── 地图提供商切换 ── */
 .mapSelector {
   position: absolute;
-  top: 12px;
+  top: 52px;
   left: 12px;
   display: flex;
   flex-direction: row;
@@ -154,6 +201,9 @@
 }
 
 .mapSelectorBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 6px 12px;
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 6px;
@@ -176,6 +226,20 @@
     border-color: #ffcc33;
     font-weight: 600;
   }
+
+  &:disabled {
+    cursor: not-allowed;
+    color: #999;
+    background: rgba(245, 245, 245, 0.9);
+  }
+}
+
+.mapSelectorHint {
+  align-self: center;
+  padding: 0 6px;
+  color: #777;
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 /* ── POI 侧边面板 ── */
@@ -200,6 +264,36 @@
   transform: translateY(calc(100% - 48px));
   opacity: 0.88;
   pointer-events: none;
+}
+
+.poiPanelHidden {
+  transform: translateY(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── POI 展开按钮 ── */
+.poiExpandBtn {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  padding: 8px 20px;
+  border-radius: 20px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  color: #1a1a2e;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 1);
+  }
 }
 
 .poiPanelHeader {
@@ -266,7 +360,15 @@
 }
 
 .poiIcon {
-  font-size: 18px;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
   flex-shrink: 0;
 }
 
@@ -290,6 +392,16 @@
 .poiType {
   font-size: 12px;
   color: #6b7280;
+}
+
+.poiRouteLink {
+  flex-shrink: 0;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: rgba(255, 204, 51, 0.24);
+  color: #6f4b00;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .poiEmpty {
@@ -320,6 +432,24 @@
     font-size: 14px;
   }
 
+  .mapSearch {
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    max-width: none;
+  }
+
+  .mapControls {
+    top: 58px;
+  }
+
+  .mapSelector {
+    top: 102px;
+    left: 12px;
+    right: 12px;
+    overflow-x: auto;
+  }
+
   .poiItem {
     padding: 10px 16px;
   }
@@ -330,5 +460,41 @@
 
   .poiType {
     font-size: 11px;
+  }
+}
+
+/* ── 高德未配置 API Key 提示弹窗 ── */
+.amapNoticeOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.amapNotice {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.amapNoticeBtn {
+  padding: 8px 24px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #ffcc33;
+  color: #1a1a2e;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: #f5c510;
   }
 }

@@ -8,6 +8,8 @@ export interface RetryOptions {
   shouldRetry?: (error: Error, attempt: number) => boolean;
 }
 
+let refreshInFlight: Promise<string | null> | null = null;
+
 export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
   options: RetryOptions = {}
@@ -59,6 +61,14 @@ interface RefreshApiResponse {
 }
 
 export async function refreshToken(): Promise<string | null> {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = refreshTokenOnce().finally(() => {
+    refreshInFlight = null;
+  });
+  return refreshInFlight;
+}
+
+async function refreshTokenOnce(): Promise<string | null> {
   try {
     const currentRefreshToken = localStorage.getItem("pg_refresh_token");
     if (!currentRefreshToken) return null;

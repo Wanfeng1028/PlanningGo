@@ -68,13 +68,12 @@ async function authPlugin(app: FastifyInstance) {
       request.userRole = payload.role;
       request.userEmail = payload.email;
     } catch {
-      // token 无效 — 通过 header 通知前端刷新
-      // 不阻断请求（仍可作为未登录访问），但前端收到 header 后应主动 refresh
       app.log.warn({
         url: request.url,
         method: request.method,
-      }, "[auth] optionalAuthGuard: token INVALID — user thinks logged in but request proceeds as anonymous. x-token-expired header sent.");
+      }, "[auth] optionalAuthGuard: token INVALID — rejecting so client can refresh and retry.");
       reply.header("x-token-expired", "1");
+      return sendError(reply, 401, "TOKEN_EXPIRED", "令牌无效或已过期");
     }
   });
 

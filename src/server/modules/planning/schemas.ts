@@ -140,7 +140,7 @@ export const executionActionSchema = z.object({
     "coffee_order_draft", "restaurant_reservation_draft", "open_taxi_deeplink",
     "open_meituan_search", "open_dianping_search", "call_restaurant",
   ]),
-  provider: z.enum(["meituan", "amap", "calendar", "mock", "dianping", "meituan_order"]).default("mock"),
+  provider: z.enum(["meituan", "open", "amap", "calendar", "mock", "dianping", "meituan_order"]).default("mock"),
   status: z.enum([
     "proposed", "quoted", "prepared", "waiting_user_confirm",
     "redirect_required", "waiting_external_confirm", "executing",

@@ -28,6 +28,7 @@ export async function registerRoutes(app: FastifyInstance) {
   await import("./routes/agentChat.js").then((m) => m.registerAgentChatRoutes(app));
   await import("./routes/mock.js").then((m) => m.registerMockRoutes(app));
   await import("./routes/location.js").then((m) => m.registerLocationRoutes(app));
+  await import("./routes/maps.js").then((m) => m.registerMapRoutes(app));
   await import("./routes/meituan.js").then((m) => m.registerMeituanRoutes(app));
   await import("./routes/conversations.js").then((m) => m.registerConversationRoutes(app));
   await import("./routes/events.js").then((m) => m.registerEventRoutes(app));

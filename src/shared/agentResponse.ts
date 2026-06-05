@@ -125,14 +125,14 @@ export type PlanningAction =
   | {
       type: "map_search";
       label: string;
-      provider: "amap" | "baidu" | "google";
+      provider: "open" | "amap" | "baidu" | "google";
       query: string;
       city?: string;
     }
   | {
       type: "navigation";
       label: string;
-      provider: "amap" | "baidu";
+      provider: "open" | "amap" | "baidu";
       origin?: string;
       destination: string;
       mode?: "walking" | "driving" | "transit";

@@ -109,7 +109,7 @@ describe('V3 Execution System Smoke Test', () => {
 
       const navAction = actions.find((a) => a.type === 'navigation');
       expect(navAction).toBeDefined();
-      expect(navAction!.provider).toBe('amap');
+      expect(navAction!.provider).toBe('open');
     });
 
     it('calendar_event 应该有 provider="calendar"', () => {
@@ -148,7 +148,7 @@ describe('V3 Execution System Smoke Test', () => {
         userId: 'user-test',
       });
 
-      const validProviders = new Set(['meituan', 'dianping', 'eleme', 'amap', 'calendar', 'mock']);
+      const validProviders = new Set(['meituan', 'dianping', 'eleme', 'open', 'amap', 'calendar', 'mock']);
 
       for (const action of actions) {
         expect(validProviders.has(action.provider)).toBe(true);
@@ -290,7 +290,7 @@ describe('V3 Execution System Smoke Test', () => {
       // 验证每个 action
       for (const action of actions) {
         // provider 有效
-        const validProviders = new Set(['meituan', 'dianping', 'eleme', 'amap', 'calendar', 'mock']);
+        const validProviders = new Set(['meituan', 'dianping', 'eleme', 'open', 'amap', 'calendar', 'mock']);
         expect(validProviders.has(action.provider)).toBe(true);
 
         // status 是 V3 状态（不是旧状态）

@@ -1,6 +1,7 @@
 import { createId, createIdempotencyKey } from "../../common/id";
 import type { ActivityPlan, ExecutionAction, UserIntent } from "../planning/schemas";
 import type { PlanningAction } from "../../../shared/agentResponse.js";
+import { buildNavigationUrl } from "../maps/navigationLinks.js";
 
 /**
  * 为方案生成可执行动作（预约、锁座、日历、分享等）。
@@ -127,7 +128,7 @@ function createNavigationAction(planId: string, optionId: string, option: Activi
     optionId,
     userId,
     type: "navigation",
-    provider: "amap",
+    provider: "open",
     status: "proposed",
     title: "生成导航路线",
     description: `为「${option.title}」生成多点导航。`,
@@ -294,7 +295,7 @@ function buildRecovery(step: ActivityPlan["timeline"][number], type: "no_seat" |
   };
 }
 
-/** 打车深链 — 打开高德/滴滴打车 */
+/** 打车/导航入口 — 默认打开当前可用的开源地图导航 */
 function createTaxiDeeplinkAction(
   planId: string,
   optionId: string,
@@ -309,10 +310,10 @@ function createTaxiDeeplinkAction(
     optionId,
     userId,
     type: "open_taxi_deeplink",
-    provider: "amap",
+    provider: "open",
     status: "proposed",
     title: `打车去${destLabel}`,
-    description: `打开高德打车，一键叫车前往${destLabel}。${step.estimatedCost ? `预估${step.estimatedCost}` : ""}`,
+    description: `打开地图导航，一键规划前往${destLabel}。${step.estimatedCost ? `预估${step.estimatedCost}` : ""}`,
     confirmationRequired: false,
     idempotencyKey: createIdempotencyKey([planId, optionId, step.poiId, "taxi_deeplink"]),
     priceEstimate: step.estimatedCost,
@@ -434,8 +435,8 @@ export function createPlanningActions(input: {
   // 1. map_search — open map to search the destination/POIs
   actions.push({
     type: "map_search",
-    label: `打开高德搜索${destination}`,
-    provider: "amap",
+    label: `打开地图搜索${destination}`,
+    provider: "open",
     query: destination,
     city,
   });
@@ -448,7 +449,7 @@ export function createPlanningActions(input: {
     actions.push({
       type: "navigation",
       label: `导航到${firstPOI}`,
-      provider: "amap",
+      provider: "open",
       origin: originLabel,
       destination: firstPOI,
     });
@@ -521,8 +522,8 @@ export function createPlanningActions(input: {
       actions.push({
         type: "open_url",
         label: `打车去${step.poiName}`,
-        provider: "amap",
-        url: `https://uri.amap.com/navigation?to=${encodeURIComponent(step.poiName)}&mode=car&coordinate=gaode`,
+        provider: "open",
+        url: buildNavigationUrl({ provider: "open", destination: step.poiName }),
       });
     }
   }

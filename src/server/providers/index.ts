@@ -2,6 +2,7 @@ import type { MapProvider, LlmProvider, BookingProvider } from './types.js'
 import { MockMapProvider } from './mockMapProvider.js'
 import { MockLlmProvider } from './mockLlmProvider.js'
 import { AmapMapProvider } from './amapMapProvider.js'
+import { OpenMapMapProvider } from './openMapMapProvider.js'
 import { OpenAICompatibleLlmProvider } from './openAICompatibleLlmProvider.js'
 import { SafeBookingProvider } from './safeBookingProvider.js'
 import { env } from '../config/env.js'
@@ -135,6 +136,16 @@ function resolveMapProvider(isProd: boolean, allowMock: boolean): MapProvider {
       timeoutMs: env.AMAP_TIMEOUT_MS,
     })
   }
+
+  return new OpenMapMapProvider({
+    tileUrl: env.OPEN_MAP_TILE_URL,
+    nominatimUrl: env.OPEN_MAP_NOMINATIM_URL,
+    overpassUrl: env.OPEN_MAP_OVERPASS_URL,
+    routeUrl: env.OPEN_MAP_ROUTE_URL,
+    timeoutMs: env.OPEN_MAP_TIMEOUT_MS,
+    publicDemoOk: env.OPEN_MAP_PUBLIC_DEMO_OK,
+    nodeEnv: env.NODE_ENV,
+  })
 
   if (isProd && !allowMock) {
     throw new Error('[providers] 生产环境必须配置 AMAP_WEB_SERVICE_KEY，或显式设置 ALLOW_MOCK_PROVIDER_IN_PRODUCTION=true')

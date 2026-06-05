@@ -5,6 +5,7 @@ import { transitionState, type ActionStatus } from "./stateMachine";
 import type { UserPermissionSnapshot } from "../agent/middleware/permissionGuard";
 import { getConnectorRegistry } from "../connectors/registry.js";
 import type { ConnectorSearchResult } from "../connectors/types.js";
+import { buildNavigationUrl } from "../maps/navigationLinks.js";
 
 function getPrisma() {
   const prisma = getPrismaClient();
@@ -232,7 +233,10 @@ export class ActionExecutor {
           } else {
             // Fallback: 生成导航 URL
             const points = (payload as Record<string, unknown>)?.points as string[] | undefined;
-            result = { navigationUrl: "https://uri.amap.com/navigation", points };
+            result = {
+              navigationUrl: buildNavigationUrl({ provider: "open", destination: points?.[0] ?? "" }),
+              points,
+            };
             finalStatus = "succeeded";
           }
           break;

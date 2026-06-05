@@ -46,13 +46,26 @@ export async function streamFetch(
       }
     }
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+    if (response.headers.get("x-token-expired") === "1" && getAuthToken()) {
+      const newToken = await refreshToken().catch(() => null);
+      if (newToken) {
+        const retryHeaders: Record<string, string> = {
+          ...(fetchOptions.headers as Record<string, string> ?? {}),
+          authorization: `Bearer ${newToken}`,
+        };
+        response = await fetch(url, {
+          ...fetchOptions,
+          headers: retryHeaders,
+          signal,
+        });
+      } else {
+        setAuthToken(null);
+        throw new Error("登录已过期，请重新登录");
+      }
     }
 
-    // Proactively refresh token if optionalAuthGuard signalled expiration
-    if (response.headers.get("x-token-expired") === "1") {
-      refreshToken().then((t) => { if (t) setAuthToken(t); }).catch(() => {});
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
     }
 
     const reader = response.body?.getReader();

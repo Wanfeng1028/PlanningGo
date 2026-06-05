@@ -12,9 +12,11 @@ import {
   reportClientError,
   trackAction,
   getApiBase,
+  getMapsStatus,
   type PlanningOption,
   type PlanningExecutableAction,
   type ServiceActionPrepareInput,
+  type MapProviderStatus,
   selectAgentPlan,
   savePlanToDb,
 } from "../lib/api";
@@ -161,6 +163,26 @@ function generateSessionTitle(prompt: string): string {
   return trimmed.length > 20 ? trimmed.slice(0, 20) + "…" : trimmed;
 }
 
+function buildMapSearchUrl(input: { provider: "open" | "amap"; query: string; city?: string }) {
+  const query = input.city ? `${input.city} ${input.query}` : input.query;
+  if (input.provider === "amap") {
+    const citySuffix = input.city ? `&city=${encodeURIComponent(input.city)}` : "";
+    return `https://www.amap.com/search?query=${encodeURIComponent(input.query)}${citySuffix}`;
+  }
+  return `https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}`;
+}
+
+function buildMapNavigationUrl(input: { provider: "open" | "amap"; destination: string; origin?: string; mode?: string }) {
+  const mode = input.mode ?? "driving";
+  if (input.provider === "amap") {
+    const amapMode: Record<string, string> = { walking: "walk", driving: "drive", transit: "bus", cycling: "ride" };
+    const originParam = input.origin ? `&from=${encodeURIComponent(input.origin)}` : "";
+    return `https://www.amap.com/dir?type=${amapMode[mode] ?? "drive"}&to=${encodeURIComponent(input.destination)}${originParam}`;
+  }
+  const route = input.origin ? `${input.origin} to ${input.destination}` : input.destination;
+  return `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${encodeURIComponent(route)}`;
+}
+
 /* ═══════════════════════════════════════════════
    Main Component
    ═══════════════════════════════════════════════ */
@@ -183,7 +205,8 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
   const viewMode = externalViewMode ?? internalViewMode;
   const setViewMode = onSetViewMode ?? setInternalViewMode;
   // 地图提供商选择
-  const [mapProvider, setMapProvider] = useState<"amap" | "osm">("amap");
+  const [mapProvider, setMapProvider] = useState<"amap" | "open">("open");
+  const [mapStatuses, setMapStatuses] = useState<Partial<Record<"amap" | "open", MapProviderStatus>>>({});
   const [inputValue, setInputValue] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [, setPhase] = useState<ChatPhase>("idle");
@@ -243,6 +266,24 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
   } | null>(null);
 
   const { toast: glassToast, show: showToast, dismiss: dismissToast } = useGlassToast();
+
+  useEffect(() => {
+    let cancelled = false;
+    getMapsStatus()
+      .then((result) => {
+        if (cancelled) return;
+        setMapStatuses(result.providers);
+        setMapProvider(result.defaultProvider);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMapProvider("open");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /* ── Typewriter effect for hero title ── */
   useEffect(() => {
@@ -361,9 +402,6 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
         } catch { /* ignore corrupt data */ }
       }
 
-      // Clear guest data when user is logged in
-      localStorage.removeItem("pg_chat_sessions");
-      localStorage.removeItem("pg_active_conversation_id");
       console.info("[FeaturesPage] loading DB conversations for user", { userId: user.id, hasGuestData: Boolean(guestSessionsToMigrate) });
 
       // Migrate guest localStorage sessions to DB if any exist
@@ -405,6 +443,10 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
           }
 
           console.info(`[FeaturesPage] migrated ${migratedCount}/${guestSessionsToMigrate!.length} guest sessions to DB`);
+          if (migratedCount === guestSessionsToMigrate!.length) {
+            localStorage.removeItem("pg_chat_sessions");
+            localStorage.removeItem("pg_active_conversation_id");
+          }
 
           // Load full conversation list from DB after migration
           const convs = await listConversations({ limit: 50 });
@@ -1239,8 +1281,9 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
     setConversationId(null);
     conversationIdRef.current = null;
     setSidebarOpen(false);
+    setViewMode("chat"); // Always switch to chat view when creating new plan
     requestAnimationFrame(() => textareaRef.current?.focus());
-  }, []);
+  }, [setViewMode]);
 
   const handleSessionClick = useCallback(async (sessionId: string) => {
     console.info("[FeaturesPage] click session", {
@@ -1479,7 +1522,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
       switch (action.type) {
         case "navigation": {
           const dest = action.description || city;
-          window.open(`https://uri.amap.com/search?keyword=${encodeURIComponent(dest)}&city=${encodeURIComponent(city)}`, "_blank");
+          window.open(buildMapSearchUrl({ provider: mapProvider, query: dest, city }), "_blank");
           break;
         }
         case "calendar_event":
@@ -1515,7 +1558,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
           break;
       }
     },
-    [city, addMemory, showToast, updateSessionMessages],
+    [city, addMemory, showToast, updateSessionMessages, mapProvider],
   );
 
   const handleUnifiedAction = useCallback(async (action: PlanningAction) => {
@@ -1537,27 +1580,17 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
         window.open(action.url, action.target ?? "_blank");
         break;
       case "map_search": {
-        const query = encodeURIComponent(action.query);
-        const citySuffix = action.city ? `&city=${encodeURIComponent(action.city)}` : "";
-        if (action.provider === "amap") {
-          window.open(`https://www.amap.com/search?query=${query}${citySuffix}`, "_blank");
-        } else if (action.provider === "baidu") {
-          window.open(`https://map.baidu.com/search/${query}`, "_blank");
-        } else {
-          window.open(`https://www.google.com/maps/search/${query}`, "_blank");
-        }
+        const provider = action.provider === "amap" && mapStatuses.amap?.configured && import.meta.env.VITE_AMAP_KEY
+          ? "amap"
+          : mapProvider;
+        window.open(buildMapSearchUrl({ provider, query: action.query, city: action.city || city }), "_blank");
         break;
       }
       case "navigation": {
-        const dest = encodeURIComponent(action.destination);
-        const originParam = action.origin ? `&from=${encodeURIComponent(action.origin)}` : "";
-        const modeMap: Record<string, string> = { walking: "walk", driving: "drive", transit: "bus" };
-        const mode = modeMap[action.mode ?? "transit"];
-        if (action.provider === "amap") {
-          window.open(`https://www.amap.com/dir?type=${mode}&to=${dest}${originParam}`, "_blank");
-        } else {
-          window.open(`https://map.baidu.com/dir/${action.origin ? encodeURIComponent(action.origin) + "/" : ""}${dest}`, "_blank");
-        }
+        const provider = action.provider === "amap" && mapStatuses.amap?.configured && import.meta.env.VITE_AMAP_KEY
+          ? "amap"
+          : mapProvider;
+        window.open(buildMapNavigationUrl({ provider, destination: action.destination, origin: action.origin, mode: action.mode }), "_blank");
         break;
       }
       case "copy_text":
@@ -1593,7 +1626,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
         setShowHandoffQR(true);
         break;
     }
-  }, [showToast]);
+  }, [showToast, mapProvider, mapStatuses.amap?.configured, city]);
 
   /* ── Phase 1: New plan action handlers ── */
 
@@ -1752,6 +1785,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
     showToast,
     conversationId,
     city,
+    mapProvider,
     setInputValue,
     textareaRef,
     onSelectPlan: async ({ conversationId: cId, optionId }) => {
@@ -2128,7 +2162,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
             >
               ← 返回
             </button>
-            <MapSelector value={mapProvider} onChange={setMapProvider} />
+            <MapSelector value={mapProvider} onChange={setMapProvider} statuses={mapStatuses} />
             {mapProvider === "amap" ? (
               <RealMap
                 key="amap"
@@ -2137,7 +2171,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
               />
             ) : (
               <OpenStreetMap
-                key="osm"
+                key="open"
                 center={location?.latitude && location?.longitude ? [location.longitude, location.latitude] : undefined}
                 city={city}
               />
@@ -2358,12 +2392,12 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
                       size="small"
                       onClick={() => {
                         window.open(
-                          `https://www.amap.com/search?query=${encodeURIComponent(step.poiName || step.title)}`,
+                          buildMapSearchUrl({ provider: mapProvider, query: step.poiName || step.title, city }),
                           "_blank",
                         );
                       }}
                     >
-                      在高德查看
+                      在地图查看
                     </Button>
                     <Button
                       variant="ghost"

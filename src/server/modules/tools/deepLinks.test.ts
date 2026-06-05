@@ -106,10 +106,20 @@ describe("generateDeepLink", () => {
 });
 
 describe("generateAllDeepLinks", () => {
-  it("should generate all 4 provider links", () => {
+  it("should generate all 5 provider links", () => {
     const links = generateAllDeepLinks("西湖");
-    expect(links).toHaveLength(4);
-    expect(links.map((l) => l.provider)).toEqual(["meituan", "dianping", "eleme", "amap"]);
+    expect(links).toHaveLength(5);
+    expect(links.map((l) => l.provider)).toEqual(["meituan", "dianping", "eleme", "open", "amap"]);
+  });
+
+  it("should generate open map navigation link", () => {
+    const openLink = generateDeepLink({
+      provider: "open",
+      poiName: "雷峰塔",
+      action: "navigate",
+    });
+    expect(openLink.provider).toBe("open");
+    expect(openLink.url).toContain("openstreetmap.org/directions");
   });
 
   it("should include coordinates in amap link when provided with navigate action", () => {

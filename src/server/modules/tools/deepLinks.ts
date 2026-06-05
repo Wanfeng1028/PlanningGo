@@ -3,8 +3,10 @@
  * 为 POI 生成美团、大众点评、饿了么、高德等平台的跳转链接。
  */
 
+import { buildMapSearchUrl, buildNavigationUrl } from "../maps/navigationLinks.js";
+
 export interface DeepLinkInput {
-  provider: "meituan" | "dianping" | "eleme" | "amap";
+  provider: "meituan" | "dianping" | "eleme" | "open" | "amap";
   poiName: string;
   lat?: number;
   lng?: number;
@@ -50,6 +52,22 @@ export function generateDeepLink(input: DeepLinkInput): DeepLink {
         icon: "🔵",
       };
 
+    case "open":
+      if (action === "navigate") {
+        return {
+          provider: "open",
+          label: "打开地图导航",
+          url: buildNavigationUrl({ provider: "open", destination: poiName, lat, lng }),
+          icon: "map",
+        };
+      }
+      return {
+        provider: "open",
+        label: "在地图查看",
+        url: buildMapSearchUrl({ provider: "open", query: poiName }),
+        icon: "map",
+      };
+
     case "amap":
       if (lat && lng && action === "navigate") {
         return {
@@ -72,7 +90,7 @@ export function generateDeepLink(input: DeepLinkInput): DeepLink {
  * 为 POI 生成所有可用的深度链接
  */
 export function generateAllDeepLinks(poiName: string, lat?: number, lng?: number): DeepLink[] {
-  const providers: DeepLinkInput["provider"][] = ["meituan", "dianping", "eleme", "amap"];
+  const providers: DeepLinkInput["provider"][] = ["meituan", "dianping", "eleme", "open", "amap"];
   return providers.map((provider) =>
     generateDeepLink({ provider, poiName, lat, lng }),
   );

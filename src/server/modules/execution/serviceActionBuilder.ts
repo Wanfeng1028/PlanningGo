@@ -35,7 +35,7 @@ function mapActionTypeToProvider(actionType: string): ServiceActionDraft["provid
     case "movie_ticket":
       return "dianping";
     case "navigation":
-      return "amap";
+      return "open";
     case "calendar_event":
       return "calendar";
     case "copy_booking_info":
@@ -109,7 +109,7 @@ const MOVIE_RULES: StepActionRule[] = [
   },
   {
     actionType: "navigation",
-    title: "打开高德导航",
+    title: "打开地图导航",
     description: "导航到影院，方便你规划路线",
     userConfirmText: "开始导航",
     hasRedirectUrl: true,
@@ -119,7 +119,7 @@ const MOVIE_RULES: StepActionRule[] = [
 const ACTIVITY_RULES: StepActionRule[] = [
   {
     actionType: "navigation",
-    title: "打开高德导航",
+    title: "打开地图导航",
     description: "导航到活动地点，方便你规划路线",
     userConfirmText: "开始导航",
     hasRedirectUrl: true,
@@ -167,7 +167,7 @@ function buildActionsForStep(step: TimelineStep): ServiceActionDraft[] {
     rules = [
       {
         actionType: "navigation",
-        title: "打开高德导航",
+        title: "打开地图导航",
         description: `导航到${poiName}，方便你规划路线`,
         userConfirmText: "开始导航",
         hasRedirectUrl: true,
@@ -204,9 +204,8 @@ function buildActionsForStep(step: TimelineStep): ServiceActionDraft[] {
 
     if (rule.hasRedirectUrl) {
       if (rule.actionType === "navigation") {
-        // 高德导航 deep link
         const deepLink = generateDeepLink({
-          provider: "amap",
+          provider: "open",
           poiName: poiName,
           lat: step.type === "travel" ? undefined : undefined,
           lng: undefined,

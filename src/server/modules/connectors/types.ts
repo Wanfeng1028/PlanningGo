@@ -9,6 +9,7 @@
 
 export type ConnectorProvider =
   | "amap"
+  | "open"
   | "calendar"
   | "meituan"
   | "dianping"
@@ -162,6 +163,7 @@ export type ServiceActionProvider =
   | "eleme"
   | "taobao_flash"
   | "amap"
+  | "open"
   | "calendar"
   | "mock";
 

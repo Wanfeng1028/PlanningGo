@@ -16,7 +16,7 @@ type MapPoi = {
   location: [number, number];
   type: string;
   distance?: number;
-  source: "amap" | "mock";
+    source: "amap" | "open" | "mock";
 };
 
 /** SDK 加载超时（毫秒） */
@@ -85,6 +85,7 @@ export function RealMap({
   const [poiMessage, setPoiMessage] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [mapStyle, setMapStyle] = useState<"standard" | "satellite">("standard");
+  const [poiPanelVisible, setPoiPanelVisible] = useState(true);
 
   // 将 ref 更新移到 useEffect 中，避免在渲染期间修改 ref
   useEffect(() => {
@@ -131,6 +132,7 @@ export function RealMap({
         lat: targetCenter[1],
         city: targetCity || "上海",
         radius: 3000,
+        provider: "amap",
       });
       const pois = result.pois
         .filter((poi: NearbyPoi) => Number.isFinite(poi.location.lng) && Number.isFinite(poi.location.lat))
@@ -406,14 +408,29 @@ export function RealMap({
         </button>
       </div>
 
-      <div className={`${styles.poiPanel} ${isDragging ? styles.poiPanelDragging : ""}`}>
+      <div className={`${styles.poiPanel} ${isDragging ? styles.poiPanelDragging : ""} ${!poiPanelVisible ? styles.poiPanelHidden : ""}`}>
         <div className={styles.poiPanelHeader}>
           <h3 className={styles.poiPanelTitle}>
             周边 {poiLoading ? "加载中" : `${poiList.length} 个地点`}
           </h3>
-          <button className={styles.poiRefreshBtn} type="button" onClick={() => loadNearbyPois()}>
-            重试
-          </button>
+          <div style={{ display: "flex", gap: "4px" }}>
+            <button
+              className={styles.poiRefreshBtn}
+              type="button"
+              onClick={() => loadNearbyPois()}
+              title="刷新"
+            >
+              🔄
+            </button>
+            <button
+              className={styles.poiRefreshBtn}
+              type="button"
+              onClick={() => setPoiPanelVisible(false)}
+              title="隐藏"
+            >
+              ✕
+            </button>
+          </div>
         </div>
         {(poiFallback || poiMessage) && (
           <p className={styles.poiStatus}>{poiMessage ?? "已切换为演示推荐地点"}</p>
@@ -440,6 +457,17 @@ export function RealMap({
           )}
         </div>
       </div>
+
+      {/* POI 隐藏后显示的展开按钮 */}
+      {!poiPanelVisible && (
+        <button
+          className={styles.poiExpandBtn}
+          type="button"
+          onClick={() => setPoiPanelVisible(true)}
+        >
+          📍 显示周边地点
+        </button>
+      )}
     </div>
   );
 }

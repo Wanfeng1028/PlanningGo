@@ -9,6 +9,7 @@ export interface UsePlanActionsOptions {
   showToast: ShowToast;
   conversationId: string | null;
   city: string;
+  mapProvider?: "open" | "amap";
   setInputValue: (value: string) => void;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   /** Called when save API is available (Phase 3+) */
@@ -18,7 +19,7 @@ export interface UsePlanActionsOptions {
 }
 
 export function usePlanActions(opts: UsePlanActionsOptions) {
-  const { showToast, conversationId, city: _city, setInputValue, textareaRef, onSavePlanApi, onSelectPlan } = opts;
+  const { showToast, conversationId, city: _city, mapProvider = "open", setInputValue, textareaRef, onSavePlanApi, onSelectPlan } = opts;
 
   /** 继续调整：预填引导文字 + 聚焦输入框 */
   const handleAdjustPlan = useCallback((plan: PlanningOption) => {
@@ -111,10 +112,17 @@ export function usePlanActions(opts: UsePlanActionsOptions) {
     const destination = navPoints[navPoints.length - 1];
     const viaPoints = navPoints.slice(1, -1);
 
-    // Build Amap navigation URL with coordinate fallback
-    const parts: string[] = [];
+    if (mapProvider === "open") {
+      const originText = origin.lat && origin.lng ? `${origin.lat},${origin.lng}` : origin.name;
+      const destinationText = destination.lat && destination.lng ? `${destination.lat},${destination.lng}` : destination.name;
+      const viaText = viaPoints.map((p) => p.name).filter(Boolean).join(" ");
+      const query = [originText, viaText, destinationText].filter(Boolean).join(" to ");
+      window.open(`https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${encodeURIComponent(query)}`, "_blank");
+      showToast("已打开开源地图导航", "success");
+      return;
+    }
 
-    // Origin
+    const parts: string[] = [];
     if (origin.lat && origin.lng) {
       parts.push(`from=${origin.lng},${origin.lat},${encodeURIComponent(origin.name)}`);
     } else {
@@ -140,7 +148,7 @@ export function usePlanActions(opts: UsePlanActionsOptions) {
     const url = `https://uri.amap.com/navigation?${parts.join("&")}&mode=car&coordinate=gaode`;
     window.open(url, "_blank");
     showToast("已打开高德导航", "success");
-  }, [showToast]);
+  }, [showToast, mapProvider]);
 
   /** 查看预约建议：提取 bookingNeeded 步骤信息 */
   const handleViewReservations = useCallback((plan: PlanningOption) => {

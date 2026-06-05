@@ -1,10 +1,9 @@
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { getNearbyPois, type NearbyPoi } from "../lib/api";
+import { getNearbyPois, planMapRoute, searchMapPois, type NearbyPoi } from "../lib/api";
 import styles from "./RealMap.module.scss";
 
-// ── 修复 Leaflet 默认图标在 Webpack/Vite 中的路径问题 ──
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
@@ -13,86 +12,89 @@ L.Icon.Default.mergeOptions({
 });
 
 export interface OpenStreetMapProps {
-  center?: [number, number]; // [lng, lat] WGS84
+  center?: [number, number];
   city?: string;
   onMarkerClick?: (marker: L.Marker) => void;
 }
 
-const DEFAULT_CENTER: [number, number] = [121.4379, 31.0339];
+type MapPoi = {
+  id: string;
+  name: string;
+  address?: string;
+  location: [number, number];
+  type: string;
+  distance?: number;
+  source: "amap" | "open" | "mock";
+};
 
-/**
- * OpenStreetMap — 基于 Leaflet + OSM 的免费开源地图
- *
- * 特点：
- * - 完全免费，无需 API Key
- * - 使用 OpenStreetMap 瓦片图层
- * - 支持 POI 搜索（复用后端 getNearbyPois，自动 fallback）
- * - 与 RealMap（高德）共享相同 UI 布局
- */
-export function OpenStreetMap({
-  center = DEFAULT_CENTER,
-  city = "上海",
-  onMarkerClick,
-}: OpenStreetMapProps) {
+const DEFAULT_CENTER: [number, number] = [121.4379, 31.0339];
+const STANDARD_TILE = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+const SATELLITE_TILE = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+
+function toMapPois(items: NearbyPoi[], fallbackType: string): MapPoi[] {
+  return items
+    .filter((poi) => Number.isFinite(poi.location.lng) && Number.isFinite(poi.location.lat))
+    .slice(0, 12)
+    .map((poi) => ({
+      id: poi.id,
+      name: poi.name,
+      address: poi.address,
+      location: [poi.location.lng, poi.location.lat],
+      type: poi.type || fallbackType,
+      distance: poi.distance,
+      source: poi.source,
+    }));
+}
+
+export function OpenStreetMap({ center = DEFAULT_CENTER, city = "上海", onMarkerClick }: OpenStreetMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
   const poiMarkersRef = useRef<L.Marker[]>([]);
-  const onMarkerClickRef = useRef(onMarkerClick);
+  const routeLayerRef = useRef<L.Polyline | null>(null);
+  const tileLayers = useRef<Record<"standard" | "satellite", L.TileLayer | null>>({ standard: null, satellite: null });
   const centerRef = useRef(center);
   const cityRef = useRef(city);
+  const onMarkerClickRef = useRef(onMarkerClick);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [poiList, setPoiList] = useState<MapPoi[]>([]);
   const [poiLoading, setPoiLoading] = useState(false);
-  const [poiFallback, setPoiFallback] = useState(false);
   const [poiMessage, setPoiMessage] = useState<string | null>(null);
+  const [routeMessage, setRouteMessage] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [mapStyle, setMapStyle] = useState<"standard" | "satellite">("standard");
+  const [poiPanelVisible, setPoiPanelVisible] = useState(true);
+  const [searchText, setSearchText] = useState("");
 
-  type MapPoi = {
-    id: string;
-    name: string;
-    address?: string;
-    location: [number, number];
-    type: string;
-    distance?: number;
-    source: "amap" | "mock";
-  };
+  useEffect(() => {
+    centerRef.current = center;
+    cityRef.current = city;
+    onMarkerClickRef.current = onMarkerClick;
+  }, [center, city, onMarkerClick]);
 
-  // ── 瓦片图层配置 ──
-  const tileLayers = useRef<Record<string, L.TileLayer>>({});
+  const clearPoiMarkers = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    poiMarkersRef.current.forEach((marker) => map.removeLayer(marker));
+    poiMarkersRef.current = [];
+  }, []);
 
-  const standardTile = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-  const satelliteTile = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
-
-  // ── 渲染 POI 标记 ──
   const renderPoiMarkers = useCallback((pois: MapPoi[]) => {
     const map = mapRef.current;
     if (!map) return;
-
-    poiMarkersRef.current.forEach((m) => map.removeLayer(m));
-    poiMarkersRef.current = [];
-
-    const markers = pois.slice(0, 12).map((poi) => {
-      const marker = L.marker(poi.location, {
-        title: poi.name,
-      });
+    clearPoiMarkers();
+    const markers = pois.map((poi) => {
+      const marker = L.marker(poi.location, { title: poi.name });
       marker.bindPopup(`<b>${poi.name}</b><br/>${poi.type}${poi.address ? `<br/>${poi.address}` : ""}`);
-      marker.on("click", () => {
-        onMarkerClickRef.current?.(marker);
-      });
+      marker.on("click", () => onMarkerClickRef.current?.(marker));
+      marker.addTo(map);
       return marker;
     });
-    if (markers.length > 0) {
-      const group = L.featureGroup(markers);
-      map.addLayer(group);
-    }
     poiMarkersRef.current = markers;
-  }, []);
+  }, [clearPoiMarkers]);
 
-  // ── 加载周边 POI ──
   const loadNearbyPois = useCallback(async (targetCenter = centerRef.current, targetCity = cityRef.current) => {
     setPoiLoading(true);
     setPoiMessage(null);
@@ -102,174 +104,153 @@ export function OpenStreetMap({
         lat: targetCenter[1],
         city: targetCity || "上海",
         radius: 3000,
+        provider: "open",
       });
-      const pois = result.pois
-        .filter((poi: NearbyPoi) => Number.isFinite(poi.location.lng) && Number.isFinite(poi.location.lat))
-        .slice(0, 12)
-        .map((poi) => ({
-          id: poi.id,
-          name: poi.name,
-          address: poi.address,
-          location: [poi.location.lng, poi.location.lat] as [number, number],
-          type: poi.type || "周边地点",
-          distance: poi.distance,
-          source: poi.source,
-        }));
+      const pois = toMapPois(result.pois, "周边地点");
       setPoiList(pois);
-      setPoiFallback(result.fallbackUsed);
-      setPoiMessage(result.hint ?? null);
+      setPoiMessage(result.hint ?? result.warnings?.[0] ?? null);
       renderPoiMarkers(pois);
     } catch {
       setPoiList([]);
-      setPoiFallback(false);
-      setPoiMessage("周边加载失败，请稍后重试。");
+      setPoiMessage("周边服务暂不可用，请稍后重试。");
     } finally {
       setPoiLoading(false);
     }
   }, [renderPoiMarkers]);
 
-  // ── 初始化 Leaflet 地图 ──
+  const runSearch = useCallback(async () => {
+    const keyword = searchText.trim();
+    if (!keyword) {
+      void loadNearbyPois();
+      return;
+    }
+    setPoiLoading(true);
+    setPoiMessage(null);
+    try {
+      const result = await searchMapPois({
+        provider: "open",
+        keywords: keyword,
+        city: cityRef.current || "上海",
+        lng: centerRef.current[0],
+        lat: centerRef.current[1],
+        radius: 5000,
+        pageSize: 12,
+      });
+      const pois = toMapPois(result.pois, "搜索结果");
+      setPoiList(pois);
+      setPoiMessage(result.hint ?? result.warnings?.[0] ?? null);
+      renderPoiMarkers(pois);
+      if (pois[0] && mapRef.current) mapRef.current.setView(pois[0].location, 15);
+    } catch {
+      setPoiList([]);
+      setPoiMessage("搜索失败，请稍后重试。");
+    } finally {
+      setPoiLoading(false);
+    }
+  }, [loadNearbyPois, renderPoiMarkers, searchText]);
+
+  const drawRouteToPoi = useCallback(async (poi: MapPoi) => {
+    const map = mapRef.current;
+    if (!map) return;
+    setRouteMessage("正在规划路线...");
+    try {
+      const result = await planMapRoute({
+        provider: "open",
+        from: { name: "当前位置", location: { lng: centerRef.current[0], lat: centerRef.current[1] } },
+        to: { name: poi.name, location: { lng: poi.location[0], lat: poi.location[1] } },
+        mode: "driving",
+      });
+      if (routeLayerRef.current) map.removeLayer(routeLayerRef.current);
+      const coordinates = result.route.coordinates ?? [];
+      if (coordinates.length > 1) {
+        const latLngs = coordinates.map((point) => [point.lat, point.lng] as [number, number]);
+        const line = L.polyline(latLngs, { color: "#2563eb", weight: 5, opacity: 0.82 }).addTo(map);
+        routeLayerRef.current = line;
+        map.fitBounds(line.getBounds(), { padding: [40, 40] });
+      }
+      setRouteMessage(`${Math.round(result.route.distance / 1000)}km · 约 ${Math.round(result.route.duration / 60)} 分钟`);
+    } catch {
+      setRouteMessage("路线规划失败，请稍后重试。");
+    }
+  }, []);
+
   useEffect(() => {
     let destroyed = false;
+    const mapEl = mapContainerRef.current;
+    if (!mapEl) return;
 
-    const initMap = async () => {
-      try {
-        setLoading(true);
-        const mapEl = mapContainerRef.current;
-        if (!mapEl) {
-          setError("地图容器异常");
-          setLoading(false);
-          return;
-        }
+    try {
+      const map = L.map(mapEl, {
+        center,
+        zoom: 15,
+        zoomControl: false,
+        touchZoom: true,
+        scrollWheelZoom: true,
+      });
+      mapRef.current = map;
+      map.on("dragstart", () => setIsDragging(true));
+      map.on("dragend", () => setIsDragging(false));
+      L.control.zoom({ position: "topright" }).addTo(map);
+      L.control.scale({ imperial: false, position: "bottomleft" }).addTo(map);
 
-        const currentCenter = centerRef.current;
-        const currentCity = cityRef.current;
-
-        // 创建地图实例
-        const map = L.map(mapEl, {
-          center: currentCenter,
-          zoom: 15,
-          zoomControl: false,
-          touchZoom: true,
-          scrollWheelZoom: true,
-        });
-
-        mapRef.current = map;
-
-        // 拖拽状态
-        map.on("dragstart", () => setIsDragging(true));
-        map.on("dragend", () => setIsDragging(false));
-
-        // 缩放控件放到右上角
-        L.control.zoom({ position: "topright" }).addTo(map);
-
-        // 比例尺放左下角
-        L.control.scale({ imperial: false, position: "bottomleft" }).addTo(map);
-
-        // 加载瓦片图层
-        const standardLayer = L.tileLayer(standardTile, {
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-          maxZoom: 19,
-        }).addTo(map);
-        tileLayers.current.standard = standardLayer;
-
-        const satelliteLayer = L.tileLayer(satelliteTile, {
-          attribution: '&copy; <a href="https://www.esri.com/">Esri</a> — Source: Esri, Maxar, Earthstar Geographics',
-          maxZoom: 19,
-        });
-        tileLayers.current.satellite = satelliteLayer;
-
-        // 用户位置标记
-        const userMarker = L.marker(currentCenter, {
-          title: "你的位置",
-        });
-        userMarker.bindPopup("📍 你的位置");
-        userMarker.addTo(map);
-        userMarkerRef.current = userMarker;
-
-        if (!destroyed) setLoading(false);
-        if (!destroyed) void loadNearbyPois(currentCenter, currentCity);
-      } catch (err) {
-        if (destroyed) return;
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error("[OpenStreetMap] 加载地图失败:", msg);
-        setError("地图加载失败，请检查网络");
-        setLoading(false);
-      }
-    };
-
-    initMap();
+      const standard = L.tileLayer(STANDARD_TILE, {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19,
+      }).addTo(map);
+      const satellite = L.tileLayer(SATELLITE_TILE, {
+        attribution: '&copy; <a href="https://www.esri.com/">Esri</a>',
+        maxZoom: 19,
+      });
+      tileLayers.current = { standard, satellite };
+      userMarkerRef.current = L.marker(center, { title: "你的位置" }).bindPopup("你的位置").addTo(map);
+      setTimeout(() => {
+        if (!destroyed) map.invalidateSize();
+      }, 100);
+      setLoading(false);
+      void loadNearbyPois(center, city);
+    } catch {
+      setError("地图加载失败，请检查网络");
+      setLoading(false);
+    }
 
     return () => {
       destroyed = true;
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
+      clearPoiMarkers();
+      if (routeLayerRef.current && mapRef.current) mapRef.current.removeLayer(routeLayerRef.current);
+      mapRef.current?.remove();
+      mapRef.current = null;
+      routeLayerRef.current = null;
       userMarkerRef.current = null;
-      poiMarkersRef.current = [];
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── 同步 props 到 ref ──
   useEffect(() => {
-    onMarkerClickRef.current = onMarkerClick;
+    const map = mapRef.current;
+    if (!map) return;
     centerRef.current = center;
     cityRef.current = city;
-  }, [onMarkerClick, center, city]);
-
-  // ── 更新中心点 ──
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    const currentCenter = centerRef.current;
-    try {
-      map.setView(currentCenter, map.getZoom());
-      void loadNearbyPois(currentCenter, cityRef.current);
-    } catch {
-      // ignore
-    }
+    map.setView(center, map.getZoom());
+    userMarkerRef.current?.setLatLng(center);
+    void loadNearbyPois(center, city);
   }, [center, city, loadNearbyPois]);
 
-  // ── 切换瓦片图层 ──
   const handleStyleChange = useCallback((style: "standard" | "satellite") => {
-    setMapStyle(style);
     const map = mapRef.current;
     if (!map) return;
-
-    const currentLayer = map.hasLayer(tileLayers.current[mapStyle])
-      ? tileLayers.current[mapStyle]
-      : null;
-    const targetLayer = tileLayers.current[style];
-
+    const currentLayer = tileLayers.current[mapStyle];
+    const nextLayer = tileLayers.current[style];
     if (currentLayer) map.removeLayer(currentLayer);
-    if (targetLayer) targetLayer.addTo(map);
+    if (nextLayer) nextLayer.addTo(map);
+    setMapStyle(style);
   }, [mapStyle]);
-
-  // ── POI 点击 ──
-  const handlePoiClick = useCallback(
-    (poi: MapPoi) => {
-      if (mapRef.current) {
-        mapRef.current.setView(poi.location, 17);
-      }
-    },
-    [],
-  );
-
-  const handleRetry = useCallback(() => {
-    setError(null);
-    setLoading(true);
-    window.location.reload();
-  }, []);
 
   if (error) {
     return (
       <div className={styles.mapContainer}>
         <div className={styles.mapError}>
           <p>{error}</p>
-          <button className={styles.mapRetryBtn} onClick={handleRetry}>
+          <button className={styles.mapRetryBtn} type="button" onClick={() => window.location.reload()}>
             重试
           </button>
         </div>
@@ -279,6 +260,11 @@ export function OpenStreetMap({
 
   return (
     <div className={styles.mapLayout}>
+      <form className={styles.mapSearch} onSubmit={(event) => { event.preventDefault(); void runSearch(); }}>
+        <input value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="搜索地点、餐厅、景点" />
+        <button type="submit">搜索</button>
+      </form>
+
       <div className={styles.mapContainer} ref={mapContainerRef}>
         {loading && (
           <div className={styles.mapLoading}>
@@ -289,49 +275,35 @@ export function OpenStreetMap({
       </div>
 
       <div className={styles.mapControls}>
-        <button
-          className={`${styles.mapControlBtn} ${mapStyle === "standard" ? styles.active : ""}`}
-          onClick={() => handleStyleChange("standard")}
-          type="button"
-        >
+        <button className={`${styles.mapControlBtn} ${mapStyle === "standard" ? styles.active : ""}`} onClick={() => handleStyleChange("standard")} type="button">
           标准
         </button>
-        <button
-          className={`${styles.mapControlBtn} ${mapStyle === "satellite" ? styles.active : ""}`}
-          onClick={() => handleStyleChange("satellite")}
-          type="button"
-        >
+        <button className={`${styles.mapControlBtn} ${mapStyle === "satellite" ? styles.active : ""}`} onClick={() => handleStyleChange("satellite")} type="button">
           卫星
         </button>
       </div>
 
-      <div className={`${styles.poiPanel} ${isDragging ? styles.poiPanelDragging : ""}`}>
+      <div className={`${styles.poiPanel} ${isDragging ? styles.poiPanelDragging : ""} ${!poiPanelVisible ? styles.poiPanelHidden : ""}`}>
         <div className={styles.poiPanelHeader}>
-          <h3 className={styles.poiPanelTitle}>
-            周边 {poiLoading ? "加载中" : `${poiList.length} 个地点`}
-          </h3>
-          <button className={styles.poiRefreshBtn} type="button" onClick={() => loadNearbyPois()}>
-            重试
-          </button>
+          <h3 className={styles.poiPanelTitle}>周边 {poiLoading ? "加载中" : `${poiList.length} 个地点`}</h3>
+          <div style={{ display: "flex", gap: "4px" }}>
+            <button className={styles.poiRefreshBtn} type="button" onClick={() => loadNearbyPois()} title="刷新">刷新</button>
+            <button className={styles.poiRefreshBtn} type="button" onClick={() => setPoiPanelVisible(false)} title="隐藏">隐藏</button>
+          </div>
         </div>
-        {(poiFallback || poiMessage) && (
-          <p className={styles.poiStatus}>{poiMessage ?? "已切换为演示推荐地点"}</p>
-        )}
+        {poiMessage && <p className={styles.poiStatus}>{poiMessage}</p>}
+        {routeMessage && <p className={styles.poiStatus}>{routeMessage}</p>}
         <div className={styles.poiList}>
           {poiList.map((poi, index) => (
-            <button
-              key={`${poi.name}-${index}`}
-              className={styles.poiItem}
-              type="button"
-              onClick={() => handlePoiClick(poi)}
-            >
-              <span className={styles.poiIcon}>📍</span>
+            <button key={`${poi.id}-${index}`} className={styles.poiItem} type="button" onClick={() => mapRef.current?.setView(poi.location, 17)}>
+              <span className={styles.poiIcon}>点</span>
               <div className={styles.poiInfo}>
                 <span className={styles.poiName}>{poi.name}</span>
-                <span className={styles.poiType}>
-                  {poi.distance ? `${poi.distance}m · ` : ""}{poi.type}{poi.source === "mock" ? " · 推荐" : ""}
-                </span>
+                <span className={styles.poiType}>{poi.distance ? `${poi.distance}m · ` : ""}{poi.type}</span>
               </div>
+              <span className={styles.poiRouteLink} onClick={(event) => { event.stopPropagation(); void drawRouteToPoi(poi); }}>
+                路线
+              </span>
             </button>
           ))}
           {poiList.length === 0 && !loading && !poiLoading && (
@@ -339,6 +311,12 @@ export function OpenStreetMap({
           )}
         </div>
       </div>
+
+      {!poiPanelVisible && (
+        <button className={styles.poiExpandBtn} type="button" onClick={() => setPoiPanelVisible(true)}>
+          显示周边地点
+        </button>
+      )}
     </div>
   );
 }

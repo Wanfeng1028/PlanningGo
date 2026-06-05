@@ -1,3 +1,5 @@
+import { buildNavigationUrl } from "../../maps/navigationLinks.js";
+
 /**
  * Navigation provider - generates navigation links
  */
@@ -10,9 +12,13 @@ export class NavigationProvider {
     origin?: string;
     destination?: string;
   }): Promise<{ navigationUrl: string; points: string[] }> {
-    // In production, this would use AMap navigation API
     const _pointsStr = params.points.join("|");
-    const navigationUrl = `https://uri.amap.com/navigation?from=${params.origin || ""}&to=${params.destination || params.points[0] || ""}&mode=car&policy=1&src=mypage&coordinate=gaode&callnative=1`;
+    const navigationUrl = buildNavigationUrl({
+      provider: "open",
+      origin: params.origin,
+      destination: params.destination || params.points[0] || "",
+      mode: "driving",
+    });
 
     return {
       navigationUrl,
@@ -27,7 +33,12 @@ export class NavigationProvider {
     origin: string;
     destination: string;
   }): Promise<{ navigationUrl: string }> {
-    const navigationUrl = `https://uri.amap.com/navigation?from=${params.origin}&to=${params.destination}&mode=walk&policy=1&src=mypage&coordinate=gaode&callnative=1`;
+    const navigationUrl = buildNavigationUrl({
+      provider: "open",
+      origin: params.origin,
+      destination: params.destination,
+      mode: "walking",
+    });
 
     return { navigationUrl };
   }
@@ -39,7 +50,12 @@ export class NavigationProvider {
     origin: string;
     destination: string;
   }): Promise<{ navigationUrl: string }> {
-    const navigationUrl = `https://uri.amap.com/navigation?from=${params.origin}&to=${params.destination}&mode=car&policy=1&src=mypage&coordinate=gaode&callnative=1`;
+    const navigationUrl = buildNavigationUrl({
+      provider: "open",
+      origin: params.origin,
+      destination: params.destination,
+      mode: "driving",
+    });
 
     return { navigationUrl };
   }
@@ -52,7 +68,13 @@ export class NavigationProvider {
     destination: string;
     city: string;
   }): Promise<{ navigationUrl: string }> {
-    const navigationUrl = `https://uri.amap.com/navigation?from=${params.origin}&to=${params.destination}&mode=bus&policy=1&city=${params.city}&src=mypage&coordinate=gaode&callnative=1`;
+    const navigationUrl = buildNavigationUrl({
+      provider: "open",
+      origin: params.origin,
+      destination: params.destination,
+      mode: "transit",
+      city: params.city,
+    });
 
     return { navigationUrl };
   }
