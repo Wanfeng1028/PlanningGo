@@ -90,6 +90,18 @@ describe("maps routes", () => {
     expect(body.data.route.navigationUrl).toContain("openstreetmap.org");
   });
 
+  it("searches POIs using open provider (Overpass keyword search)", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/maps/search?provider=open&keywords=咖啡&lat=31.2304&lng=121.4737&radius=3000",
+    });
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.payload);
+    expect(body.data.provider).toBe("open");
+    expect(body.data.pois[0].name).toBe("人民广场咖啡");
+    expect(body.data.pois[0].source).toBe("open");
+  });
+
   it("rejects amap requests when key is missing", async () => {
     const res = await app.inject({
       method: "GET",
