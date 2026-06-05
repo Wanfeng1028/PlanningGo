@@ -284,7 +284,7 @@ export async function registerAgentRoutes(app: FastifyInstance) {
       });
 
       // heartbeat 用 let 声明，确保外层 finally 也能清理
-      let heartbeat: ReturnType<typeof setInterval>;
+      let heartbeat: ReturnType<typeof setInterval> = 0 as never;
 
       try {
         const parsed = agentPlanBodySchema.parse(request.body);
