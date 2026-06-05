@@ -10,7 +10,7 @@
 
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { getSelectedPlanId, selectPlan } from "../services/store.js";
+import { getSelectedPlanId, saveActions, selectPlan } from "../services/store.js";
 import { planOptions } from "../data/mockData.js";
 import { NotFoundError } from "../common/errors.js";
 import { sendOk } from "../common/response.js";
@@ -187,13 +187,10 @@ export async function registerPlanRoutes(app: FastifyInstance) {
     }
 
     const db = app.db;
-    if (!db) {
-      return reply.status(503).send({ error: "数据库不可用" });
-    }
 
     // ── V3: 优先从 DB messages 恢复方案（source of truth）──
     let restored = null;
-    if (input.conversationId) {
+    if (db && input.conversationId) {
       restored = await restorePlanFromMessages(db, input.conversationId, input.optionId);
     }
 
@@ -225,6 +222,33 @@ export async function registerPlanRoutes(app: FastifyInstance) {
       useActions = input.executableActions;
       usePlanId = input.planId;
       useOptionId = input.optionId;
+    }
+
+    if (!db) {
+      // Memory fallback (Mock mode / no PostgreSQL): still allow saving executableActions
+      // so the execution chain can run end-to-end in demo/tests.
+      const memoryPlanId = usePlanId ?? input.conversationId ?? `plan_${Date.now()}`;
+
+      if (useActions && useActions.length > 0) {
+        saveActions(useActions.map((a) => ({
+          id: a.id,
+          planId: memoryPlanId,
+          optionId: useOptionId,
+          userId,
+          type: a.type as any,
+          provider: ((a.provider as string) || "mock") as any,
+          status: normalizeActionStatus(a.status) as any,
+          title: a.title,
+          description: a.description,
+          confirmationRequired: Boolean(a.confirmationRequired),
+          idempotencyKey: a.idempotencyKey || `idem-${a.id}`,
+          priceEstimate: a.priceEstimate ?? undefined,
+          expiresAt: a.expiresAt ?? undefined,
+          payload: (a.payload ?? {}) as Record<string, unknown>,
+        })));
+      }
+
+      return sendOk(reply, { planId: memoryPlanId, message: "方案已保存（内存模式）" });
     }
 
     // Idempotent: check if already saved for this conversation + plan + option

@@ -25,6 +25,7 @@ import { getConnectorRegistry } from "../modules/connectors/registry.js";
 import type { ConnectorSearchResult } from "../modules/connectors/types.js";
 import { isTerminalState, isValidTransition, type ActionStatus } from "../modules/execution/stateMachine.js";
 import { getActionExecutor } from "../modules/execution/actionExecutor.js";
+import { getAction, listActions, updateActionStatus } from "../services/store.js";
 
 /**
  * 安全查找 action：同时校验 id 和 userId ownership
@@ -52,7 +53,7 @@ export async function registerActionRoutes(app: FastifyInstance) {
     const query = z.object({ planId: z.string().optional() }).parse(request.query);
     const db = app.db;
     if (!db) {
-      return sendOk(reply, { items: [] });
+      return sendOk(reply, { items: listActions(query.planId, request.userId!) });
     }
 
     const where: Record<string, unknown> = { userId: request.userId! };
@@ -73,7 +74,16 @@ export async function registerActionRoutes(app: FastifyInstance) {
     const params = z.object({ id: z.string() }).parse(request.params);
     const db = app.db;
     if (!db) {
-      throw new NotFoundError("DB_UNAVAILABLE");
+      const action = getAction(params.id);
+      if (!action || action.userId !== request.userId) throw new NotFoundError("ACTION_NOT_FOUND");
+      if (isTerminalState(action.status as any)) throw new NotFoundError("ACTION_EXPIRED");
+
+      updateActionStatus(params.id, "quoted");
+      return sendOk(reply, {
+        quoteId: `quote-${params.id}`,
+        status: "available",
+        warnings: ["DB 不可用，使用内存模式 quote fallback"],
+      });
     }
 
     // V3: 必须校验 userId ownership，防止越权操作
@@ -143,7 +153,20 @@ export async function registerActionRoutes(app: FastifyInstance) {
 
     const db = app.db;
     if (!db) {
-      throw new NotFoundError("DB_UNAVAILABLE");
+      const action = getAction(params.id);
+      if (!action || action.userId !== request.userId) throw new NotFoundError("ACTION_NOT_FOUND");
+      if (isTerminalState(action.status as any)) throw new NotFoundError("ACTION_EXPIRED");
+
+      const actionStatus = action.status as ActionStatus;
+      assertConfirmable(actionStatus);
+
+      updateActionStatus(params.id, "redirect_required" as any);
+      return sendOk(reply, {
+        preparedActionId: `prepared-${params.id}`,
+        status: "redirect_required",
+        message: "请在移动端或第三方平台完成确认",
+        redirectUrl: "https://example.com/redirect",
+      });
     }
 
     // V3: 必须校验 userId ownership，防止越权操作
@@ -236,7 +259,14 @@ export async function registerActionRoutes(app: FastifyInstance) {
     const params = z.object({ id: z.string() }).parse(request.params);
     const db = app.db;
     if (!db) {
-      throw new NotFoundError("DB_UNAVAILABLE");
+      const action = getAction(params.id);
+      if (!action || action.userId !== request.userId) throw new NotFoundError("ACTION_NOT_FOUND");
+      if (isTerminalState(action.status as any)) {
+        throw new NotFoundError("ACTION_ALREADY_TERMINAL");
+      }
+      const updated = updateActionStatus(params.id, "cancelled");
+      if (!updated) throw new NotFoundError("ACTION_NOT_FOUND");
+      return sendOk(reply, updated);
     }
 
     // V3: 必须校验 userId ownership，防止越权取消
