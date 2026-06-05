@@ -71,7 +71,11 @@ export function classifyAgentIntent(message: string, state?: AgentState | null):
   }
 
   // select_plan — user selecting a plan by text
-  if (/选[这那第]|选择.*方案|我选择好了|就[这那]个|第[一二三四五六]套|选这套|选那套/.test(trimmed)) {
+  // Use negative lookbehind to exclude negation patterns like "不想选那个方案"
+  // Node.js fully supports ES2018 lookbehind; safe for server-side use
+  const selectRegex =
+    /(?<!不)(?<!没)(?<!别)选[这那第]|(?<!不)(?<!没)(?<!别)选择.*方案|(?<!不)(?<!没)(?<!别)就[这那]个|第[一二三四五六]套|选这套|选那套|我选择好了/;
+  if (selectRegex.test(trimmed)) {
     return "select_plan";
   }
 

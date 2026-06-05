@@ -5,57 +5,13 @@ import type { PlanningContext } from "../planning/contextBuilder";
 import type { CandidatePool } from "../planning/candidateGenerator";
 import type { LlmQuery } from "../../providers/types";
 import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
 
-export interface PlannerInput {
-  traceId: string;
-  planId: string;
-  intent: UserIntent;
-  context: PlanningContext;
-  candidates: CandidatePool;
-  providers?: PlanningProviders;
-  signal?: AbortSignal;
-}
+// ─── Single Source of Truth: Zod Schema ──────────────────────
+// The Zod schema below is the ONLY place to define the LLM output shape.
+// `llmPlanJsonSchema` is derived automatically, ensuring prompt ↔ validation consistency.
 
-// LLM 输出 JSON schema 描述（发给 LLM 的 prompt 里用）
-const PLAN_JSON_SCHEMA_DESC = `{
-  "plans": [{
-    "title": "方案标题",
-    "targetGroup": "family|friends|couple|solo",
-    "score": 0-100,
-    "summary": "一句话方案说明",
-    "totalDurationMinutes": 数字,
-    "totalCostMin": 数字,
-    "totalCostMax": 数字,
-    "assumptions": ["假设1"],
-    "highlights": ["亮点1"],
-    "risks": ["风险1"],
-    "timeline": [{
-      "startTime": "HH:MM",
-      "endTime": "HH:MM",
-      "type": "travel|activity|meal|movie|event|buffer|return|rest",
-      "title": "具体店铺/景点名称（禁止用泛化描述如'景点游览''在附近用餐'）",
-      "poiName": "具体店铺全称或null",
-      "durationMinutes": 数字,
-      "transport": "driving|taxi|subway|walk|mixed|none",
-      "reasoning": "为什么安排这个步骤",
-      "bookingNeeded": true/false,
-      "description": "步骤详细描述，必须包含推荐菜品/饮品/游览路线",
-      "estimatedCost": "预计花费，如人均80元",
-      "bookingHint": "预约提示，如提前1天预约",
-      "suggestions": ["可选建议，如带相机", "穿运动鞋"],
-      "whyRecommended": "为什么推荐这家店/这个景点（20-50字）",
-      "recommendedItems": ["推荐菜品/饮品名称，至少2个"],
-      "bookingAdvice": "预约方式和建议，如'美团预约''电话预约''无需预约'",
-      "queueRisk": "low|medium|high|unknown",
-      "businessHours": "营业时间，如09:00-22:00",
-      "actionHints": ["可执行动作提示，如'打开美团下单''导航到店''电话预约'"],
-      "fallbackPois": ["附近备选店铺名称，2-3个"]
-    }],
-    "backupPlan": "备选方案说明"
-  }]
-}`;
-
-// LLM 返回的原始 schema（用于 zod 校验）
+/** LLM 返回的原始 schema（用于 zod 校验） */
 const llmPlanItemSchema = z.object({
   title: z.string(),
   targetGroup: z.enum(["family", "friends", "couple", "solo"]).default("solo"),
@@ -68,8 +24,10 @@ const llmPlanItemSchema = z.object({
   highlights: z.array(z.string()).default([]),
   risks: z.array(z.string()).default([]),
   timeline: z.array(z.object({
-    startTime: z.string(),
-    endTime: z.string(),
+    /** LLM 必须输出 HH:MM 格式（24 小时制），如 "14:00"。非标准格式会被 repairer 重试修正。 */
+    startTime: z.string().regex(/^\d{1,2}:\d{2}$/, "startTime 必须为 HH:MM 格式，如 14:00"),
+    /** LLM 必须输出 HH:MM 格式（24 小时制），如 "15:30"。非标准格式会被 repairer 重试修正。 */
+    endTime: z.string().regex(/^\d{1,2}:\d{2}$/, "endTime 必须为 HH:MM 格式，如 15:30"),
     type: z.enum(["travel", "activity", "meal", "movie", "event", "buffer", "return", "rest"]),
     title: z.string(),
     poiName: z.string().nullable().default(null),
@@ -98,6 +56,22 @@ const llmOutputSchema = z.object({
   plans: z.array(llmPlanItemSchema).min(1).max(3),
 });
 
+/**
+ * Auto-derived JSON Schema from Zod — used in the LLM prompt as a structured example.
+ * Single source of truth: adding a field here automatically updates the prompt.
+ */
+const llmPlanJsonSchema = JSON.stringify(zodToJsonSchema(llmOutputSchema), null, 2);
+
+export interface PlannerInput {
+  traceId: string;
+  planId: string;
+  intent: UserIntent;
+  context: PlanningContext;
+  candidates: CandidatePool;
+  providers?: PlanningProviders;
+  signal?: AbortSignal;
+}
+
 const SYSTEM_PROMPT = `你是"周末去哪儿"的行程规划 AI。用户会告诉你出行需求，你需要生成 2-3 套差异化的可执行行程方案。
 
 严格要求：
@@ -121,6 +95,9 @@ const SYSTEM_PROMPT = `你是"周末去哪儿"的行程规划 AI。用户会告�
 16. fallbackPois 必须给出 2-3 个附近备选店铺名称
 17. estimatedCost 必须给出该步骤的预估花费（如"人均 80 元"、"25-38 元"、"免费"）
 18. suggestions 字段给出贴心建议（如"带相机"、"穿运动鞋"、"适合拍照"）
+
+请严格按照以下 JSON Schema 输出（不要输出 Schema 本身，只输出符合该结构的 JSON 数据）：
+${llmPlanJsonSchema}
 
 示例（好的输出）：
 {

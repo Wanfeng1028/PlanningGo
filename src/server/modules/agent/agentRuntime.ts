@@ -28,6 +28,8 @@ import * as mem from "../../services/memoryStore.js";
 
 const MAX_TOOL_ROUNDS = 5;
 const MAX_HISTORY_MESSAGES = 20;
+/** When history exceeds this, truncate to recent window + summary of older turns */
+const MAX_HISTORY_TOKENS_ESTIMATE = 6000;
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -119,12 +121,20 @@ export async function runAgentChatStream(
     userMemory,
   });
 
+  // Context window management: truncate history if too long, inject summary into system prompt
+  const { messages: historyMessages, summary } = truncateContextIfNeeded(
+    history,
+    systemPrompt,
+    state?.planningDraft as Record<string, unknown> | undefined,
+    log,
+  );
+
+  // Inject conversation summary into system prompt if truncation occurred
+  const finalSystemPrompt = summary ? `${systemPrompt}\n\n${summary}` : systemPrompt;
+
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-    { role: "system", content: systemPrompt },
-    ...history.map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content,
-    })),
+    { role: "system", content: finalSystemPrompt },
+    ...historyMessages,
   ];
 
   // 6. Tool call loop
@@ -902,6 +912,66 @@ async function loadHistory(
     role: m.role,
     content: m.content,
   }));
+}
+
+// ─── Context Window Management ──────────────────────────────
+
+/**
+ * Estimate token count for a message (rough heuristic).
+ */
+function estimateMessageTokens(content: string): number {
+  const cnChars = (content.match(/[\u4e00-\u9fff]/g) || []).length;
+  const enWords = (content.replace(/[\u4e00-\u9fff]/g, " ").trim().split(/\s+/).filter(Boolean).length);
+  return Math.round(cnChars * 0.3 + enWords * 1.3);
+}
+
+/**
+ * When conversation history is too long, truncate to a sliding window
+ * and inject a summary of older turns into the system prompt.
+ */
+function truncateContextIfNeeded(
+  history: HistoryMessage[],
+  systemPrompt: string,
+  planningDraft: Record<string, unknown> | undefined,
+  log: AgentChatContext["log"],
+): { messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[]; summary?: string } {
+  const KEEP_RECENT = 10;
+  const summaryPrefix = "【对话摘要】（早期对话的压缩摘要，供参考）：\n";
+
+  let totalTokens = estimateMessageTokens(systemPrompt);
+  for (const msg of history) {
+    totalTokens += estimateMessageTokens(msg.content);
+  }
+
+  if (totalTokens <= MAX_HISTORY_TOKENS_ESTIMATE || history.length <= KEEP_RECENT) {
+    return {
+      messages: history.map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      })),
+    };
+  }
+
+  const recentMessages = history.slice(-KEEP_RECENT);
+  const olderMessages = history.slice(0, -KEEP_RECENT);
+
+  const summaryParts: string[] = [];
+  for (const msg of olderMessages) {
+    const roleLabel = msg.role === "user" ? "用户" : "助手";
+    const preview = msg.content.length > 100 ? msg.content.slice(0, 100) + "…" : msg.content;
+    summaryParts.push(`- ${roleLabel}：${preview}`);
+  }
+
+  const summary = summaryPrefix + summaryParts.join("\n");
+  log.info({ olderCount: olderMessages.length, recentCount: KEEP_RECENT }, "[agentRuntime] truncated history to sliding window");
+
+  return {
+    messages: recentMessages.map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+    })),
+    summary,
+  };
 }
 
 // ─── Tool Display Name Helper ───────────────────────────────
