@@ -43,17 +43,19 @@ export async function registerAgentRoutes(app: FastifyInstance) {
   type PlanningModeBody = { modelMode?: "flash" | "pro" };
 
   const enforcePlanningQuota = (request: FastifyRequest<{ Body: PlanningModeBody }>, reply: FastifyReply): boolean => {
-    if (planningCounters.size > maxPlanningCounterEntries) {
-      const now = Date.now();
-      for (const [k, v] of planningCounters.entries()) {
-        if (v.resetAt <= now) planningCounters.delete(k);
-      }
-    }
     const modelMode = request?.body?.modelMode === "pro" ? "pro" : "flash";
     const quota = planningModeQuota[modelMode];
     const identity = request.userId ?? request.ip ?? "anonymous";
     const key = `${identity}:${modelMode}`;
     const now = Date.now();
+
+    // 清理过期 key（每次请求都清理，防止 Map 无限增长）
+    if (planningCounters.size > maxPlanningCounterEntries) {
+      for (const [k, v] of planningCounters.entries()) {
+        if (v.resetAt <= now) planningCounters.delete(k);
+      }
+    }
+
     const current = planningCounters.get(key);
     if (!current || now >= current.resetAt) {
       planningCounters.set(key, { count: 1, resetAt: now + quota.windowMs });
@@ -281,6 +283,9 @@ export async function registerAgentRoutes(app: FastifyInstance) {
         abortController.abort();
       });
 
+      // heartbeat 用 let 声明，确保外层 finally 也能清理
+      let heartbeat: ReturnType<typeof setInterval>;
+
       try {
         const parsed = agentPlanBodySchema.parse(request.body);
         const userId = request.userId;
@@ -315,7 +320,7 @@ export async function registerAgentRoutes(app: FastifyInstance) {
         await saveMessage(db, conversationId, "user", parsed.prompt, undefined, app.log);
 
         // ── 3. 运行规划管道（带心跳 + 真流式进度回调 + AbortSignal） ──
-        const heartbeat = setInterval(() => {
+        heartbeat = setInterval(() => {
           if (!abortController.signal.aborted) reply.raw.write(":heartbeat\n\n");
         }, 15_000);
 
@@ -336,17 +341,13 @@ export async function registerAgentRoutes(app: FastifyInstance) {
         // 注：orchestrator 已在 runPlanningPipeline 开头发送首个 "正在理解你的需求..." 状态，此处无需重复发送
 
         let result: Awaited<ReturnType<typeof runPlanningPipeline>>;
-        try {
-          result = await runPlanningPipeline({
-            ...parsed,
-            providers: app.providers ?? undefined,
-            userId,
-            progress: progressCallbacks,
-            signal: abortController.signal,
-          });
-        } finally {
-          clearInterval(heartbeat);
-        }
+        result = await runPlanningPipeline({
+          ...parsed,
+          providers: app.providers ?? undefined,
+          userId,
+          progress: progressCallbacks,
+          signal: abortController.signal,
+        });
 
         // 客户端已断连则跳过写入
         if (abortController.signal.aborted) {
@@ -422,6 +423,9 @@ export async function registerAgentRoutes(app: FastifyInstance) {
             // Connection already closed, ignore write errors
           }
         }
+      } finally {
+        // 确保心跳定时器一定被清理，防止内存泄漏
+        clearInterval(heartbeat);
       }
     },
   );
