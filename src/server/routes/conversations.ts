@@ -2,7 +2,7 @@
  * Conversations & Messages 路由 — /api/conversations/*
  */
 
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import type { PrismaClient } from "../../generated/prisma/client.js";
 import { z } from "zod";
 import { sendOk, sendCreated, sendError } from "../common/response.js";
@@ -28,7 +28,7 @@ async function assertConversationAccess(
   conv: { userId: string | null; guestId: string | null },
   userId: string | null,
   guestIdFromRequest: string | null,
-  reply: FastifyInstance["reply"],
+  reply: FastifyReply,
   action: string,
 ): Promise<boolean> {
   // 孤儿会话 (userId=null, guestId=null) — 拒绝所有访问

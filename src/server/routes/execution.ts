@@ -9,7 +9,7 @@ import { baseToolLogs } from "../data/mockData.js";
 import { NotFoundError } from "../common/errors.js";
 import { sendOk, sendError } from "../common/response.js";
 import { optionalUserId } from "../common/uid.js";
-import type { PrismaClient } from "../generated/prisma/client.js";
+import type { PrismaClient } from "../../generated/prisma/client.js";
 
 export async function registerExecutionRoutes(app: FastifyInstance) {
   app.get("/api/execution/demo", { preHandler: [app.optionalAuthGuard] }, async () => ({
