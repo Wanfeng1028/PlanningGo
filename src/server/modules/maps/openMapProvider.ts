@@ -41,12 +41,6 @@ function truncatePoint(p: MapPoint): MapPoint {
 // --- Safe Overpass QL builder (fix #2: prevent QL injection) ---
 
 /**
- * Whitelist of allowed Overpass element types for safety.
- * Only "node" and "way" are safe for around-queries; "relation" can be huge.
- */
-const SAFE_OVERPASS_ELEMENT_TYPES = new Set(["node", "way"]);
-
-/**
  * Whitelist of allowed OSM tag keys for POI type filtering.
  * These are common, well-known tag keys that are safe to use in ["key"] queries.
  */
@@ -149,7 +143,7 @@ function buildOverpassKeywordQuery(
 ): string {
   // Sanitize keyword: only allow safe characters (alphanumeric, spaces, common punctuation)
   const sanitizedKeyword = keyword
-    .replace(/[^\w\s\u4e00-\u9fff\-\.\/\,\!\?\(\)]/g, "")
+    .replace(/[^\w\s\u4e00-\u9fff\-./,!()?]/g, "")
     .trim();
 
   if (!sanitizedKeyword) {
@@ -329,7 +323,7 @@ export class OpenMapProvider implements UnifiedMapProviderClient {
     if (!res.ok) throw new Error(`OPEN_MAP_GEOCODE_FAILED_${res.status}`);
     const data = await res.json() as unknown[];
     return data.flatMap((item) => {
-      const poi = normalizeOsmPoi(item as Parameters<typeof normalizeOsmPoi>[0], query.address);
+      const poi = normalizeNominatimPoi(item as Parameters<typeof normalizeNominatimPoi>[0], query.address);
       return poi ? [poi] : [];
     });
   }
