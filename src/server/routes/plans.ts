@@ -16,6 +16,7 @@ import { NotFoundError } from "../common/errors.js";
 import { sendOk } from "../common/response.js";
 import { optionalUserId } from "../common/uid.js";
 import { normalizeActionStatus } from "../modules/execution/statusNormalizer.js";
+import type { ExecutionAction } from "../modules/planning/schemas.js";
 
 /**
  * 从 DB messages 中按 conversationId 恢复方案数据

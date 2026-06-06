@@ -386,9 +386,9 @@ export async function registerHandoffRoutes(fastify: FastifyInstance) {
       // 简单限流：使用 Redis INCR
       // 如果 Redis 不可用则跳过
       try {
-        const current = await (limiter as Record<string, unknown>).incr?.(`rl:${rateLimitKey}`);
+        const current = await (limiter as any).incr?.(`rl:${rateLimitKey}`);
         if (current === 1) {
-          await (limiter as Record<string, unknown>).expire?.(`rl:${rateLimitKey}`, 60);
+          await (limiter as any).expire?.(`rl:${rateLimitKey}`, 60);
         }
         if (current && current > 5) {
           return sendError(reply, 429, "RATE_LIMIT_EXCEEDED", "认领过于频繁，请稍后再试");

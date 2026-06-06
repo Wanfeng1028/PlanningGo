@@ -158,7 +158,7 @@ export async function registerActionRoutes(app: FastifyInstance) {
       const actionStatus = action.status as ActionStatus;
       assertConfirmable(actionStatus);
 
-      updateActionStatus(params.id, "redirect_required" as ActionStatus);
+      updateActionStatus(params.id, "redirect_required" as const);
       return sendOk(reply, {
         preparedActionId: `prepared-${params.id}`,
         status: "redirect_required",
