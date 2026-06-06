@@ -6,7 +6,7 @@ import styles from "./RealMap.module.scss";
 export interface RealMapProps {
   center?: [number, number]; // 高德坐标系 [lng, lat]
   city?: string;
-  onMarkerClick?: (marker: Record<string, unknown>) => void;
+  onMarkerClick?: (marker: MarkerInstance) => void;
 }
 
 type MapPoi = {
@@ -30,7 +30,7 @@ const DEFAULT_CENTER: [number, number] = [121.4379, 31.0339];
    每次组件挂载都重新加载 SDK，避免单例模式导致的时序问题
 */
 
-function loadSdk(): Promise<unknown> {
+function loadSdk(): Promise<AMapSdk> {
   return Promise.race([
     AMapLoader.load({
       key: import.meta.env.VITE_AMAP_KEY || "",
@@ -54,6 +54,27 @@ function loadSdk(): Promise<unknown> {
   ]);
 }
 
+interface AMapSdk {
+  Map: new (container: HTMLDivElement | string, options: Record<string, unknown>) => MapInstance;
+  Marker: new (options: { position: [number, number]; title: string; anchor?: string; icon?: unknown }) => MarkerInstance;
+  Size: new (width: number, height: number) => { width: number; height: number };
+  Icon: new (options: { size: { width: number; height: number }; image: string; imageSize: { width: number; height: number } }) => unknown;
+}
+
+interface MapInstance {
+  on: (event: string, handler: (...args: unknown[]) => void) => void;
+  setCenter: (center: [number, number]) => void;
+  setZoom: (zoom: number) => void;
+  setMapStyle: (style: string) => void;
+  remove: (items: unknown[]) => void;
+  add: (items: unknown[] | unknown) => void;
+  destroy: () => void;
+}
+
+interface MarkerInstance {
+  on: (event: string, handler: (...args: unknown[]) => void) => void;
+}
+
 /**
  * RealMap — 基于高德地图 JS API 的真实交互式地图
  *
@@ -71,7 +92,7 @@ export function RealMap({
   const mapWrapperRef = useRef<HTMLDivElement>(null);
   /** AMap 实际使用的容器（由 document.createElement 创建，不在 React 树中） */
   const mapContainerElRef = useRef<HTMLDivElement | null>(null);
-  const mapInstanceRef = useRef<unknown>(null);
+  const mapInstanceRef = useRef<MapInstance | null>(null);
   // 用 ref 存储最新 props，避免每次渲染创建新数组导致 useEffect 无限循环
   const centerRef = useRef(center);
   const cityRef = useRef(city);
@@ -96,8 +117,7 @@ export function RealMap({
 
   const renderPoiMarkers = useCallback((pois: MapPoi[]) => {
     const map = mapInstanceRef.current;
-    const AMap = (window as Record<string, unknown>).AMap;
-    if (!map || !AMap) return;
+    if (!map) return;
 
     if (poiMarkersRef.current.length > 0) {
       try {
@@ -108,8 +128,9 @@ export function RealMap({
       poiMarkersRef.current = [];
     }
 
+    const AMapSdk = window as unknown as AMapSdk;
     const markers = pois.slice(0, 12).map((poi) => {
-      const marker = new AMap.Marker({
+      const marker = new AMapSdk.Marker({
         position: poi.location,
         title: poi.name,
         anchor: "bottom-center",
@@ -190,7 +211,7 @@ export function RealMap({
         }
 
         // ── 加载 SDK ──
-        const AMap = await loadSdk();
+        const AMapSdk = await loadSdk();
 
         // ── 再次检查组件是否已卸载 ──
         if (destroyed || abortController.signal.aborted) {
@@ -216,7 +237,7 @@ export function RealMap({
         const currentCenter = centerRef.current;
         const currentCity = cityRef.current;
 
-        const map = new AMap.Map(mapContainer, {
+        const map = new AMapSdk.Map(mapContainer, {
           zoom: 15,
           center: currentCenter,
           mapStyle: mapStyle === "satellite" ? "amap://styles/satellite" : "amap://styles/normal",
@@ -234,13 +255,13 @@ export function RealMap({
         map.on("dragend", () => setIsDragging(false));
 
         // 用户位置标记
-        const userMarker = new AMap.Marker({
+        const userMarker = new AMapSdk.Marker({
           position: currentCenter,
           title: "你的位置",
-          icon: new AMap.Icon({
-            size: new AMap.Size(25, 34),
+          icon: new AMapSdk.Icon({
+            size: new AMapSdk.Size(25, 34),
             image: "https://a.amap.com/jsapi_demos/static/demo-center/icons/poi-marker-default.png",
-            imageSize: new AMap.Size(25, 34),
+            imageSize: new AMapSdk.Size(25, 34),
           }),
         });
         map.add(userMarker);

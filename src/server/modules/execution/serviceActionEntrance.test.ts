@@ -12,7 +12,7 @@
 
 import { describe, it, expect } from "vitest";
 import { buildServiceActionsForStep } from "./serviceActionBuilder.js";
-import { generateDeepLink } from "../tools/deepLinks.js";
+import { generateDeepLink, type DeepLinkInput } from "../tools/deepLinks.js";
 
 // ============================================================================
 // Forbidden text patterns — 禁止出现的文案
@@ -274,7 +274,7 @@ describe("deepLinks URL safety", () => {
     ];
 
     for (const tc of testCases) {
-      const link = generateDeepLink(tc as Record<string, unknown>);
+      const link = generateDeepLink(tc as DeepLinkInput);
       expect(link.url).not.toContain("null");
       expect(link.url).not.toContain("undefined");
     }

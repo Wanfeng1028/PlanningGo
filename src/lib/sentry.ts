@@ -13,6 +13,25 @@ async function loadSentry(): Promise<unknown> {
   return new Function("s", "return import(s);")(specifier);
 }
 
+type SentryModule = {
+  init?: (options: Record<string, unknown>) => void;
+  browserTracingIntegration?: () => unknown;
+  replayIntegration?: (options?: { maskAllText?: boolean; blockAllMedia?: boolean }) => unknown;
+  replayIntegration2?: () => { maskAllText: boolean; blockAllMedia: boolean };
+  withScope?: (fn: (scope: SentryScope) => void) => void;
+  captureException?: (err: Error) => void;
+};
+
+type SentryEvent = {
+  exception?: {
+    values?: Array<{ type?: string }>;
+  };
+};
+
+type SentryScope = {
+  setExtra: (key: string, value: unknown) => void;
+};
+
 export function initSentry() {
   const dsn = import.meta.env.VITE_SENTRY_DSN;
   if (!dsn) {
@@ -20,19 +39,20 @@ export function initSentry() {
     return;
   }
 
-  loadSentry().then((Sentry: Record<string, unknown>) => {
+  loadSentry().then((module: unknown) => {
+    const Sentry = module as SentryModule;
     Sentry.init?.({
       dsn,
       environment: import.meta.env.SENTRY_ENVIRONMENT || import.meta.env.MODE,
       integrations: [
         (Sentry.browserTracingIntegration as (() => unknown) | undefined)?.(),
-        (Sentry.replayIntegration as (() => { maskAllText: boolean; blockAllMedia: boolean }) | undefined)?.({ maskAllText: true, blockAllMedia: true }),
+        (Sentry.replayIntegration as ((options?: { maskAllText?: boolean; blockAllMedia?: boolean }) => unknown) | undefined)?.({ maskAllText: true, blockAllMedia: true }),
       ].filter(Boolean),
       tracesSampleRate: import.meta.env.MODE === "production" ? 0.1 : 1.0,
       replaysSessionSampleRate: 0,
       replaysOnErrorSampleRate: 1.0,
-      beforeSend(event: Record<string, unknown>) {
-        if ((event as Record<string, unknown>)?.exception?.values?.[0]?.type === "ChunkLoadError") return null;
+      beforeSend(event: SentryEvent) {
+        if (event?.exception?.values?.[0]?.type === "ChunkLoadError") return null;
         return event;
       },
     });
@@ -46,11 +66,12 @@ export function captureError(error: Error, context?: Record<string, unknown>) {
   const dsn = import.meta.env.VITE_SENTRY_DSN;
   if (!dsn) return;
 
-  loadSentry().then((Sentry: Record<string, unknown>) => {
-    (Sentry.withScope as ((fn: (scope: Record<string, unknown>) => void) => void))((scope: Record<string, unknown>) => {
+  loadSentry().then((module: unknown) => {
+    const Sentry = module as SentryModule;
+    (Sentry.withScope as ((fn: (scope: SentryScope) => void) => void))((scope: SentryScope) => {
       if (context) {
         for (const [key, value] of Object.entries(context)) {
-          (scope.setExtra as ((key: string, value: unknown) => void))(key, value);
+          scope.setExtra(key, value);
         }
       }
       (Sentry.captureException as ((err: Error) => void))(error);
