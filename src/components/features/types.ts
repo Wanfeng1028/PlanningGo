@@ -96,6 +96,7 @@ export interface ChatMessage {
   chips?: string[];
   plans?: PlanningOption[];
   actions?: PlanningExecutableAction[];
+  planningActions?: PlanningAction[];
   nextActions?: NextActionItem[];
   selectedOptionId?: string;
   selectedPlanTitle?: string;
