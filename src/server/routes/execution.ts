@@ -1,5 +1,7 @@
 /**
  * Execution 路由
+ *
+ * 安全修复 (#6)：demo 接口在生产环境需要 auth 保护。
  */
 
 import type { FastifyInstance, FastifyRequest } from "fastify";
@@ -10,6 +12,7 @@ import { NotFoundError } from "../common/errors.js";
 import { sendOk, sendError } from "../common/response.js";
 import { optionalUserId } from "../common/uid.js";
 import type { PrismaClient } from "../../generated/prisma/client.js";
+import { env } from "../config/env.js";
 
 /**
  * 从 Cookie 中提取 guestId（而非 URL 参数）
@@ -71,12 +74,15 @@ async function assertExecutionAccess(
 }
 
 export async function registerExecutionRoutes(app: FastifyInstance) {
-  app.get("/api/execution/demo", { preHandler: [app.optionalAuthGuard] }, async () => ({
+  // 安全修复 (#6)：生产环境 demo 接口要求登录
+  const execDemoGuard = env.NODE_ENV === "production" ? [app.authGuard] : [app.optionalAuthGuard];
+
+  app.get("/api/execution/demo", { preHandler: execDemoGuard }, async () => ({
     traceId: "exec_demo",
     steps: listExecutionSteps(),
   }));
 
-  app.post("/api/execution/advance", { preHandler: [app.optionalAuthGuard] }, async () => ({
+  app.post("/api/execution/advance", { preHandler: execDemoGuard }, async () => ({
     traceId: "exec_demo",
     steps: advanceExecution(),
   }));

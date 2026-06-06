@@ -79,7 +79,10 @@ export async function registerPrivacyRoutes(app: FastifyInstance) {
         db.notificationPreference.deleteMany({ where: { userId } }),
         db.userSession.deleteMany({ where: { userId } }),
         db.companion.deleteMany({ where: { userId } }),
-        db.memory.deleteMany({ where: { userId } }),
+        db.memory.updateMany({
+          where: { userId },
+          data: { deletedAt: new Date() },
+        }),
         db.plan.deleteMany({ where: { userId } }),
         db.action.deleteMany({ where: { userId } }),
         db.reservation.deleteMany({ where: { userId } }),

@@ -4,6 +4,8 @@
  * POST /api/agent/chat/stream — SSE streaming chat endpoint
  * POST /api/agent/chat       — Non-streaming chat endpoint
  * POST /api/agent/plans/select — Plan selection endpoint
+ *
+ * 安全修复 (#3)：plans/select 接口增加会话所有权校验，防止 BOLA。
  */
 
 import type { FastifyInstance } from "fastify";
@@ -16,6 +18,7 @@ import { env } from "../config/env.js";
 import type { AgentResponse } from "../../shared/agentResponse.js";
 import type { PrismaClient } from "../../generated/prisma/client.js";
 import * as mem from "../services/memoryStore.js";
+import { assertConversationOwnership, OwnershipError } from "../common/ownership.js";
 
 // ─── Schemas ────────────────────────────────────────────────
 
@@ -31,6 +34,7 @@ const chatStreamBodySchema = z.object({
 const planSelectBodySchema = z.object({
   conversationId: z.string().uuid(),
   optionId: z.string().min(1),
+  guestId: z.string().max(128).optional(),
 });
 
 // ─── Registration ───────────────────────────────────────────
@@ -257,11 +261,49 @@ export async function registerAgentChatRoutes(app: FastifyInstance) {
     async (request, reply) => {
       try {
         const parsed = planSelectBodySchema.parse(request.body);
-
-        app.log.info({ route: "POST /api/agent/plans/select", userId: request.userId ?? null, authenticated: Boolean(request.userId), conversationId: parsed.conversationId, optionId: parsed.optionId, method: "POST" }, "[agentChat:planSelect] incoming");
+        const userId = request.userId;
+        const guestId = (request.body as Record<string, unknown>)?.guestId as string | undefined ?? null;
         const db: PrismaClient | null = app.db;
 
-        // Verify conversation exists
+        app.log.info({ route: "POST /api/agent/plans/select", userId: request.userId ?? null, authenticated: Boolean(request.userId), conversationId: parsed.conversationId, optionId: parsed.optionId, method: "POST" }, "[agentChat:planSelect] incoming");
+
+        // ── 安全修复 (#3)：校验会话所有权，防止 BOLA ──
+        if (db && userId) {
+          try {
+            await assertConversationOwnership(db, parsed.conversationId, userId, guestId);
+          } catch (err) {
+            if (err instanceof OwnershipError || (err instanceof Error && err.message.includes("FORBIDDEN"))) {
+              return reply.status(403).send({ error: "FORBIDDEN", message: "无权操作此会话" });
+            }
+            // NOT_FOUND
+            return reply.status(404).send({ error: "CONVERSATION_NOT_FOUND" });
+          }
+        } else if (db && !userId && guestId) {
+          // Guest user: also check ownership
+          try {
+            await assertConversationOwnership(db, parsed.conversationId, null, guestId);
+          } catch (err) {
+            return reply.status(404).send({ error: "CONVERSATION_NOT_FOUND" });
+          }
+        } else if (!db) {
+          // Memory-only mode: verify against memory store
+          const memConv = mem.getConversation(parsed.conversationId);
+          if (!memConv) {
+            return reply.status(404).send({ error: "CONVERSATION_NOT_FOUND" });
+          }
+          // Memory ownership check
+          if (userId && memConv.userId && memConv.userId !== userId) {
+            return reply.status(403).send({ error: "FORBIDDEN", message: "无权操作此会话" });
+          }
+          if (!userId && guestId && memConv.guestId !== guestId) {
+            return reply.status(403).send({ error: "FORBIDDEN", message: "无权操作此会话" });
+          }
+          if (!userId && !guestId && memConv.userId) {
+            return reply.status(403).send({ error: "FORBIDDEN", message: "此会话属于登录用户" });
+          }
+        }
+
+        // Verify conversation exists (ownership already checked above)
         let conversationExists = false;
         let selectedPlanTitle = "已选方案";
 

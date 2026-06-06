@@ -1,5 +1,6 @@
 import { env } from "../../config/env";
 import { getPrismaClient } from "../../common/prisma";
+import { sanitizeForLog } from "../../common/logSanitizer";
 import type { Prisma } from "../../../generated/prisma/client.js";
 
 /**
@@ -28,7 +29,7 @@ export async function trackEvent(params: {
         guestId: params.guestId,
         conversationId: params.conversationId,
         eventName: params.eventName,
-        eventPayloadJson: params.eventPayload as unknown as Prisma.InputJsonValue,
+        eventPayloadJson: sanitizeForLog(params.eventPayload) as unknown as Prisma.InputJsonValue,
         page: params.page || "",
         traceId: params.traceId || "",
       },
@@ -66,7 +67,7 @@ export async function reportClientError(params: {
         route: params.route,
         message: params.message,
         stack: params.stack,
-        payloadJson: params.payload as unknown as Prisma.InputJsonValue,
+        payloadJson: sanitizeForLog(params.payload) as unknown as Prisma.InputJsonValue,
       },
     });
   } catch (error) {

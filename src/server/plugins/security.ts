@@ -38,7 +38,7 @@ async function securityPlugin(app: FastifyInstance) {
   }
 
   await app.register(cookie, {
-    secret: cookieSecret ?? "dev-cookie-secret-not-for-production",
+    secret: cookieSecret,
   });
 }
 

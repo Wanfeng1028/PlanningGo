@@ -2,6 +2,9 @@
  * tools.ts — Agent 工具注册与调度
  *
  * 汇总所有工具的 OpenAI function 定义，以及工具调用的分发逻辑。
+ *
+ * 安全修复 (#1)：所有工具参数必须经过 Zod schema 校验后再使用，
+ * 防止 LLM 传入恶意/畸形参数导致类型转换错误或注入风险。
  */
 import type OpenAI from "openai";
 import type { PlanningSlots } from "../../../shared/agentResponse.js";
@@ -10,17 +13,20 @@ import {
   updatePlanningDraftToolDef,
   executeUpdatePlanningDraft,
   type UpdateDraftInput,
+  updateDraftInputSchema,
 } from "./slotTools.js";
 import {
   searchPlacesToolDef,
   executeSearchPlaces,
   type SearchPlacesInput,
+  searchPlacesInputSchema,
 } from "./placeTools.js";
 import {
   prepareActionToolDef,
   generateWeekendPlanToolDef,
   executePrepareAction,
   type PrepareActionInput,
+  prepareActionInputSchema,
 } from "./actionTools.js";
 
 // ─── Tool Definitions (for OpenAI function calling) ─────────
@@ -51,6 +57,66 @@ export interface ToolCallResult {
   shouldConfirmAction?: boolean;
 }
 
+// ─── Parameter Validation Helper ────────────────────────────
+
+/**
+ * Validate and parse tool arguments with Zod schema.
+ * Returns { valid: true, args } or { valid: false, error }.
+ */
+function validateToolArgs(
+  toolName: string,
+  argsStr: string,
+): { valid: true; args: Record<string, unknown> } | { valid: false; error: string } {
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(argsStr);
+  } catch {
+    return { valid: false, error: "Invalid JSON arguments" };
+  }
+
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return { valid: false, error: "Tool arguments must be a JSON object" };
+  }
+
+  // Validate against tool-specific schema
+  let validated: Record<string, unknown>;
+  switch (toolName) {
+    case "update_planning_draft": {
+      const result = updateDraftInputSchema.safeParse(parsed);
+      if (!result.success) {
+        return { valid: false, error: `update_planning_draft validation failed: ${result.error.message}` };
+      }
+      validated = result.data;
+      break;
+    }
+    case "search_places": {
+      const result = searchPlacesInputSchema.safeParse(parsed);
+      if (!result.success) {
+        return { valid: false, error: `search_places validation failed: ${result.error.message}` };
+      }
+      validated = result.data;
+      break;
+    }
+    case "prepare_action": {
+      const result = prepareActionInputSchema.safeParse(parsed);
+      if (!result.success) {
+        return { valid: false, error: `prepare_action validation failed: ${result.error.message}` };
+      }
+      validated = result.data;
+      break;
+    }
+    case "generate_weekend_plan": {
+      // This tool only needs valid JSON (params are passed through to planning pipeline)
+      validated = parsed;
+      break;
+    }
+    default:
+      return { valid: false, error: `Unknown tool: ${toolName}` };
+  }
+
+  return { valid: true, args: validated };
+}
+
 // ─── Dispatch ───────────────────────────────────────────────
 
 /**
@@ -61,12 +127,13 @@ export async function executeToolCall(
   argsStr: string,
   ctx: ToolCallContext,
 ): Promise<{ resultStr: string; sideEffect?: Partial<ToolCallResult> }> {
-  let args: Record<string, unknown>;
-  try {
-    args = JSON.parse(argsStr);
-  } catch {
-    return { resultStr: JSON.stringify({ error: "Invalid JSON arguments" }) };
+  // Validate args BEFORE using them
+  const validation = validateToolArgs(toolName, argsStr);
+  if (!validation.valid) {
+    return { resultStr: JSON.stringify({ error: validation.error }) };
   }
+
+  const args = validation.args;
 
   switch (toolName) {
     case "update_planning_draft": {

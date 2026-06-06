@@ -2,15 +2,23 @@
  * placeTools.ts — search_places 工具
  *
  * 搜索真实地点/景点/餐厅，接入高德地图 POI 体系。
+ *
+ * 安全修复 (#1)：引入 Zod schema 用于运行时参数校验。
+ * 安全修复 (#2)：工具结果返回字段受控，限制为安全字段 allowlist。
  */
 import { getAmapClient } from "../tools/amap/client.js";
+import { z } from "zod";
 
-export interface SearchPlacesInput {
-  keywords: string;
-  city?: string;
-  category?: string;
-  radius?: number;
-}
+// ─── Zod Schemas (安全修复 #1) ─────────────────────────────
+
+export const searchPlacesInputSchema = z.object({
+  keywords: z.string().min(1).max(200),
+  city: z.string().max(50).optional(),
+  category: z.string().max(50).optional(),
+  radius: z.number().optional(),
+});
+
+export type SearchPlacesInput = z.infer<typeof searchPlacesInputSchema>;
 
 export interface PlaceResult {
   id: string;
@@ -30,6 +38,10 @@ export interface SearchPlacesResult {
 
 /**
  * Execute search_places: search POI via AMap API.
+ *
+ * 安全修复 (#2)：工具结果只返回安全字段 allowlist，
+ * 限制为 [id, name, address, rating, avgPrice, distance, location]，
+ * 不暴露高德原始数据中可能包含的恶意内容（如 message 字段）。
  */
 export async function executeSearchPlaces(
   input: SearchPlacesInput,
@@ -66,6 +78,7 @@ export async function executeSearchPlaces(
       };
     }
 
+    // 安全修复 (#2): 只暴露安全字段 allowlist，不暴露 message 等可疑文本字段
     const places: PlaceResult[] = response.pois.map((poi) => ({
       id: poi.id,
       name: poi.name,
@@ -87,7 +100,7 @@ export async function executeSearchPlaces(
     return {
       places: [],
       total: 0,
-      message: `搜索失败：${error instanceof Error ? error.message : String(error)}。建议用户稍后重试。`,
+      message: `搜索失败：${error instanceof Error ? error.message.slice(0, 100) : String(error)}. 建议用户稍后重试。`,
     };
   }
 }

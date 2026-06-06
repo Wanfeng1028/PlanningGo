@@ -2,23 +2,30 @@
  * slotTools.ts — update_planning_draft 工具
  *
  * 记录用户补充的规划信息（槽位），返回当前已知信息和缺失信息。
+ *
+ * 安全修复 (#1)：引入 Zod schema 用于运行时参数校验。
  */
 import type { PlanningSlots, PlanningSlotKey } from "../../../shared/agentResponse.js";
 import { mergeSlots, getMissingSlots } from "./chatRouter.js";
+import { z } from "zod";
 
-export interface UpdateDraftInput {
-  origin?: string;
-  destination?: string;
-  destinationCity?: string;
-  budget?: number;
-  partySize?: number;
-  date?: string;
-  time?: string;
-  timeWindow?: string;
-  preference?: string | string[];
-  preferences?: string | string[];
-  companions?: string;
-}
+// ─── Zod Schema (安全修复 #1) ──────────────────────────────
+
+export const updateDraftInputSchema = z.object({
+  origin: z.string().max(200).optional(),
+  destination: z.string().max(200).optional(),
+  destinationCity: z.string().max(50).optional(),
+  budget: z.number().min(0).max(1000000).optional(),
+  partySize: z.number().int().min(1).max(100).optional(),
+  date: z.string().max(100).optional(),
+  time: z.string().max(100).optional(),
+  timeWindow: z.string().max(50).optional(),
+  preference: z.union([z.string().max(200), z.array(z.string().max(200))]).optional(),
+  preferences: z.union([z.string().max(200), z.array(z.string().max(200))]).optional(),
+  companions: z.string().max(100).optional(),
+});
+
+export type UpdateDraftInput = z.infer<typeof updateDraftInputSchema>;
 
 export interface UpdateDraftResult {
   knownSlots: PlanningSlots;

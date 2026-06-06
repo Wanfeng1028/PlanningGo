@@ -1,5 +1,6 @@
 import { createId } from "../../common/id";
 import { env } from "../../config/env";
+import { sanitizeHtmlForRender } from "../../common/ugcSanitizer";
 import type { ActivityPlan, UserIntent, PlanningProviders } from "../planning/schemas";
 import type { PlanningContext } from "../planning/contextBuilder";
 import type { CandidatePool } from "../planning/candidateGenerator";
@@ -129,6 +130,17 @@ export function minutesToTime(minutes: number): string {
   const h = Math.floor(minutes / 60) % 24;
   const m = minutes % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/**
+ * Sanitize user input for LLM prompts to prevent prompt injection.
+ * Uses XML-like tags to isolate user content and HTML entity encoding.
+ */
+function sanitizeUserInput(input: string): string {
+  // HTML entity encoding to prevent injection
+  const sanitized = sanitizeHtmlForRender(input);
+  // Truncate to prevent excessive token usage
+  return sanitized.slice(0, 2000);
 }
 
 /**
@@ -872,21 +884,27 @@ function buildLlmPrompt(input: PlannerInput): string {
   if (/烧烤|烤肉/.test(raw)) prefHints.push("用户想吃烧烤，请安排具体烧烤店并推荐烤串、烤羊排等");
   if (/奶茶|茶饮/.test(raw)) prefHints.push("用户想喝奶茶，请安排具体奶茶店并推荐饮品");
 
-  return `用户需求：
-- 城市：${intent.city}
-- 出发地：${intent.origin.label || "未提供"}
-- 日期：${intent.date ?? "本周末"}
-- 出发时间：${intent.departAt ?? resolveStartTime(intent)}
-- 参与者：${intent.participantMode}，${intent.partySize}人
-- 时长：${intent.durationHours[0]}-${intent.durationHours[1]}小时
-- 预算上限：${intent.budgetMax !== undefined ? `${intent.budgetMax}元（用户明确提供，请严格遵守）` : "用户未提供预算，请按中等消费水平合理估算，并在 assumptions 中标注"}
-- 偏好：${intent.preferences.length > 0 ? intent.preferences.join("、") : "无特殊偏好"}
+  return `<user_input>
+用户需求：
+- 城市：${sanitizeUserInput(intent.city || "")}
+- 出发地：${sanitizeUserInput(intent.origin.label || "未提供")}
+- 日期：${sanitizeUserInput(intent.date ?? "本周末")}
+- 出发时间：${sanitizeUserInput(intent.departAt ?? resolveStartTime(intent))}
+- 参与者：${sanitizeUserInput(intent.participantMode)}，${sanitizeUserInput(String(intent.partySize))}人
+- 时长：${sanitizeUserInput(String(intent.durationHours[0]))}-${sanitizeUserInput(String(intent.durationHours[1]))}小时
+- 预算上限：${intent.budgetMax !== undefined ? `${sanitizeUserInput(String(intent.budgetMax))}元（用户明确提供，请严格遵守）` : "用户未提供预算，请按中等消费水平合理估算，并在 assumptions 中标注"}
+- 偏好：${intent.preferences.length > 0 ? intent.preferences.map((p) => sanitizeUserInput(p)).join("、") : "无特殊偏好"}
 ${prefHints.length > 0 ? `\n特殊需求提示：\n${prefHints.map((h) => `- ${h}`).join("\n")}` : ""}
+</user_input>
 
-天气：${weather.condition}，${weather.temperature}，${weather.suggestion}
+<weather_info>
+天气：${sanitizeUserInput(weather.condition)}，${sanitizeUserInput(weather.temperature)}，${sanitizeUserInput(weather.suggestion)}
+</weather_info>
 
+<candidate_locations>
 候选地点（请从以下列表中选择具体店铺，不要编造）：
 ${candidateList || "（无候选地点，请根据城市和需求推荐具体店铺名）"}
+</candidate_locations>
 
 重要：每个 meal/buffer/rest 步骤必须指定具体店铺名，不能写"在附近用餐""找家咖啡店"这类泛化描述。
 

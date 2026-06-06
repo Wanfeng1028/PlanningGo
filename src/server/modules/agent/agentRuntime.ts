@@ -3,6 +3,8 @@
  *
  * 核心运行时：LLM streaming + tool_calls + 多轮工具执行 + 预算控制
  * 优先使用 LLM，异常时 fallback 到旧规则模板。
+ *
+ * 安全修复 (#2)：工具结果回灌 LLM 前做 allowlist 清洗和长度截断。
  */
 import type OpenAI from "openai";
 import type { PrismaClient, Prisma } from "../../../generated/prisma/client.js";
@@ -23,6 +25,49 @@ import { extractPlanningSlots, getMissingSlots, isContinuationIntent, generateTi
 import { extractMemoryFromSlots, mergeMemoryProfile } from "./memoryExtractor.js";
 import { updateConversationTitle } from "./titleUtils.js";
 import * as mem from "../../services/memoryStore.js";
+import { sanitizeForLog } from "../../common/logSanitizer.js";
+
+// ─── Tool Result Sanitization (安全修复 #2) ────────────────
+
+/**
+ * Sanitize tool result string before injecting into LLM context.
+ * - Truncates long messages to prevent prompt injection via large payloads
+ * - Strips potential control characters
+ */
+const MAX_TOOL_RESULT_LENGTH = 2000;
+
+function sanitizeToolResultForLLM(toolName: string, resultStr: string): string {
+  let sanitized: string;
+
+  switch (toolName) {
+    case "search_places": {
+      // POI results: allow only safe fields (id, name, address, rating, avgPrice, distance, location)
+      // Already restricted at the tool level, but truncate for safety
+      sanitized = resultStr.slice(0, MAX_TOOL_RESULT_LENGTH);
+      break;
+    }
+    case "update_planning_draft": {
+      // Internal state result — truncate to prevent draft overflow injection
+      sanitized = resultStr.slice(0, MAX_TOOL_RESULT_LENGTH);
+      break;
+    }
+    case "prepare_action": {
+      // Action description — limit length
+      sanitized = resultStr.slice(0, MAX_TOOL_RESULT_LENGTH);
+      break;
+    }
+    case "generate_weekend_plan": {
+      // Plan request signal — small, no truncation needed
+      sanitized = resultStr;
+      break;
+    }
+    default:
+      sanitized = resultStr.slice(0, MAX_TOOL_RESULT_LENGTH);
+  }
+
+  // Strip control characters (except common whitespace)
+  return sanitized.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
+}
 
 // ─── Constants ──────────────────────────────────────────────
 
@@ -268,7 +313,8 @@ export async function runAgentChatStream(
         messages.push({
           role: "tool" as const,
           tool_call_id: tc.id,
-          content: resultStr,
+          // 安全修复 (#2): 工具结果在回灌 LLM 前先做清洗
+          content: sanitizeToolResultForLLM(tc.name, resultStr),
         });
       } catch (err) {
         log.warn({ err }, `[agentRuntime] Tool ${tc.name} failed`);
@@ -287,7 +333,7 @@ export async function runAgentChatStream(
         messages.push({
           role: "tool" as const,
           tool_call_id: tc.id,
-          content: JSON.stringify({ error: `Tool execution failed: ${err instanceof Error ? err.message : String(err)}` }),
+          content: JSON.stringify({ error: `Tool execution failed: ${err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200)}` }),
         });
       }
     }
@@ -862,7 +908,13 @@ async function saveMsg(
   if (db) {
     try {
       const msg = await db.message.create({
-        data: { conversationId, role, content, payloadJson: payloadJson as unknown as Prisma.InputJsonValue },
+        data: {
+          conversationId,
+          role,
+          content,
+          // 安全修复 (#4): payload 落库前脱敏
+          payloadJson: (sanitizeForLog(payloadJson) as unknown as Prisma.InputJsonValue),
+        },
       });
       log?.info({
         conversationId,

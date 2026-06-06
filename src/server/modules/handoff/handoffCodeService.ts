@@ -2,9 +2,11 @@
  * HandoffCode 短期一次性接力码服务
  *
  * 安全设计：
- * - 二维码只包含短 code（6 位字母数字），不含 accessToken / refreshToken
+ * - 二维码只包含短 code（字母数字），不含 accessToken / refreshToken
  * - code 有效期 10 分钟
  * - code 一次性使用，claimed 后即失效
+ *
+ * 安全修复 (#5)：码长从 6 位增加到 10 位，降低碰撞概率（2^52 vs 2^60 熵值）
  */
 import { randomBytes } from "node:crypto";
 import { getPrismaClient } from "../../common/prisma";
@@ -12,7 +14,7 @@ import { env } from "../../config/env";
 import QRCode from "qrcode";
 
 const CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
-const CODE_LENGTH = 6;
+const CODE_LENGTH = 10; // 安全修复 (#5): 从 6 增加到 10
 
 /**
  * Minimal type for the handoffCode Prisma model.
@@ -111,13 +113,13 @@ export async function createHandoffCode(input: CreateHandoffCodeInput): Promise<
 
 /**
  * Query a handoff code (check existence, expiration, status)
+ *
+ * 安全修复 (#5): 不返回 userId/guestId，防止枚举短码时泄露关联用户信息。
  */
 export async function getHandoffCode(code: string): Promise<{
   code: string;
   conversationId: string;
   planId: string | null;
-  userId: string | null;
-  guestId: string | null;
   status: string;
   expiresAt: string;
 } | null> {
@@ -144,8 +146,6 @@ export async function getHandoffCode(code: string): Promise<{
     code: record.code,
     conversationId: record.conversationId,
     planId: record.planId,
-    userId: record.userId,
-    guestId: record.guestId,
     status: record.status,
     expiresAt: record.expiresAt.toISOString(),
   };

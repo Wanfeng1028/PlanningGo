@@ -1,9 +1,12 @@
 /**
  * Developer 仓库 — DeveloperApp + ApiKey + Webhook + RequestLog + Usage
+ *
+ * 安全修复 (#4)：requestPreview/responsePreview 落库前经过 sanitizeForLog 脱敏。
  */
 
 import crypto from "node:crypto";
 import type { PrismaClient, Prisma } from "../../generated/prisma/client.js";
+import { sanitizeForLog } from "../common/logSanitizer.js";
 
 export class DeveloperRepository {
   constructor(private db: PrismaClient) {}
@@ -231,7 +234,8 @@ export class DeveloperRepository {
       data: {
         webhookId: data.webhookId,
         event: data.event,
-        payload: data.payload as unknown as Prisma.InputJsonValue,
+        // 安全修复 (#4): 落库前脱敏
+        payload: (sanitizeForLog(data.payload) as Record<string, unknown>) as unknown as Prisma.InputJsonValue,
         status: data.status ?? "pending",
         responseStatus: data.responseStatus ?? null,
         latencyMs: data.latencyMs ?? null,
@@ -295,8 +299,9 @@ export class DeveloperRepository {
         latencyMs: data.latencyMs,
         traceId: data.traceId,
         errorCode: data.errorCode ?? null,
-        requestPreview: (data.requestPreview ?? {}) as unknown as Prisma.InputJsonValue,
-        responsePreview: (data.responsePreview ?? {}) as unknown as Prisma.InputJsonValue,
+        // 安全修复 (#4): 落库前脱敏
+        requestPreview: (sanitizeForLog(data.requestPreview) as Record<string, unknown>) as unknown as Prisma.InputJsonValue,
+        responsePreview: (sanitizeForLog(data.responsePreview) as Record<string, unknown>) as unknown as Prisma.InputJsonValue,
       },
     });
   }

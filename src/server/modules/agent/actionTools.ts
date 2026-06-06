@@ -2,17 +2,24 @@
  * actionTools.ts — prepare_action 工具
  *
  * 准备执行动作（导航、预约、日历等），返回待确认的 action 信息。
+ *
+ * 安全修复 (#1)：引入 Zod schema 用于运行时参数校验。
  */
 import type { PendingAction } from "../../../shared/agentResponse.js";
 import { randomUUID } from "node:crypto";
+import { z } from "zod";
 
-export interface PrepareActionInput {
-  actionType: string;
-  title: string;
-  description: string;
-  planId?: string;
-  optionId?: string;
-}
+// ─── Zod Schema (安全修复 #1) ──────────────────────────────
+
+export const prepareActionInputSchema = z.object({
+  actionType: z.string().max(50),
+  title: z.string().min(1).max(200),
+  description: z.string().min(1).max(500),
+  planId: z.string().optional(),
+  optionId: z.string().optional(),
+});
+
+export type PrepareActionInput = z.infer<typeof prepareActionInputSchema>;
 
 export interface PrepareActionResult {
   action: PendingAction;

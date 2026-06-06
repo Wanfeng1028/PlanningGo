@@ -90,6 +90,9 @@ export async function buildApp() {
   // ── 健康检查（不需要认证） ──
   app.get("/api/health", async (_request, reply) => {
     reply.header("Cache-Control", "public, max-age=5");
+    if (env.NODE_ENV === "production") {
+      return { ok: true, timestamp: new Date().toISOString() };
+    }
     return { ok: true, status: "ok", timestamp: new Date().toISOString() };
   });
   // 启动时间，用于计算 uptime
