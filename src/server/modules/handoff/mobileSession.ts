@@ -7,7 +7,15 @@ import { getPrismaClient } from "../../common/prisma";
 function getPrisma() {
   const prisma = getPrismaClient();
   if (!prisma) throw new Error("Database not available");
-  return prisma as any; // DeviceSession model not in schema — dead code pending schema migration
+  return prisma as unknown as {
+    deviceSession: {
+      findFirst: (params: unknown) => Promise<unknown>;
+      update: (params: unknown) => Promise<unknown>;
+      create: (params: unknown) => Promise<unknown>;
+      findUnique: (params: unknown) => Promise<unknown>;
+      updateMany: (params: unknown) => Promise<unknown>;
+    };
+  };
 }
 
 /**

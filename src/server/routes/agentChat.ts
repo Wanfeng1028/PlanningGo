@@ -282,7 +282,7 @@ export async function registerAgentChatRoutes(app: FastifyInstance) {
           // Guest user: also check ownership
           try {
             await assertConversationOwnership(db, parsed.conversationId, null, guestId);
-          } catch (_err) {
+          } catch {
             return reply.status(404).send({ error: "CONVERSATION_NOT_FOUND" });
           }
         } else if (!db) {

@@ -87,6 +87,7 @@ export function GlassToast({ toast, onDismiss }: GlassToastProps) {
 
 /** 便捷 hook：返回 [currentToast, showToast] */
 let _toastId = 0;
+// eslint-disable-next-line react-refresh/only-export-components
 export function useGlassToast() {
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);

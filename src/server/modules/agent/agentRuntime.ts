@@ -67,7 +67,8 @@ function sanitizeToolResultForLLM(toolName: string, resultStr: string): string {
 
   // Strip control characters (except common whitespace)
   // eslint-disable-next-line no-control-regex
-  return sanitized.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
+  const CONTROL_CHAR_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
+  return sanitized.replace(CONTROL_CHAR_REGEX, "");
 }
 
 // ─── Constants ──────────────────────────────────────────────
