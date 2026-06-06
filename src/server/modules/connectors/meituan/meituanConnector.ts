@@ -36,7 +36,7 @@ const CAPABILITIES: ConnectorCapability[] = [
 // ============================================================================
 
 async function searchPoi(
-  input: ConnectorSearchInput,
+  _input: ConnectorSearchInput,
 ): Promise<ConnectorSearchResult[]> {
   // TODO: 对接美团开放平台 API
   // https://open.meituan.com/api/doc?method=restaurant.search

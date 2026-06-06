@@ -974,9 +974,9 @@ function truncateContextIfNeeded(
   };
 }
 
-// ─── Tool Display Name Helper ───────────────────────────────
+// ─── Tool Display Name Helper (reserved for future use) ───────────────────────
 
-function getToolDisplayName(name: string): string {
+function _getToolDisplayName(name: string): string {
   const map: Record<string, string> = {
     update_planning_draft: "记录规划信息",
     search_places: "搜索地点",
@@ -991,8 +991,9 @@ function getToolDisplayName(name: string): string {
 /**
  * Produce a short, user-friendly summary of a tool result.
  * Never exposes raw API keys, tokens, or full internal payloads.
+ * (reserved for future use)
  */
-function summarizeToolResult(toolName: string, resultStr: string): string {
+function _summarizeToolResult(toolName: string, resultStr: string): string {
   try {
     const result = JSON.parse(resultStr) as Record<string, unknown>;
     if (typeof result.error === "string") {

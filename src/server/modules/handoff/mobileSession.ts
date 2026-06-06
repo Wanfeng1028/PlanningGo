@@ -7,7 +7,7 @@ import { getPrismaClient } from "../../common/prisma";
 function getPrisma() {
   const prisma = getPrismaClient();
   if (!prisma) throw new Error("Database not available");
-  return prisma as any; // DeviceSession model not in schema — dead code pending schema migration
+  return prisma as unknown; // DeviceSession model not in schema — dead code pending schema migration
 }
 
 /**

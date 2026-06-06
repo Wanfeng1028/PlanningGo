@@ -28,7 +28,7 @@ const FORBIDDEN_PATTERNS = [
   "succeeded",
 ];
 
-function assertNoForbiddenText(text: string, context: string) {
+function assertNoForbiddenText(text: string, _context: string) {
   for (const pattern of FORBIDDEN_PATTERNS) {
     expect(text.toLowerCase()).not.toContain(
       pattern.toLowerCase(),
@@ -274,7 +274,7 @@ describe("deepLinks URL safety", () => {
     ];
 
     for (const tc of testCases) {
-      const link = generateDeepLink(tc as any);
+      const link = generateDeepLink(tc as Record<string, unknown>);
       expect(link.url).not.toContain("null");
       expect(link.url).not.toContain("undefined");
     }

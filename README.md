@@ -338,13 +338,16 @@ npm run dev
 ### Docker Compose（推荐）
 
 ```bash
-# 1. 创建环境变量
-cat > .env << 'EOF'
-POSTGRES_PASSWORD=your-strong-db-password
-REDIS_PASSWORD=your-strong-redis-password
+# 1. 创建环境变量（JWT/COOKIE 密钥自动生成）
 JWT_ACCESS_SECRET=$(openssl rand -hex 32)
 JWT_REFRESH_SECRET=$(openssl rand -hex 32)
 COOKIE_SECRET=$(openssl rand -hex 32)
+cat > .env <<EOF
+POSTGRES_PASSWORD=your-strong-db-password
+REDIS_PASSWORD=your-strong-redis-password
+JWT_ACCESS_SECRET=$JWT_ACCESS_SECRET
+JWT_REFRESH_SECRET=$JWT_REFRESH_SECRET
+COOKIE_SECRET=$COOKIE_SECRET
 AMAP_WEB_SERVICE_KEY=your-amap-key
 QWEN_API_KEY=your-qwen-key
 CORS_ORIGINS=https://example.com

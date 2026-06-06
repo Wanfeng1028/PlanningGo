@@ -6,7 +6,7 @@ import styles from "./RealMap.module.scss";
 export interface RealMapProps {
   center?: [number, number]; // 高德坐标系 [lng, lat]
   city?: string;
-  onMarkerClick?: (marker: any) => void;
+  onMarkerClick?: (marker: Record<string, unknown>) => void;
 }
 
 type MapPoi = {
@@ -30,7 +30,7 @@ const DEFAULT_CENTER: [number, number] = [121.4379, 31.0339];
    每次组件挂载都重新加载 SDK，避免单例模式导致的时序问题
 */
 
-function loadSdk(): Promise<any> {
+function loadSdk(): Promise<unknown> {
   return Promise.race([
     AMapLoader.load({
       key: import.meta.env.VITE_AMAP_KEY || "",
@@ -71,12 +71,12 @@ export function RealMap({
   const mapWrapperRef = useRef<HTMLDivElement>(null);
   /** AMap 实际使用的容器（由 document.createElement 创建，不在 React 树中） */
   const mapContainerElRef = useRef<HTMLDivElement | null>(null);
-  const mapInstanceRef = useRef<any>(null);
+  const mapInstanceRef = useRef<unknown>(null);
   // 用 ref 存储最新 props，避免每次渲染创建新数组导致 useEffect 无限循环
   const centerRef = useRef(center);
   const cityRef = useRef(city);
   const onMarkerClickRef = useRef(onMarkerClick);
-  const poiMarkersRef = useRef<any[]>([]);
+  const poiMarkersRef = useRef<unknown[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [poiList, setPoiList] = useState<MapPoi[]>([]);
@@ -96,7 +96,7 @@ export function RealMap({
 
   const renderPoiMarkers = useCallback((pois: MapPoi[]) => {
     const map = mapInstanceRef.current;
-    const AMap = (window as any).AMap;
+    const AMap = (window as Record<string, unknown>).AMap;
     if (!map || !AMap) return;
 
     if (poiMarkersRef.current.length > 0) {

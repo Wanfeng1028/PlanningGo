@@ -2,7 +2,7 @@ import type { ToolExecutionResult, ToolExecutionContext } from "../tools/types";
 import { env } from "../../config/env";
 import { getPrismaClient } from "../../common/prisma";
 import type { Prisma } from "../../../generated/prisma/client.js";
-import { sanitizeToolCallInput, sanitizeToolCallOutput, shouldStripStack } from "../../common/logSanitizer.js";
+import { sanitizeToolCallInput, sanitizeToolCallOutput } from "../../common/logSanitizer.js";
 
 /**
  * Log a tool call to the database

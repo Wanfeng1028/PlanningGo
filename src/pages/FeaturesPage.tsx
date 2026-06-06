@@ -1163,7 +1163,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
         setAbortController(null);
       }
     },
-    [isBusy, city, modelMode, addMessage, setSessionMessages, showToast, updateLastAssistant, forceScrollToBottom, selectedPlanId, user?.id],
+    [city, modelMode, addMessage, setSessionMessages, showToast, updateLastAssistant, forceScrollToBottom, selectedPlanId, user?.id],
   );
 
   const handleStopGeneration = useCallback(() => {
@@ -1293,11 +1293,11 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
       conversationId: conversationIdRef.current,
     });
 
-    // Save current draft before switching
-    if (currentSessionIdRef.current && inputValue.trim()) {
+    // Save current draft before switching (use ref to avoid stale closure on inputValue)
+    if (currentSessionIdRef.current && draftBySessionRef.current.get(currentSessionIdRef.current)) {
       const currentKey = `pg_input_draft_${currentSessionIdRef.current}`;
-      draftBySessionRef.current.set(currentSessionIdRef.current, inputValue);
-      try { localStorage.setItem(currentKey, inputValue); } catch { /* ignore */ }
+      const draft = draftBySessionRef.current.get(currentSessionIdRef.current) ?? "";
+      try { localStorage.setItem(currentKey, draft); } catch { /* ignore */ }
     }
 
     // Set active session state immediately
@@ -1558,7 +1558,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
           break;
       }
     },
-    [city, addMemory, showToast, updateSessionMessages, mapProvider],
+    [city, showToast, updateSessionMessages, mapProvider],
   );
 
   const handleUnifiedAction = useCallback(async (action: PlanningAction) => {
@@ -1630,8 +1630,8 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
 
   /* ── Phase 1: New plan action handlers ── */
 
-  /** Resolve relative Chinese date references to ISO date strings */
-  function resolveRelativeDate(dateStr: string): string {
+  /** Resolve relative Chinese date references to ISO date strings (reserved for future use) */
+  function _resolveRelativeDate(dateStr: string): string {
     if (!dateStr) return "";
     // Already an absolute date (YYYY-MM-DD or YYYYMMDD)
     if (/^\d{4}-?\d{2}-?\d{2}$/.test(dateStr)) {
@@ -2099,7 +2099,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
         </div>
       );
     },
-    [selectedPlanId, handleRetryLast, handleNewChat, handleSelectPlan, handleExecuteAction, busyActionId, handleUnifiedAction, handleAdjustPlan, handleGenerateCalendar, handleSavePlan, handleViewReservations, handleOpenNavigation, showToast, doSubmit],
+    [selectedPlanId, conversationId, handleRetryLast, handleNewChat, handleSelectPlan, handleExecuteAction, busyActionId, handleUnifiedAction, handleAdjustPlan, handleGenerateCalendar, handleSavePlan, handleViewReservations, handleOpenNavigation, showToast, doSubmit, handleTrackAction, handleShowDraft],
   );
 
   /* ═══════════════════════════════════════════════

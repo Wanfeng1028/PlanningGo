@@ -11,7 +11,8 @@ COPY . .
 RUN npx prisma generate
 RUN npm run build
 # 移除 devDependencies，只保留生产依赖
-RUN npm prune --omit=dev
+# 注意：prisma CLI 需要保留用于生产环境 migrate deploy
+RUN npm prune --omit=dev && npm install prisma --no-save
 
 FROM base AS runtime
 ENV NODE_ENV=production

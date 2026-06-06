@@ -20,7 +20,7 @@ const MOCK_POIS: PoiResult[] = [
 ]
 
 export class MockMapProvider implements MapProvider {
-  async searchPois(query: PoiQuery, signal?: AbortSignal): Promise<PoiResult[]> {
+  async searchPois(query: PoiQuery, _signal?: AbortSignal): Promise<PoiResult[]> {
     await simulateDelay(100, 300)
     const keyword = query.keywords?.toLowerCase() || ''
     const type = query.types || ''

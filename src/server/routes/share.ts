@@ -104,7 +104,7 @@ export async function registerShareRoutes(app: FastifyInstance) {
   // ── 投票 ──
   app.post("/api/share/rooms/:id/vote", { preHandler: [app.authGuard] }, async (request, reply) => {
     const params = z.object({ id: z.string() }).parse(request.params);
-    const userId = uid(request);
+    const _userId = uid(request);
     const body = z
       .object({ memberName: z.string(), vote: z.enum(["yes", "no"]), comment: z.string().optional() })
       .parse(request.body);
