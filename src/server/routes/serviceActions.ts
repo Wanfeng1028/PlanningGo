@@ -48,16 +48,6 @@ const prepareActionBodySchema = z.object({
   })).optional(),
 });
 
-const prepareActionResponseSchema = z.object({
-  actionId: z.string(),
-  status: z.enum(["prepared", "redirect_required"]),
-  title: z.string(),
-  description: z.string(),
-  redirectUrl: z.string().optional(),
-  copyText: z.string().optional(),
-  riskNotice: z.string(),
-});
-
 const RISK_NOTICE = "价格、库存、配送费、优惠券和预约结果以第三方平台最终页面为准。";
 
 // ============================================================================

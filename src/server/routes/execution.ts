@@ -29,7 +29,7 @@ async function assertExecutionAccess(
   executionKey: string,
   userId: string | null,
   guestIdFromRequest: string | null,
-  action: string,
+  _action: string,
 ): Promise<boolean> {
   const step = await db.executionStep.findUnique({
     where: { id: executionKey },

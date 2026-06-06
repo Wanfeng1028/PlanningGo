@@ -13,7 +13,6 @@ import { requireUserId } from "../common/uid.js";
 import { env } from "../config/env.js";
 import { getProviderDiagnostics } from "../modules/agent/modelClient.js";
 import { validateWebhookUrlWithDns } from "../common/ssrfProtection.js";
-import { shouldStripStack } from "../common/logSanitizer.js";
 
 interface AuthenticatedRequest extends FastifyRequest {
   userId?: string;

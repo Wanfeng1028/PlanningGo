@@ -117,7 +117,7 @@ export class ActionExecutor {
 
     try {
       const registry = getConnectorRegistry();
-      const connector = registry.get(provider as any);
+      const connector = registry.get(provider as Parameters<typeof registry.get>[0]);
 
       // 交易类动作: 走 Connector Registry prepare → redirect
       const tradingTypes = new Set([
@@ -162,10 +162,10 @@ export class ActionExecutor {
         try {
           const poi = (payload as Record<string, unknown>)?.poi as Record<string, unknown> | undefined;
           const prepared = await connector.prepare({
-            provider: provider as any,
+            provider: provider as Parameters<typeof registry.get>[0],
             actionType: type,
             poi: poi ? {
-              provider: provider as any,
+              provider: provider as Parameters<typeof registry.get>[0],
               name: (poi.name as string) || type,
               address: (poi.address as string) || undefined,
               lat: (poi.lat as number) || undefined,
@@ -223,9 +223,9 @@ export class ActionExecutor {
           // 导航: 生成导航 URL (高德)
           if (connector?.prepare) {
             const prepared = await connector.prepare({
-              provider: provider as any,
+              provider: provider as Parameters<typeof registry.get>[0],
               actionType: type,
-              poi: (payload as Record<string, unknown>)?.poi as ConnectorSearchResult | undefined as any,
+              poi: (payload as Record<string, unknown>)?.poi as ConnectorSearchResult | undefined,
               userId: "guest",
             });
             result = prepared;
@@ -263,7 +263,7 @@ export class ActionExecutor {
           // 分享: 生成分享链接
           if (connector?.prepare) {
             const prepared = await connector.prepare({
-              provider: provider as any,
+              provider: provider as Parameters<typeof registry.get>[0],
               actionType: type,
               userId: "guest",
             });

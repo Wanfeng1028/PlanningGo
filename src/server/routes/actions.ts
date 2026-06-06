@@ -76,7 +76,7 @@ export async function registerActionRoutes(app: FastifyInstance) {
     if (!db) {
       const action = getAction(params.id);
       if (!action || action.userId !== request.userId) throw new NotFoundError("ACTION_NOT_FOUND");
-      if (isTerminalState(action.status as any)) throw new NotFoundError("ACTION_EXPIRED");
+      if (isTerminalState(action.status as ActionStatus)) throw new NotFoundError("ACTION_EXPIRED");
 
       updateActionStatus(params.id, "quoted");
       return sendOk(reply, {
@@ -90,16 +90,14 @@ export async function registerActionRoutes(app: FastifyInstance) {
     const action = await findActionOwnedByUser(db, params.id, request.userId!);
 
     if (!action) throw new NotFoundError("ACTION_NOT_FOUND");
-    if (isTerminalState(action.status as any)) {
+    if (isTerminalState(action.status as ActionStatus)) {
       throw new NotFoundError("ACTION_EXPIRED");
     }
 
     // 通过 Connector Registry 执行 quote
     const registry = getConnectorRegistry();
     const actionType = action.type;
-
-    // 根据 action 的 provider 字段选择 connector
-    const connectorProvider = (action.provider || "mock") as any;
+    const connectorProvider = (action.provider || "mock") as Parameters<typeof registry.get>[0];
     const connector = registry.get(connectorProvider);
 
     if (!connector?.quote) {
@@ -120,7 +118,7 @@ export async function registerActionRoutes(app: FastifyInstance) {
       const quoteResult = await connector.quote({
         provider: connectorProvider,
         actionType,
-        poi: (payload?.poi as Record<string, unknown> | undefined) as ConnectorSearchResult | undefined as any,
+        poi: payload?.poi as ConnectorSearchResult | undefined,
         items: payload?.items as Array<{ name: string; quantity: number; price?: number }> | undefined,
         partySize: payload?.partySize as number | undefined,
         startTime: payload?.startTime as string | undefined,
@@ -155,12 +153,12 @@ export async function registerActionRoutes(app: FastifyInstance) {
     if (!db) {
       const action = getAction(params.id);
       if (!action || action.userId !== request.userId) throw new NotFoundError("ACTION_NOT_FOUND");
-      if (isTerminalState(action.status as any)) throw new NotFoundError("ACTION_EXPIRED");
+      if (isTerminalState(action.status as ActionStatus)) throw new NotFoundError("ACTION_EXPIRED");
 
       const actionStatus = action.status as ActionStatus;
       assertConfirmable(actionStatus);
 
-      updateActionStatus(params.id, "redirect_required" as any);
+      updateActionStatus(params.id, "redirect_required" as ActionStatus);
       return sendOk(reply, {
         preparedActionId: `prepared-${params.id}`,
         status: "redirect_required",
@@ -173,7 +171,7 @@ export async function registerActionRoutes(app: FastifyInstance) {
     const action = await findActionOwnedByUser(db, params.id, request.userId!);
 
     if (!action) throw new NotFoundError("ACTION_NOT_FOUND");
-    if (isTerminalState(action.status as any)) {
+    if (isTerminalState(action.status as ActionStatus)) {
       throw new NotFoundError("ACTION_EXPIRED");
     }
 
@@ -200,7 +198,7 @@ export async function registerActionRoutes(app: FastifyInstance) {
     // V3: 交易动作走 Connector prepare → redirect
     const registry = getConnectorRegistry();
     const actionType = action.type;
-    const connectorProvider = (action.provider || "mock") as any;
+    const connectorProvider = (action.provider || "mock") as Parameters<typeof registry.get>[0];
     const connector = registry.get(connectorProvider);
 
     if (!connector?.prepare) {
@@ -222,7 +220,7 @@ export async function registerActionRoutes(app: FastifyInstance) {
       const prepared = await connector.prepare({
         provider: connectorProvider,
         actionType,
-        poi: (payload?.poi as Record<string, unknown> | undefined) as ConnectorSearchResult | undefined as any,
+        poi: payload?.poi as ConnectorSearchResult | undefined,
         items: payload?.items as Array<{ name: string; quantity: number; price?: number }> | undefined,
         partySize: payload?.partySize as number | undefined,
         startTime: payload?.startTime as string | undefined,
@@ -261,7 +259,7 @@ export async function registerActionRoutes(app: FastifyInstance) {
     if (!db) {
       const action = getAction(params.id);
       if (!action || action.userId !== request.userId) throw new NotFoundError("ACTION_NOT_FOUND");
-      if (isTerminalState(action.status as any)) {
+      if (isTerminalState(action.status as ActionStatus)) {
         throw new NotFoundError("ACTION_ALREADY_TERMINAL");
       }
       const updated = updateActionStatus(params.id, "cancelled");
@@ -275,7 +273,7 @@ export async function registerActionRoutes(app: FastifyInstance) {
     if (!action) throw new NotFoundError("ACTION_NOT_FOUND");
 
     // 只有非终态才能取消 — 复用 V3 isTerminalState
-    if (isTerminalState(action.status as any)) {
+    if (isTerminalState(action.status as ActionStatus)) {
       throw new NotFoundError("ACTION_ALREADY_TERMINAL");
     }
 

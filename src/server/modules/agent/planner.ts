@@ -61,7 +61,7 @@ const llmOutputSchema = z.object({
  * Auto-derived JSON Schema from Zod — used in the LLM prompt as a structured example.
  * Single source of truth: adding a field here automatically updates the prompt.
  */
-const llmPlanJsonSchema = JSON.stringify(zodToJsonSchema(llmOutputSchema as any), null, 2) as string;
+const llmPlanJsonSchema = JSON.stringify(zodToJsonSchema(llmOutputSchema as z.ZodType), null, 2) as string;
 
 export interface PlannerInput {
   traceId: string;
@@ -749,7 +749,6 @@ function buildIndoorBackupPlan(input: PlannerInput): ActivityPlan {
   const budget = userBudget ?? 300; // Default budget, never override user's explicit value
   const indoor = candidates.activities.find((item) => item.indoor);
   const restaurant = candidates.restaurants[0];
-  const cafe = candidates.cafes[0] ?? candidates.cafes[1];
   const optionId = createId("option_indoor");
   const startTime = resolveStartTime(intent);
   const startMin = timeToMinutes(startTime);
