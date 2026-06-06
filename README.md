@@ -1,8 +1,8 @@
-# 🗺️ PlanningGo
+# 🗺️ 周末去哪儿
 
 > **AI 驱动的本地生活周末规划 Agent — 一句话生成可执行的周末计划**
 
-![PlanningGo Screenshot](public/design/01.png)
+![周末去哪儿 Screenshot](public/design/01.png)
 
 ![Local Life](https://img.shields.io/badge/Local%20Life-Weekend%20Planning-ffcc33?style=for-the-badge&labelColor=111213)
 ![AI Agent](https://img.shields.io/badge/AI%20Agent-Plan%20%26%20Execute-111213?style=for-the-badge&labelColor=ffcc33)
@@ -16,7 +16,7 @@
 
 ## 📖 项目简介
 
-**PlanningGo** 是一个面向本地生活的周末活动规划 Agent。它不只是给你推荐地点，而是把「想去哪、和谁去、预算多少、天气如何、要不要排队、能不能预订、怎么分享给家人朋友」这些麻烦事串成一条**可执行的计划**。
+**周末去哪儿** 是一个面向本地生活的周末活动规划 Agent。它不只是给你推荐地点，而是把「想去哪、和谁去、预算多少、天气如何、要不要排队、能不能预订、怎么分享给家人朋友」这些麻烦事串成一条**可执行的计划**。
 
 你只需要输入一句话，它会帮你拆解需求、生成多套方案、处理约束、给出路线、提醒授权边界，并把最终计划变成可以执行和分享的周末安排。
 
@@ -231,7 +231,7 @@ npm run dev       # 终端 2
 
 ## 🎮 演示模式
 
-PlanningGo 支持演示模式，方便在比赛、演示或测试场景中快速展示核心功能。
+周末去哪儿 支持演示模式，方便在比赛、演示或测试场景中快速展示核心功能。
 
 ### 启用演示模式
 
@@ -448,7 +448,7 @@ npm run smoke:all
 ## 📁 项目结构
 
 ```
-PlanningGo/
+周末去哪儿/
 ├── src/
 │   ├── components/        # React 组件
 │   │   ├── RealMap/       # 地图组件（OSM + AMap）
