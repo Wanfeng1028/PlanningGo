@@ -62,7 +62,7 @@ const llmOutputSchema = z.object({
  * Auto-derived JSON Schema from Zod — used in the LLM prompt as a structured example.
  * Single source of truth: adding a field here automatically updates the prompt.
  */
-const llmPlanJsonSchema = JSON.stringify(zodToJsonSchema(llmOutputSchema.unsafeRefine(() => true)), null, 2) as string;
+const llmPlanJsonSchema = JSON.stringify(zodToJsonSchema(llmOutputSchema), null, 2) as string;
 
 export interface PlannerInput {
   traceId: string;

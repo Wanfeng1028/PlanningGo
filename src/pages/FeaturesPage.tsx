@@ -1499,11 +1499,11 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
           if (currentSessionIdRef.current) {
             const newStatus = (result.status as string) || "done";
             updateSessionMessages(currentSessionIdRef.current, (prev) =>
-              prev.map((msg) => {
+                prev.map((msg) => {
                 if (!msg.actions) return msg;
                 return {
                   ...msg,
-                  actions: msg.actions.map((a) =>
+                  actions: msg.actions.map((a: PlanningExecutableAction) =>
                     a.id === action.id ? { ...a, status: newStatus } : a
                   ),
                 };
@@ -1816,7 +1816,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
         case "分享给同行人": {
           const plan = messages.flatMap((m) => (m.role === "assistant" && "plans" in m ? m.plans ?? [] : [])).find((p) => p.id === selectedPlanId);
           const title = plan?.title ?? "周末出行计划";
-          const text = plan?.timeline.map((t) => `${t.startTime}–${t.endTime} ${t.title}`).join("\n") || title;
+          const text = plan?.timeline.map((t: { startTime: string; endTime: string; title: string }) => `${t.startTime}–${t.endTime} ${t.title}`).join("\n") || title;
           if (navigator.share) {
             navigator.share({ title: "周末去哪儿", text }).catch(() => {});
           } else {
@@ -1974,7 +1974,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
                 <div>我先整理时间、预算、同行人和位置。</div>
                 {msg.chips && (
                   <div className={styles.thinkingChips}>
-                    {msg.chips.map((c) => (
+                    {msg.chips.map((c: string) => (
                       <span key={c} className={styles.thinkingChip}>
                         {c}
                       </span>
@@ -2040,10 +2040,10 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
                 {/* Plan cards with embedded action chips */}
                 {msg.plans && msg.plans.length > 0 && (
                   <div className={styles.planCards}>
-                    {msg.plans.map((plan) => {
+                    {msg.plans.map((plan: PlanningOption) => {
                       // Group actions by planId for this plan
                       const planActions = (msg.actions || []).filter(
-                        (a) => a.planId === plan.id
+                        (a: PlanningExecutableAction) => a.planId === plan.id
                       );
                       return (
                         <PlanCardView
@@ -2074,7 +2074,7 @@ export default function FeaturesPage({ user, onOpenModal, onNavigate, location, 
                 {/* Next action chips for plan_selected messages */}
                 {msg.nextActions && msg.nextActions.length > 0 && (
                   <div className={styles.planSelectedActions}>
-                    {msg.nextActions.map((action) => (
+                    {msg.nextActions.map((action: NextActionItem) => (
                       <button
                         key={action.key}
                         className={styles.planSelectedChip}
