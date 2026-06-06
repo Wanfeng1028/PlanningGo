@@ -45,7 +45,7 @@ describe("createHandoffCode", () => {
       userId: "user-1",
     });
 
-    expect(result.code).toHaveLength(6);
+    expect(result.code).toHaveLength(10);
     expect(result.continueUrl).toContain("/handoff/");
     expect(result.continueUrl).toContain(result.code);
     expect(result.qrSvg).toBe("<svg>mock-qr</svg>");
@@ -98,7 +98,7 @@ describe("createHandoffCode", () => {
     expect(result.continueUrl).not.toContain("accessToken");
     expect(result.continueUrl).not.toContain("refreshToken");
     // Only contains the short code
-    expect(result.continueUrl).toMatch(/^http:\/\/localhost:5173\/handoff\/[A-Z0-9]{6}$/);
+    expect(result.continueUrl).toMatch(/^http:\/\/localhost:5173\/handoff\/[A-Z0-9]{10}$/);
   });
 
   it("should handle optional planId", async () => {
