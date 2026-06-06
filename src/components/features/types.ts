@@ -2,11 +2,11 @@
  * @fileoverview Shared types for plan card view, chat messages, and related components.
  */
 
-import type { PlanningOption, PlanningExecutableAction } from "../../lib/api";
+import type { PlanningOption, PlanningExecutableAction, PlanningAction } from "../../lib/api";
 import type { AgentTraceEvent } from "../../shared/agentResponse";
 
 /* ── Re-export API types used by extracted feature components ── */
-export type { PlanningOption, PlanningExecutableAction };
+export type { PlanningOption, PlanningExecutableAction, PlanningAction };
 
 // ── Plan Card Types ─────────────────────────────────────────
 

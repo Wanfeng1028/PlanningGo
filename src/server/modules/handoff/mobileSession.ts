@@ -55,7 +55,7 @@ export async function upsertDeviceSession(params: {
       },
     });
 
-    return { sessionId: existing.id };
+    return { sessionId: existing.id as string };
   }
 
   // Create new session
@@ -73,7 +73,7 @@ export async function upsertDeviceSession(params: {
     },
   });
 
-  return { sessionId: session.id };
+  return { sessionId: session.id as string };
 }
 
 /**
@@ -99,13 +99,13 @@ export async function getDeviceSession(sessionId: string): Promise<{
   }
 
   return {
-    userId: session.userId || undefined,
-    guestId: session.guestId || undefined,
-    deviceType: session.deviceType,
-    platform: session.platform,
-    lastCity: session.lastCity || undefined,
-    lastLat: session.lastLat || undefined,
-    lastLng: session.lastLng || undefined,
+    userId: (session.userId as string) || undefined,
+    guestId: (session.guestId as string) || undefined,
+    deviceType: session.deviceType as string,
+    platform: session.platform as string,
+    lastCity: (session.lastCity as string) || undefined,
+    lastLat: (session.lastLat as number) || undefined,
+    lastLng: (session.lastLng as number) || undefined,
   };
 }
 
