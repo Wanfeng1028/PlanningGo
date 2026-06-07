@@ -2,7 +2,9 @@
 
 > **AI 驱动的本地生活周末规划 Agent — 一句话生成可执行的周末计划**
 
-![周末去哪儿 Screenshot](public/design/01.png)
+<div align="center">
+  <video src="planninggo-browser-full-demo-20260608.mp4" controls width="800" max-width="100%"></video>
+</div>
 
 ![Local Life](https://img.shields.io/badge/Local%20Life-Weekend%20Planning-ffcc33?style=for-the-badge&labelColor=111213)
 ![AI Agent](https://img.shields.io/badge/AI%20Agent-Plan%20%26%20Execute-111213?style=for-the-badge&labelColor=ffcc33)
