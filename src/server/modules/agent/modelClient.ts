@@ -110,6 +110,14 @@ function buildProviderList(): ProviderConfig[] {
       proModel: env.LONGCAT_PRO_MODEL ?? "longcat-chat",
       capability: { streaming: true, toolCalling: false, jsonMode: true, maxToolRounds: 0 },
     },
+    {
+      name: "custom",
+      apiKey: env.CUSTOM_API_KEY,
+      baseURL: env.CUSTOM_BASE_URL,
+      flashModel: env.CUSTOM_MODEL ?? "gpt-4o",
+      proModel: env.CUSTOM_MODEL ?? "gpt-4o",
+      capability: defaultCap,
+    },
   ];
 }
 

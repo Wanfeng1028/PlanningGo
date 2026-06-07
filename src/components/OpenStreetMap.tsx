@@ -12,6 +12,7 @@ L.Icon.Default.mergeOptions({
 });
 
 export interface OpenStreetMapProps {
+  /** 地图中心点，保持和高德组件一致：[lng, lat] */
   center?: [number, number];
   city?: string;
   onMarkerClick?: (marker: L.Marker) => void;
@@ -21,6 +22,7 @@ type MapPoi = {
   id: string;
   name: string;
   address?: string;
+  /** 统一保存为 [lng, lat]，渲染到 Leaflet 前再转换 */
   location: [number, number];
   type: string;
   distance?: number;
@@ -30,6 +32,41 @@ type MapPoi = {
 const DEFAULT_CENTER: [number, number] = [121.4379, 31.0339];
 const STANDARD_TILE = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 const SATELLITE_TILE = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+
+function isValidLngLat(point: [number, number] | undefined): point is [number, number] {
+  return !!point
+    && Number.isFinite(point[0])
+    && Number.isFinite(point[1])
+    && Math.abs(point[0]) <= 180
+    && Math.abs(point[1]) <= 90;
+}
+
+function normalizeLngLat(point: [number, number] | undefined): [number, number] {
+  return isValidLngLat(point) ? point : DEFAULT_CENTER;
+}
+
+function toLeafletLatLng(point: [number, number]): [number, number] {
+  return [point[1], point[0]];
+}
+
+function buildFallbackPois(center: [number, number], targetCity: string): MapPoi[] {
+  const [lng, lat] = center;
+  const cityLabel = targetCity || "当前城市";
+  return [
+    { id: "open-fallback-park", name: `${cityLabel}城市公园`, type: "公园 / 休闲", offset: [0.006, 0.003], distance: 680 },
+    { id: "open-fallback-cafe", name: `${cityLabel}附近咖啡`, type: "咖啡 / 休息", offset: [-0.004, 0.004], distance: 520 },
+    { id: "open-fallback-food", name: `${cityLabel}本地餐厅`, type: "餐厅 / 美食", offset: [0.003, -0.005], distance: 760 },
+    { id: "open-fallback-metro", name: `${cityLabel}交通站点`, type: "交通 / 出行", offset: [-0.006, -0.003], distance: 840 },
+  ].map((item) => ({
+    id: item.id,
+    name: item.name,
+    type: item.type,
+    distance: item.distance,
+    source: "open" as const,
+    address: "开源地图周边服务暂不可用，已展示可交互演示点",
+    location: [lng + item.offset[0], lat + item.offset[1]] as [number, number],
+  }));
+}
 
 function toMapPois(items: NearbyPoi[], fallbackType: string): MapPoi[] {
   return items
@@ -46,7 +83,8 @@ function toMapPois(items: NearbyPoi[], fallbackType: string): MapPoi[] {
     }));
 }
 
-export function OpenStreetMap({ center = DEFAULT_CENTER, city = "上海", onMarkerClick }: OpenStreetMapProps) {
+export function OpenStreetMap({ center: rawCenter = DEFAULT_CENTER, city = "上海", onMarkerClick }: OpenStreetMapProps) {
+  const center = normalizeLngLat(rawCenter);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
@@ -86,7 +124,7 @@ export function OpenStreetMap({ center = DEFAULT_CENTER, city = "上海", onMark
     if (!map) return;
     clearPoiMarkers();
     const markers = pois.map((poi) => {
-      const marker = L.marker(poi.location, { title: poi.name });
+      const marker = L.marker(toLeafletLatLng(poi.location), { title: poi.name });
       marker.bindPopup(`<b>${poi.name}</b><br/>${poi.type}${poi.address ? `<br/>${poi.address}` : ""}`);
       marker.on("click", () => onMarkerClickRef.current?.(marker));
       marker.addTo(map);
@@ -107,12 +145,15 @@ export function OpenStreetMap({ center = DEFAULT_CENTER, city = "上海", onMark
         provider: "open",
       });
       const pois = toMapPois(result.pois, "周边地点");
-      setPoiList(pois);
-      setPoiMessage(result.hint ?? result.warnings?.[0] ?? null);
-      renderPoiMarkers(pois);
+      const visiblePois = pois.length > 0 ? pois : buildFallbackPois(targetCenter, targetCity);
+      setPoiList(visiblePois);
+      setPoiMessage(pois.length > 0 ? (result.hint ?? result.warnings?.[0] ?? null) : "开源周边服务暂未返回数据，已显示可交互演示点。");
+      renderPoiMarkers(visiblePois);
     } catch {
-      setPoiList([]);
-      setPoiMessage("周边服务暂不可用，请稍后重试。");
+      const fallbackPois = buildFallbackPois(targetCenter, targetCity);
+      setPoiList(fallbackPois);
+      setPoiMessage("开源周边服务暂不可用，已显示可交互演示点。");
+      renderPoiMarkers(fallbackPois);
     } finally {
       setPoiLoading(false);
     }
@@ -140,7 +181,7 @@ export function OpenStreetMap({ center = DEFAULT_CENTER, city = "上海", onMark
       setPoiList(pois);
       setPoiMessage(result.hint ?? result.warnings?.[0] ?? null);
       renderPoiMarkers(pois);
-      if (pois[0] && mapRef.current) mapRef.current.setView(pois[0].location, 15);
+      if (pois[0] && mapRef.current) mapRef.current.setView(toLeafletLatLng(pois[0].location), 15);
     } catch {
       setPoiList([]);
       setPoiMessage("搜索失败，请稍后重试。");
@@ -181,7 +222,7 @@ export function OpenStreetMap({ center = DEFAULT_CENTER, city = "上海", onMark
 
     try {
       const map = L.map(mapEl, {
-        center,
+        center: toLeafletLatLng(center),
         zoom: 15,
         zoomControl: false,
         touchZoom: true,
@@ -202,7 +243,7 @@ export function OpenStreetMap({ center = DEFAULT_CENTER, city = "上海", onMark
         maxZoom: 19,
       });
       tileLayers.current = { standard, satellite };
-      userMarkerRef.current = L.marker(center, { title: "你的位置" }).bindPopup("你的位置").addTo(map);
+      userMarkerRef.current = L.marker(toLeafletLatLng(center), { title: "你的位置" }).bindPopup("你的位置").addTo(map);
       setTimeout(() => {
         if (!destroyed) map.invalidateSize();
       }, 100);
@@ -228,11 +269,12 @@ export function OpenStreetMap({ center = DEFAULT_CENTER, city = "上海", onMark
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    centerRef.current = center;
+    const nextCenter = normalizeLngLat(center);
+    centerRef.current = nextCenter;
     cityRef.current = city;
-    map.setView(center, map.getZoom());
-    userMarkerRef.current?.setLatLng(center);
-    void loadNearbyPois(center, city);
+    map.setView(toLeafletLatLng(nextCenter), map.getZoom());
+    userMarkerRef.current?.setLatLng(toLeafletLatLng(nextCenter));
+    void loadNearbyPois(nextCenter, city);
   }, [center, city, loadNearbyPois]);
 
   const handleStyleChange = useCallback((style: "standard" | "satellite") => {
@@ -295,7 +337,7 @@ export function OpenStreetMap({ center = DEFAULT_CENTER, city = "上海", onMark
         {routeMessage && <p className={styles.poiStatus}>{routeMessage}</p>}
         <div className={styles.poiList}>
           {poiList.map((poi, index) => (
-            <button key={`${poi.id}-${index}`} className={styles.poiItem} type="button" onClick={() => mapRef.current?.setView(poi.location, 17)}>
+            <button key={`${poi.id}-${index}`} className={styles.poiItem} type="button" onClick={() => mapRef.current?.setView(toLeafletLatLng(poi.location), 17)}>
               <span className={styles.poiIcon}>点</span>
               <div className={styles.poiInfo}>
                 <span className={styles.poiName}>{poi.name}</span>

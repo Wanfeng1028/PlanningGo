@@ -25,6 +25,8 @@ import {
   Calendar,
   Globe,
   Smartphone,
+  Key,
+  Server,
 } from "lucide-react";
 import { Button } from "../components/Button";
 import { RevealGroup } from "../components/RevealGroup";
@@ -83,7 +85,7 @@ import styles from "./ProfilePage.module.scss";
 
 // ── Tab definitions ──
 
-type TabKey = "persona" | "memory" | "companion" | "history" | "notifications" | "privacy" | "developer" | "account";
+type TabKey = "persona" | "memory" | "companion" | "history" | "notifications" | "privacy" | "developer" | "account" | "llm";
 
 interface TabDef {
   key: TabKey;
@@ -101,6 +103,7 @@ const TABS: TabDef[] = [
   { key: "privacy", label: "隐私与安全", icon: Shield },
   { key: "developer", label: "开发者模式", icon: Code2, guestHidden: true },
   { key: "account", label: "账号管理", icon: Settings },
+  { key: "llm", label: "LLM 设置", icon: Server, guestHidden: true },
 ];
 
 // ── Category labels ──
@@ -192,6 +195,14 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
   const [passwordForm, setPasswordForm] = useState({ current: "", next: "", confirm: "" });
   const [showPasswords, setShowPasswords] = useState(false);
 
+  // ── LLM 设置 ──
+  const [llmForm, setLlmForm] = useState({
+    apiKey: "",
+    baseUrl: "https://api.openai.com/v1",
+    model: "",
+  });
+  const [showLlmKey, setShowLlmKey] = useState(false);
+
   const { toast, show, dismiss } = useGlassToast();
   const [confirmDialog, setConfirmDialog] = useState<{ title: string; desc: string; onConfirm: () => void } | null>(null);
 
@@ -278,6 +289,20 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
 
   useEffect(() => {
     fetchAll();
+    // 从 localStorage 加载 LLM 配置
+    try {
+      const saved = localStorage.getItem("pg_llm_config");
+      if (saved) {
+        const config = JSON.parse(saved);
+        setLlmForm({
+          apiKey: config.apiKey || "",
+          baseUrl: config.baseUrl || "https://api.openai.com/v1",
+          model: config.model || "",
+        });
+      }
+    } catch {
+      // ignore
+    }
   }, [fetchAll]);
 
   // ── Dev data (lazy load on tab switch) ──
@@ -538,6 +563,24 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
       show("密码已修改");
     } catch {
       show("修改失败");
+    }
+  };
+
+  const handleSaveLlmConfig = async () => {
+    if (!llmForm.apiKey.trim()) {
+      show("API Key 不能为空");
+      return;
+    }
+    try {
+      // 保存到 localStorage 作为本地配置
+      localStorage.setItem("pg_llm_config", JSON.stringify({
+        apiKey: llmForm.apiKey,
+        baseUrl: llmForm.baseUrl,
+        model: llmForm.model,
+      }));
+      show("LLM 配置已保存");
+    } catch {
+      show("保存失败");
     }
   };
 
@@ -1407,6 +1450,70 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
     </RevealGroup>
   );
 
+  const renderLlm = () => (
+    <RevealGroup>
+      <div className={styles.tabHeader}>
+        <h2 className={styles.tabTitle}>LLM 设置</h2>
+        <p className={styles.tabDesc}>配置自定义 LLM API，支持任意 OpenAI 兼容接口</p>
+      </div>
+
+      <div className={styles.glassCard}>
+        <h3 className={styles.glassCardTitle}>API 配置</h3>
+        <div className={styles.fieldGroup} style={{ marginBottom: 16 }}>
+          <label className={styles.fieldLabel}>API Key</label>
+          <div style={{ position: "relative" }}>
+            <input
+              className={styles.fieldInput}
+              type={showLlmKey ? "text" : "password"}
+              value={llmForm.apiKey}
+              onChange={(e) => setLlmForm({ ...llmForm, apiKey: e.target.value })}
+              placeholder="sk-xxxxxxxxxxxxxxxx"
+              style={{ paddingRight: 40 }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowLlmKey(!showLlmKey)}
+              style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--color-text-secondary)" }}
+            >
+              {showLlmKey ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+        </div>
+        <div className={styles.fieldGroup} style={{ marginBottom: 16 }}>
+          <label className={styles.fieldLabel}>Base URL</label>
+          <input
+            className={styles.fieldInput}
+            value={llmForm.baseUrl}
+            onChange={(e) => setLlmForm({ ...llmForm, baseUrl: e.target.value })}
+            placeholder="https://api.openai.com/v1"
+          />
+        </div>
+        <div className={styles.fieldGroup}>
+          <label className={styles.fieldLabel}>模型名称（可选）</label>
+          <input
+            className={styles.fieldInput}
+            value={llmForm.model}
+            onChange={(e) => setLlmForm({ ...llmForm, model: e.target.value })}
+            placeholder="gpt-4o 或自定义模型名"
+          />
+        </div>
+        <div className={styles.saveRow} style={{ marginTop: 24 }}>
+          <Button onClick={handleSaveLlmConfig}>保存配置</Button>
+        </div>
+      </div>
+
+      <div className={styles.glassCard}>
+        <h3 className={styles.glassCardTitle}>使用说明</h3>
+        <div style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.7 }}>
+          <p style={{ margin: "0 0 8px" }}>• 支持任意 OpenAI 兼容格式的 LLM 服务</p>
+          <p style={{ margin: "0 0 8px" }}>• 配置将保存在浏览器本地，不会上传到服务器</p>
+          <p style={{ margin: "0 0 8px" }}>• 常见支持的服务：Azure OpenAI、LocalAI、Ollama、vLLM 等</p>
+          <p style={{ margin: 0 }}>• Base URL 需包含 /v1 路径</p>
+        </div>
+      </div>
+    </RevealGroup>
+  );
+
   const tabRenderers: Record<TabKey, () => React.ReactNode> = {
     persona: renderPersona,
     memory: renderMemory,
@@ -1416,6 +1523,7 @@ export function ProfilePage({ user, onOpenModal, onLogout }: ProfilePageProps) {
     privacy: renderPrivacy,
     developer: renderDeveloper,
     account: renderAccount,
+    llm: renderLlm,
   };
 
   // ── Main render ──

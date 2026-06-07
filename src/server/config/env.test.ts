@@ -91,6 +91,7 @@ const baseProdEnv = {
   GROK_API_KEY: undefined,
   GROK_BASE_URL: "https://api.x.ai",
   GROK_MODEL: undefined,
+  CUSTOM_BASE_URL: "https://api.openai.com/v1",
   AMAP_WEB_SERVICE_KEY: "test-key",
   AMAP_BASE_URL: "https://restapi.amap.com",
   AMAP_TIMEOUT_MS: 5000,

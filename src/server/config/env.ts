@@ -167,6 +167,11 @@ const envSchema = z.object({
     .default("false")
     .transform((v) => v === "true"),
 
+  // ── 自定义 LLM（可选，OpenAI 兼容接口）──
+  CUSTOM_API_KEY: z.string().optional(),
+  CUSTOM_BASE_URL: z.string().url().default("https://api.openai.com/v1"),
+  CUSTOM_MODEL: z.string().optional(),
+
   // ── 演示模式 ──
   DEMO_MODE: z
     .string()
@@ -256,7 +261,8 @@ function hasAnyLlmKeyLocal(input: typeof env): boolean {
     input.MIMO_API_KEY ||
     input.LONGCAT_API_KEY ||
     input.CLAUDE_API_KEY ||
-    input.GROK_API_KEY,
+    input.GROK_API_KEY ||
+    input.CUSTOM_API_KEY,
   );
 }
 
