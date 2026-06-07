@@ -16,3 +16,4 @@ nul
 /src/generated/prisma
 .qwen/
 logs/
+.kunsdd/
