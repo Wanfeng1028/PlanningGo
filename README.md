@@ -3,7 +3,7 @@
 > **AI 驱动的本地生活周末规划 Agent — 一句话生成可执行的周末计划**
 
 <div align="center">
-  <video src="planninggo-browser-full-demo-20260608.mp4" controls width="800" max-width="100%"></video>
+  <video src="https://raw.githubusercontent.com/Wanfeng1028/PlanningGo/main/public/planninggo-demo.mp4" controls width="800" max-width="100%"></video>
 </div>
 
 ![Local Life](https://img.shields.io/badge/Local%20Life-Weekend%20Planning-ffcc33?style=for-the-badge&labelColor=111213)
