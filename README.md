@@ -3,7 +3,7 @@
 > **AI 驱动的本地生活周末规划 Agent — 一句话生成可执行的周末计划**
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/Wanfeng1028/PlanningGo/main/public/design/01.png" alt="周末去哪儿 Screenshot" width="800" />
+  <img src="https://raw.githubusercontent.com/Wanfeng1028/PlanningGo/main/public/design/demo.gif" alt="周末去哪儿 Demo" width="800" />
   <br/>
   <a href="https://github.com/Wanfeng1028/PlanningGo/blob/main/public/planninggo-demo.mp4">🎬 查看完整演示视频 (MP4)</a>
 </div>
