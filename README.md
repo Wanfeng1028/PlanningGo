@@ -3,7 +3,9 @@
 > **AI 驱动的本地生活周末规划 Agent — 一句话生成可执行的周末计划**
 
 <div align="center">
-  <video src="https://raw.githubusercontent.com/Wanfeng1028/PlanningGo/main/public/planninggo-demo.mp4" controls width="800" max-width="100%"></video>
+  <img src="https://raw.githubusercontent.com/Wanfeng1028/PlanningGo/main/public/design/01.png" alt="周末去哪儿 Screenshot" width="800" />
+  <br/>
+  <a href="https://github.com/Wanfeng1028/PlanningGo/blob/main/public/planninggo-demo.mp4">🎬 查看完整演示视频 (MP4)</a>
 </div>
 
 ![Local Life](https://img.shields.io/badge/Local%20Life-Weekend%20Planning-ffcc33?style=for-the-badge&labelColor=111213)
@@ -137,47 +139,144 @@ npm run dev       # 终端 2
 
 ## 🏗️ 技术栈
 
+### 前端
+
+| 技术 | 版本 | 用途 |
+| --- | --- | --- |
+| React | 19.2 | UI 框架（函数组件 + Hooks） |
+| TypeScript | 5.9 | 类型安全 |
+| Vite | 8.0 | 构建工具 |
+| SCSS + CSS Modules | sass 1.94 | 样式系统（不使用 Tailwind） |
+| Framer Motion | 12.23 | 页面过渡 + 元素动画 |
+| Leaflet | 1.9 | 开源地图（OSM 瓦片） |
+| 高德 JS API | @amap/amap-jsapi-loader | 可选地图引擎 |
+| Lucide React | 0.555 | 图标库 |
+| marked | 18.0 | Markdown 渲染（AI 回复） |
+| Zod | 4.4 | 运行时 schema 校验 |
+| DOMPurify | 3.4 | XSS 防护 |
+| qrcode | 1.5 | QR 码生成（移动端接续） |
+
+**15 个页面**：HomePage · FeaturesPage · FlowPage · CasesPage · DesignReviewPage · DevelopersPage · ProfilePage · ProfileGatePage · HandoffPage · AuthModal · Modal · BottomTabs · NavBar · RealMap · RouteMap
+
+### 后端
+
+| 技术 | 版本 | 用途 |
+| --- | --- | --- |
+| Fastify | 5.8 | 高性能 Node.js 框架 |
+| Prisma | 7.8 | 类型安全 ORM |
+| PostgreSQL | 16 | 主数据库（40+ 模型） |
+| Redis | 7 | 会话/缓存（ioredis 5.10） |
+| JWT | jsonwebtoken 9.0 | Access + Refresh Token |
+| bcryptjs | 3.0 | 密码哈希 |
+| Helmet | @fastify/helmet 13 | HTTP 安全头（CSP/X-Frame） |
+| CORS | @fastify/cors 11 | 跨域 |
+| Rate Limit | @fastify/rate-limit 10 | 请求限流 |
+| Pino | 10.3 | 结构化日志 |
+
+**23 个路由** · **6 个 Fastify 插件** · **16 个公共工具**
+
+### AI / Agent 架构
+
+#### 多 LLM Provider 路由（12 个）
+
+| Provider | 环境变量 | Tool Calling | 说明 |
+| --- | --- | --- | --- |
+| OpenAI | `OPENAI_API_KEY` | ✅ | 默认首选 |
+| Qwen 通义千问 | `QWEN_API_KEY` | ✅ | 阿里云 DashScope |
+| DeepSeek | `DEEPSEEK_API_KEY` | ✅ | |
+| Moonshot | `MOONSHOT_API_KEY` | ✅ | |
+| Groq | `GROQ_API_KEY` | ✅ | |
+| Gemini | `GEMINI_API_KEY` | ✅ | OpenAI 兼容端点 |
+| 豆包 Doubao | `DOUBAO_API_KEY` | ❌ | Volcengine |
+| MiMo 小米 | `MIMO_API_KEY` | ✅ | 推荐生产用 |
+| LongCat 美团 | `LONGCAT_API_KEY` | ❌ | |
+| Claude | `CLAUDE_API_KEY` | ✅ | Anthropic（adapter） |
+| Grok | `GROK_API_KEY` | ✅ | xAI（adapter） |
+| Custom | `CUSTOM_API_KEY` | ✅ | 自定义 OpenAI 兼容 |
+
+**路由策略**：`LLM_PROVIDER_PRIORITY` 指定优先级，`auto` 自动检测有 Key 的 Provider；Flash/Pro 双模型模式；支持流式/非流式/Tool Calling
+
+#### Agent Pipeline（主流程）
+
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        前端 (React + Vite)                   │
-│  React 19 · TypeScript · SCSS/CSS Modules · Framer Motion   │
-│  Leaflet · Lucide Icons · Zod Validation                     │
-├─────────────────────────────────────────────────────────────┤
-│                        后端 (Fastify)                        │
-│  Fastify 5 · Prisma ORM · PostgreSQL · Redis · JWT Auth     │
-├─────────────────────────────────────────────────────────────┤
-│                      AI / Agent 层                           │
-│  LLM Provider 多路由 (MiMo / Qwen / DeepSeek)               │
-│  AMap API · OpenStreetMap · 意图解析 · 工具编排              │
-├─────────────────────────────────────────────────────────────┤
-│                      部署 & 运维                             │
-│  Docker Compose · PM2 · Nginx · Sentry 错误追踪              │
-└─────────────────────────────────────────────────────────────┘
+intent → context → candidates → score → plan → enrich → route → validate → repair → suggestions → actions
 ```
+
+| 模块 | 职责 |
+| --- | --- |
+| **意图解析** | 从自然语言提取时间/预算/同行人/城市/偏好 |
+| **上下文构建** | 聚合用户画像 + 天气数据 + 安全策略 |
+| **候选生成** | 并行调用工具生成候选 POI 池 |
+| **方案生成** | 基于候选池生成多个可执行方案 |
+| **方案修复** | 时间窗/完整链路/无座/预算冲突修复 |
+| **对话路由** | Agent Chat 交互（rule/llm 双模式） |
+
+#### 中间件护栏（5 个）
+
+| 中间件 | 职责 |
+| --- | --- |
+| 城市约束 | 确保所有工具调用和输出在目标城市内 |
+| 工具预算 | Flash/Pro 模式控制调用次数/轮数/延迟 |
+| 输出安全 | 检查输出是否混入其他城市信息 |
+| 权限控制 | 自动执行前检查用户授权范围 |
+| 追踪 | TraceId 注入 |
+
+#### 工具系统
+
+| 类别 | 工具 |
+| --- | --- |
+| **AMAP 工具** | POI 搜索 · 路线规划 · 天气查询 · 地理编码 · 响应缓存 |
+| **内部工具** | 用户记忆管理 · 用户画像 · 预约查询 |
+| **动作工具** | 导航 · 日历 · 分享 · 预约 · 咖啡下单 · 餐厅预约 · 打车深链 · 美团搜索 · 大众点评搜索 · 电话预约 |
+
+#### 执行引擎
+
+**状态机**：`proposed → quoted → prepared → waiting_user_confirm → redirect_required → redirected_to_payment → waiting_external_confirm → external_confirmed → executing → succeeded / ics_generated`
+
+**5 个执行提供者**：预约 · 日历 · Mock · 导航 · 分享
+
+#### 移动端接续
+
+QR 码生成 · SHA256 接续令牌（TTL 可配置，默认 300s） · 桌面/手机会话同步
+
+#### 可观测性
+
+工具调用日志 · LLM 调用日志 · 用户事件日志 · 客户端/服务端错误日志
+
+### 部署 & 运维
+
+| 技术 | 说明 |
+| --- | --- |
+| Docker Compose | 开发/生产双配置，内部网络隔离 |
+| Dockerfile | 多阶段构建（node:20-alpine），安全用户 UID 1001 |
+| PM2 + Nginx | 生产进程管理 + SSL 终止 + API 反代 |
+| Vitest | 单元测试（3.2） |
+| Playwright | E2E 测试（1.60，Chromium） |
+| autocannon | HTTP 负载测试 |
 
 ---
 
 ## 📐 架构概览
 
-### Agent 执行流程
+### Agent Pipeline 执行流程
 
 ```
-用户输入 → 意图解析 → 工具编排 → 方案生成 → 授权执行 → 分享协作
-   │           │          │          │           │           │
-   ▼          ▼          ▼          ▼           ▼           ▼
- "带娃半天   提取时间/   并行查询   多方案      导航/日历    生成分享
-  预算300"    预算/偏好   POI/天气   评分排序    分享链接    链接 & 投票
+用户输入 → 意图解析 → 上下文构建 → 候选生成 → 方案生成 → 方案修复 → 授权执行 → 分享协作
+   │         │          │           │          │          │          │          │
+   ▼         ▼          ▼           ▼          ▼          ▼          ▼          ▼
+ "带娃半天  提取时间/   用户画像+   并行查询   多方案      无座/预算   导航/日历   生成分享
+  预算300"   预算/偏好   天气+策略   POI/天气   评分排序    冲突修复    分享链接   链接 & 投票
 ```
 
 ### 核心模块
 
 <details>
-<summary><b>🔧 工具层 (Tools Layer)</b></summary>
+<summary><b>🔧 工具系统 (Tools System)</b></summary>
 
-- **工具注册中心**：统一管理所有工具（AMap、内部工具等）
-- **工具执行器**：支持并行工具调用，带预算控制和超时管理
-- **地图集成**：POI 搜索、路线规划、天气查询、地理编码
-- **内部工具**：用户画像、记忆管理、预约查询
+- **工具注册中心**：按名称注册/检索，按风险级别过滤（read/write/external_action），每个工具定义 name/description/riskLevel/budgetCost/timeoutMs/inputSchema/outputSchema/execute
+- **AMAP 工具**：POI 搜索 · 路线规划 · 天气查询 · 地理编码 · 响应缓存
+- **内部工具**：用户记忆管理 · 用户画像 · 预约查询
+- **动作工具**：导航 · 日历 · 分享 · 预约 · 咖啡下单 · 餐厅预约 · 打车深链 · 美团搜索 · 大众点评搜索 · 电话预约
 
 </details>
 
@@ -185,28 +284,31 @@ npm run dev       # 终端 2
 <summary><b>🛡️ 中间件护栏 (Middleware Guards)</b></summary>
 
 - **城市约束**：确保所有工具调用和输出都在目标城市内
-- **工具预算**：Flash/Pro 模式自动控制工具调用次数和延迟
+- **工具预算**：Flash/Pro 模式自动控制工具调用次数、轮数和延迟
 - **输出安全**：检查最终方案是否混入其他城市信息
 - **权限控制**：自动执行前检查用户授权范围
+- **追踪**：TraceId 注入
 
 </details>
 
 <details>
 <summary><b>🤖 Agent Runtime</b></summary>
 
-- **意图解析**：从自然语言中提取时间、预算、同行人、偏好
-- **上下文构建**：聚合用户画像、环境数据和安全策略
-- **工具编排**：并行调用工具生成候选 POI 池
+- **意图解析**：从自然语言中提取时间、预算、同行人、城市、偏好
+- **上下文构建**：聚合用户画像、环境数据（天气）和安全策略
+- **候选生成**：并行调用工具生成候选 POI 池
 - **方案生成**：基于候选池生成多个可执行方案
+- **方案修复**：时间窗/完整链路/无座/预算冲突修复
+- **对话路由**：Agent Chat 交互（rule/llm 双模式）
 
 </details>
 
 <details>
-<summary><b>⚡ 自动执行引擎 (Execution Engine)</b></summary>
+<summary><b>⚡ 执行引擎 (Execution Engine)</b></summary>
 
-- **状态机**：`proposed → prepared → waiting_authorization → authorized → executing → succeeded/failed`
+- **状态机**：`proposed → quoted → prepared → waiting_user_confirm → redirect_required → redirected_to_payment → waiting_external_confirm → external_confirmed → executing → succeeded / ics_generated`
 - **幂等性**：每个动作都有 idempotencyKey，防止重复执行
-- **执行提供者**：导航、日历、分享、预约等外部服务集成
+- **5 个执行提供者**：预约 · 日历 · Mock · 导航 · 分享
 
 </details>
 
@@ -214,7 +316,7 @@ npm run dev       # 终端 2
 <summary><b>📱 移动端接续 (Mobile Handoff)</b></summary>
 
 - **QR 码生成**：桌面端生成方案后显示二维码
-- **接续令牌**：安全的令牌机制，5 分钟有效期
+- **接续令牌**：SHA256 哈希，TTL 可配置（默认 300s）
 - **会话同步**：桌面端和手机端共享同一方案和执行状态
 
 </details>
@@ -226,6 +328,24 @@ npm run dev       # 终端 2
 - **LLM 调用日志**：记录 LLM 调用的 token 使用、延迟、状态
 - **用户事件日志**：记录用户行为和页面访问
 - **错误日志**：记录客户端和服务器端错误
+
+</details>
+
+<details>
+<summary><b>🗺️ 地图集成 (Maps Integration)</b></summary>
+
+- **Leaflet + OSM**：开源地图，支持瓦片/搜索/逆地理/路线规划
+- **高德地图**：POI 搜索 · 路线规划 · 天气查询 · 地理编码
+- **地图切换器**：支持 OpenStreetMap 和高德地图双引擎切换
+
+</details>
+
+<details>
+<summary><b>🔌 外部服务连接器 (Connectors)</b></summary>
+
+- **AMap Connector**：高德地图服务
+- **Calendar Connector**：日历事件创建
+- **Meituan Connector**：美团预约/搜索（OAuth）
 
 </details>
 
@@ -448,6 +568,8 @@ npm run test:e2e
 npm run smoke:all
 ```
 
+> **454 tests passing** — 覆盖 Agent 意图解析、中间件护栏、执行引擎、AMAP 连接器、手接续、认证服务等核心模块
+
 ---
 
 ## 📁 项目结构
@@ -455,23 +577,81 @@ npm run smoke:all
 ```
 周末去哪儿/
 ├── src/
-│   ├── components/        # React 组件
-│   │   ├── RealMap/       # 地图组件（OSM + AMap）
-│   │   ├── MapSelector/   # 地图切换器
+│   ├── components/              # React 组件
+│   │   ├── features/            # 功能组件（PlanCardView/Composer/ErrorCard/ExternalServicePanel/...）
+│   │   ├── AuthModal.tsx        # 认证弹窗
+│   │   ├── BottomTabs.tsx       # 移动端底部导航
+│   │   ├── MapSelector.tsx      # 地图切换器
+│   │   ├── NavBar.tsx           # 桌面端顶部导航
+│   │   ├── RealMap.tsx          # 地图组件（OSM + AMap）
+│   │   ├── RouteMap.tsx         # 路线地图
 │   │   └── ...
-│   ├── pages/             # 页面组件
-│   │   ├── HomePage/
-│   │   ├── FeaturesPage/
-│   │   └── ...
-│   ├── server/            # Fastify 后端
-│   │   ├── modules/       # 业务模块
-│   │   ├── plugins/       # Fastify 插件
-│   │   └── routes/        # API 路由
-│   └── lib/               # 工具库
-├── prisma/                # 数据库 Schema & 迁移
-├── public/                # 静态资源
-├── docker-compose.prod.yml
-└── DESIGN.md              # 设计系统规范
+│   ├── pages/                   # 页面组件（15 个）
+│   │   ├── HomePage/            # 首页
+│   │   ├── FeaturesPage/        # 规划工作台
+│   │   ├── FlowPage/            # 流程页
+│   │   ├── CasesPage/           # 场景案例
+│   │   ├── DesignReviewPage/    # 设计评审
+│   │   ├── DevelopersPage/      # 开发者中心
+│   │   ├── ProfilePage/         # 个人中心
+│   │   ├── ProfileGatePage/     # 画像设置
+│   │   └── HandoffPage/         # 移动端接续
+│   ├── server/                  # Fastify 后端
+│   │   ├── modules/             # 业务模块
+│   │   │   ├── agent/           # Agent 核心（意图解析/编排/工具/对话）
+│   │   │   │   └── middleware/  # 5 个中间件护栏
+│   │   │   ├── connectors/      # 外部服务连接器（AMap/Calendar/Meituan）
+│   │   │   │   ├── amap/
+│   │   │   │   ├── calendar/
+│   │   │   │   └── meituan/
+│   │   │   ├── execution/       # 执行引擎（状态机/动作/提供者）
+│   │   │   │   └── providers/   # 5 个执行提供者
+│   │   │   ├── handoff/         # 移动端接续（QR/令牌/会话）
+│   │   │   ├── maps/            # 地图统一接口
+│   │   │   ├── observability/   # 可观测性（工具/LLM/事件日志）
+│   │   │   ├── planning/        # 规划引擎（候选/评分/校验/修复）
+│   │   │   ├── suggestions/     # 推荐引擎
+│   │   │   └── tools/           # 工具系统
+│   │   │       ├── amap/        # AMap 工具（POI/路线/天气/地理编码）
+│   │   │       └── internal/    # 内部工具（记忆/画像/预约）
+│   │   ├── plugins/             # Fastify 插件（6 个）
+│   │   ├── providers/           # Provider 适配器（10 个）
+│   │   ├── repositories/        # 数据访问层
+│   │   ├── routes/              # API 路由（23 个）
+│   │   ├── services/            # 业务服务
+│   │   ├── common/              # 公共工具（16 个）
+│   │   ├── config/              # 配置（env.ts）
+│   │   ├── data/                # 数据文件
+│   │   ├── app.ts               # Fastify 应用构建
+│   │   ├── index.ts             # 入口
+│   │   ├── routes.ts            # 路由注册
+│   │   └── types.ts             # 类型定义
+│   ├── shared/                  # 前后端共享
+│   ├── styles/                  # 全局样式（global.scss + _glass.scss）
+│   ├── lib/                     # 前端工具库（12 个）
+│   ├── data/                    # 静态数据
+│   ├── generated/               # Prisma 生成代码
+│   ├── App.tsx
+│   ├── main.tsx
+│   └── types.ts
+├── prisma/                      # 数据库 Schema & 迁移（40+ 模型）
+│   ├── schema.prisma
+│   ├── migrations/
+│   └── seed.ts
+├── public/                      # 静态资源
+├── scripts/                     # 运维脚本
+├── tests/                       # E2E 测试
+├── DESIGN.md                    # 设计系统规范
+├── DEMO_SCRIPT.md               # 演示脚本
+├── FEATURES_PAGE_FIXES.md       # 功能页修复记录
+├── docker-compose.yml           # 开发 Docker
+├── docker-compose.prod.yml      # 生产 Docker
+├── Dockerfile                   # 生产镜像
+├── playwright.config.ts         # E2E 配置
+├── prisma.config.ts             # Prisma 配置
+├── eslint.config.js             # ESLint 配置
+├── .env.example                 # 环境变量模板（80+ 配置项）
+└── package.json
 ```
 
 ---
