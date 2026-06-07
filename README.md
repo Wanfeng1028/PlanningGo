@@ -8,13 +8,15 @@
   <a href="https://github.com/Wanfeng1028/PlanningGo/blob/main/public/planninggo-demo.mp4">🎬 查看完整演示视频 (MP4)</a>
 </div>
 
-![Local Life](https://img.shields.io/badge/Local%20Life-Weekend%20Planning-ffcc33?style=for-the-badge&labelColor=111213)
-![AI Agent](https://img.shields.io/badge/AI%20Agent-Plan%20%26%20Execute-111213?style=for-the-badge&labelColor=ffcc33)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.9-%233178C6?style=for-the-badge&logo=typescript&logoColor=white)
-![React](https://img.shields.io/badge/React-19-%2361DAFB?style=for-the-badge&logo=react&logoColor=black)
-![Fastify](https://img.shields.io/badge/Fastify-5.8-%23000000?style=for-the-badge&logo=fastify&logoColor=white)
-![Status](https://img.shields.io/badge/Status-Demo%20Ready-27ae60?style=for-the-badge)
-![Tests](https://img.shields.io/badge/Tests-454%20passing-3b7f8f?style=for-the-badge)
+<div align="center">
+  ![Local Life](https://img.shields.io/badge/Local%20Life-Weekend%20Planning-ffcc33?style=for-the-badge&labelColor=111213)
+  ![AI Agent](https://img.shields.io/badge/AI%20Agent-Plan%20%26%20Execute-111213?style=for-the-badge&labelColor=ffcc33)
+  ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-%233178C6?style=for-the-badge&logo=typescript&logoColor=white)
+  ![React](https://img.shields.io/badge/React-19-%2361DAFB?style=for-the-badge&logo=react&logoColor=black)
+  ![Fastify](https://img.shields.io/badge/Fastify-5.8-%23000000?style=for-the-badge&logo=fastify&logoColor=white)
+  ![Status](https://img.shields.io/badge/Status-Demo%20Ready-27ae60?style=for-the-badge)
+  ![Tests](https://img.shields.io/badge/Tests-454%20passing-3b7f8f?style=for-the-badge)
+</div>
 
 ---
 
